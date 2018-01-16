@@ -9,6 +9,6 @@ void kernel_main(void) {
 	vga_writes("Starting up...\n");
 	vga_writes("Detecting floppy disks...\n")
 	floppy_detect();
-	vga_writes("Disabling NMI...\n");
-	NMI_disable();
+	vga_writes("Enabling NMI...\n");
+	NMI_enable();
 }
