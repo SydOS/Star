@@ -1,12 +1,10 @@
-#if !defined(__cplusplus)
-#include <stdbool.h>
-#endif
-#include <stddef.h>
-#include <stdint.h>
-
 #include "main.h"
+#include "vga.h"
+#include "floppy.h"
 
 void kernel_main(void) {
 	vga_initialize();
 	vga_writes("SydOS Pre-Alpha\n");
+	vga_writes("Starting up...\n");
+	floppy_detect();
 }
