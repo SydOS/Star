@@ -1,5 +1,5 @@
 #include "main.h"
-#include "vga.h"
+#include "driver/vga.h"
 #include "io.h"
 
 void floppy_detect() {

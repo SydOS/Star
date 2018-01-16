@@ -1,6 +1,6 @@
 #include "main.h"
-#include "vga.h"
-#include "floppy.h"
+#include "driver/vga.h"
+#include "driver/floppy.h"
 
 void kernel_main(void) {
 	vga_initialize();

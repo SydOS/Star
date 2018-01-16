@@ -1,5 +1,5 @@
 #include "main.h"
-#include "pic.h"
+#include "driver/pic.h"
 #include "io.h"
 
 void PIC_sendEOI(unsigned char irq) {
