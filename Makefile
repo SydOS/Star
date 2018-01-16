@@ -1,7 +1,7 @@
 CFLAGS?=-std=gnu99 -ffreestanding -O2 -Wall -Wextra -I./include
 
 all:
-	i686-elf-as boot.asm -o boot.o
+	nasm -felf32 boot.asm -o boot.o
 
 	i686-elf-gcc -c main.c -o main.o $(CFLAGS)
 	i686-elf-gcc -c vga.c -o vga.o $(CFLAGS)
