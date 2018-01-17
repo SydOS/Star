@@ -8,7 +8,7 @@ all:
 	i686-elf-gcc -c src/main.c -o main.o $(CFLAGS)
 	i686-elf-gcc -c driver/vga.c -o vga.o $(CFLAGS)
 	i686-elf-gcc -c driver/floppy.c -o floppy.o $(CFLAGS)
-	i686-elf-gcc -c driver/pic.c -o pic.o $(CFLAGS)
+	i686-elf-gcc -c driver/pic/pic.c -o pic.o $(CFLAGS)
 	i686-elf-gcc -c driver/nmi.c -o nmi.o $(CFLAGS)
 
 	i686-elf-gcc -T linker.ld -o sydos.bin -ffreestanding -O2 -nostdlib *.o -lgcc
