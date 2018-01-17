@@ -1,18 +1,14 @@
 #include "main.h"
 #include "driver/vga.h"
 #include "driver/floppy.h"
-#include "drivers/nmi.h"
-
-void enable_a20();
+#include "driver/nmi.h"
 
 void kernel_main(void) {
 	vga_initialize();
 	vga_writes("SydOS Pre-Alpha\n");
 	vga_writes("Starting up...\n");
-	vga_writes("Detecting floppy disks...\n")
+	vga_writes("Detecting floppy disks...\n");
 	floppy_detect();
 	vga_writes("Enabling NMI...\n");
 	NMI_enable();
-
-	enable_a20();
 }
