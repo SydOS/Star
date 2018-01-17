@@ -47,6 +47,7 @@ void vga_putchar(char c) {
 	if (c == '\n') {
 		terminal_column = 0;
 		terminal_row++;
+		return;
 	} else {
 		vga_putentryat(c, terminal_color, terminal_column, terminal_row);
 	}
