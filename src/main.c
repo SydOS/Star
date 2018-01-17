@@ -2,6 +2,7 @@
 #include "driver/vga.h"
 #include "driver/floppy.h"
 #include "driver/nmi.h"
+#include "driver/pic.h"
 
 extern void enable_A20();
 
@@ -27,6 +28,9 @@ void kernel_main(void) {
     } else {
     	vga_writes("A20 line detection returned invalid result!\n");
     }
+
+    vga_writes("Setting up PIC...\n");
+    PIC_remap(0x20, 0x28);
 
 	vga_writes("HALTING CPU...\n");
 }
