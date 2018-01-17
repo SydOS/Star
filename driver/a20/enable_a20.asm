@@ -1,6 +1,7 @@
 [bits 32]
 [section .text]
  
+global enable_A20
 enable_A20:
         cli
  
