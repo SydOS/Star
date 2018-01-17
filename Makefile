@@ -4,6 +4,7 @@ all:
 	nasm -felf32 src/boot.asm -o boot.o
 	nasm -felf32 driver/a20/check_a20.asm -o check_a20.o
 	nasm -felf32 driver/a20/enable_a20.asm -o enable_a20.o
+	nasm -felf32 driver/pic/disable.asm -o pic_disable.o
 
 	i686-elf-gcc -c src/main.c -o main.o $(CFLAGS)
 	i686-elf-gcc -c driver/vga.c -o vga.o $(CFLAGS)
