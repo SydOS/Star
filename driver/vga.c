@@ -1,4 +1,5 @@
 #include "main.h"
+#include "driver/vga.h"
 
 static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) {
 	return fg | bg << 4;
@@ -39,11 +40,18 @@ void vga_setcolor(uint8_t color) {
 
 void vga_putentryat(char c, uint8_t color, size_t x, size_t y) {
 	const size_t index = y * VGA_WIDTH + x;
-	terminal_buffer[index] = vga_entry(c, color)
+	terminal_buffer[index] = vga_entry(c, color);
 }
 
 void vga_putchar(char c) {
-	vga_putentryat(c, terminal_color, terminal_column, terminal_row);
+	if (c == '\n') {
+		terminal_column = 0;
+		terminal_row++;
+		return;
+	} else {
+		vga_putentryat(c, terminal_color, terminal_column, terminal_row);
+	}
+
 	if (++terminal_column == VGA_WIDTH) {
 		terminal_column = 0;
 		if (++terminal_row == VGA_HEIGHT) {
@@ -59,5 +67,5 @@ void vga_write(const char* data, size_t size) {
 }
 
 void vga_writes(const char* data) {
-	terminal_write(data, strlen(data));
+	vga_write(data, strlen(data));
 }

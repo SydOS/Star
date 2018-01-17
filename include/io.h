@@ -11,3 +11,11 @@ static inline uint8_t inb(uint16_t port)
                    : "Nd"(port) );
     return ret;
 }
+
+static inline void io_wait(void)
+{
+    /* TODO: This is probably fragile. */
+    asm volatile ( "jmp 1f\n\t"
+                   "1:jmp 2f\n\t"
+                   "2:" );
+}
