@@ -1,3 +1,4 @@
+#include "main.h"
 #include "io.h"
 
 void NMI_enable() {
