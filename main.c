@@ -3,6 +3,8 @@
 #include "driver/floppy.h"
 #include "drivers/nmi.h"
 
+void enable_a20();
+
 void kernel_main(void) {
 	vga_initialize();
 	vga_writes("SydOS Pre-Alpha\n");
@@ -11,4 +13,6 @@ void kernel_main(void) {
 	floppy_detect();
 	vga_writes("Enabling NMI...\n");
 	NMI_enable();
+
+	enable_a20();
 }
