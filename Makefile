@@ -1,4 +1,4 @@
-CFLAGS?=-std=gnu99 -ffreestanding -O2 -Wall -Wextra -I./include
+CFLAGS?=-std=gnu99 -ffreestanding -O3 -Wall -Wextra -I./include
 
 all:
 	nasm -felf32 boot.asm -o boot.o
