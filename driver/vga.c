@@ -116,7 +116,7 @@ void vga_writes(const char* data) {
 }
 
 /**
- * Set the color of the terminal
+ * Publically accessable function to the color of the terminal
  * @param fg Foreground color from vga_color struct
  * @param bg Background color from vga_color struct
  */
