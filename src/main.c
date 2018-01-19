@@ -38,14 +38,15 @@ void kernel_main(void) {
 	vga_writes("Initializing IDT...\n");
 	idt_init();
 
-	vga_writes("Detecting floppy disks...\n");
-	floppy_detect();
-
 	vga_writes("Enabling NMI...\n");
 	NMI_enable();
 
+	// TODO: Setup exceptions in our IDT table
+
     vga_writes("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
+
+    // TODO: Setup PIT
 
     vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 	vga_writes("HALTING CPU...\n");
