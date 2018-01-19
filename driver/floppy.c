@@ -2,6 +2,9 @@
 #include "driver/vga.h"
 #include "io.h"
 
+/**
+ * Temporary function to detect floppy disks in drives
+ */
 void floppy_detect() {
 	unsigned char a, b, c;
 	outb(0x70, 0x10);
