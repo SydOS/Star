@@ -17,15 +17,6 @@ void kernel_main(void) {
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	vga_writes("Initializing GDT...\n");
-	gdt_init();
-
-	vga_writes("Detecting floppy disks...\n");
-	floppy_detect();
-
-	vga_writes("Enabling NMI...\n");
-	NMI_enable();
-
 	vga_writes("Checking A20 line...\n");
 	int AX;
 	asm( "movl $0, %0"
@@ -39,6 +30,15 @@ void kernel_main(void) {
     } else {
     	vga_writes("A20 line detection returned invalid result!\n");
     }
+
+	vga_writes("Initializing GDT...\n");
+	gdt_init();
+
+	vga_writes("Detecting floppy disks...\n");
+	floppy_detect();
+
+	vga_writes("Enabling NMI...\n");
+	NMI_enable();
 
     vga_writes("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
