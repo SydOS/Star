@@ -2,6 +2,10 @@
 #include "driver/pic.h"
 #include "io.h"
 
+/**
+ * Send end of interrupt command to PIC
+ * @param irq IRQ interrupt ID
+ */
 void PIC_sendEOI(unsigned char irq) {
 	if(irq >= 8) {
 		outb(PIC2_COMMAND, PIC_EOI);
@@ -10,11 +14,11 @@ void PIC_sendEOI(unsigned char irq) {
 	outb(PIC1_COMMAND, PIC_EOI);
 }
 
-/*
-	offset1: vector offset for master PIC
-		vectors on the master become offset1...offset1+7
-	offset2: same for slave PIC: offset2...offset2+7
-*/
+/**
+ * Remaps the PIC to certain ports
+ * @param offset1 Vector offset for master PIC (offset1...offset1+7)
+ * @param offset2 Vector offset for slave PIC (offset2...offset2+7)
+ */
 void PIC_remap(int offset1, int offset2) {
 	unsigned char a1, a2;
 
