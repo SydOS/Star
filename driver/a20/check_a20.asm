@@ -9,8 +9,8 @@
 ; Returns: 0 in ax if the a20 line is disabled (memory wraps around)
 ;          1 in ax if the a20 line is enabled (memory does not wrap around)
  
-global check_a20
-check_a20:
+global _check_a20
+_check_a20:
     pushf
     push ds
     push es

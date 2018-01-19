@@ -1,8 +1,8 @@
 [bits 32]
 [section .text]
  
-global enable_A20
-enable_A20:
+global _enable_A20
+_enable_A20:
         cli
  
         call    a20wait
