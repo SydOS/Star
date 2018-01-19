@@ -4,6 +4,7 @@
 #include "driver/floppy.h"
 #include "driver/nmi.h"
 #include "driver/pic.h"
+#include "driver/idt.h"
 
 extern void _enable_A20();
 
@@ -33,6 +34,9 @@ void kernel_main(void) {
 
 	vga_writes("Initializing GDT...\n");
 	gdt_init();
+
+	vga_writes("Initializing IDT...\n");
+	idt_init();
 
 	vga_writes("Detecting floppy disks...\n");
 	floppy_detect();
