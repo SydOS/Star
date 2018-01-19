@@ -6,6 +6,9 @@
 
 extern void enable_A20();
 
+/**
+ * The main function for the kernel, called from boot.asm
+ */
 void kernel_main(void) {
 	vga_initialize();
 	vga_writes("SydOS Pre-Alpha\n");
