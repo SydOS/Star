@@ -1,4 +1,5 @@
 #include "main.h"
+#include "driver/gdt.h"
 #include "driver/vga.h"
 #include "driver/floppy.h"
 #include "driver/nmi.h"
@@ -11,8 +12,12 @@ extern void enable_A20();
  */
 void kernel_main(void) {
 	vga_initialize();
-	vga_writes("SydOS Pre-Alpha\n");
-	vga_writes("Starting up...\n");
+	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
+	vga_writes("   _____           _  ____   _____ \n  / ____|         | |/ __ \\ / ____|\n | (___  _   _  __| | |  | | (___  \n  \\___ \\| | | |/ _` | |  | |\\___ \\ \n  ____) | |_| | (_| | |__| |____) |\n |_____/ \\__, |\\__,_|\\____/|_____/ \n          __/ |                    \n         |___/                     \n");
+	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	vga_writes("Initializing GDT...\n");
+	gdt_init();
 	vga_writes("Detecting floppy disks...\n");
 	floppy_detect();
 	vga_writes("Enabling NMI...\n");
@@ -35,5 +40,6 @@ void kernel_main(void) {
     vga_writes("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
+    vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 	vga_writes("HALTING CPU...\n");
 }

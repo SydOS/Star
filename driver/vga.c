@@ -59,7 +59,7 @@ void vga_initialize(void) {
  * Set the framebuffer color for next write based on internally generated color
  * @param color An internally generated color from vga_entry_color
  */
-void vga_setcolor(uint8_t color) {
+void vga_internal_setcolor(uint8_t color) {
 	terminal_color = color;
 }
 
@@ -113,4 +113,13 @@ void vga_write(const char* data, size_t size) {
  */
 void vga_writes(const char* data) {
 	vga_write(data, strlen(data));
+}
+
+/**
+ * Set the color of the terminal
+ * @param fg Foreground color from vga_color struct
+ * @param bg Background color from vga_color struct
+ */
+void vga_setcolor(enum vga_color fg, enum vga_color bg) {
+	terminal_color = vga_entry_color(fg, bg);
 }

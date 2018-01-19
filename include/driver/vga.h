@@ -22,3 +22,4 @@ static const size_t VGA_HEIGHT = 25;
 
 extern void vga_initialize(void);
 extern void vga_writes(const char* data);
+extern void vga_setcolor(enum vga_color fg, enum vga_color bg);
