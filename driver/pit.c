@@ -79,7 +79,7 @@ static inline void __pit_send_data(uint16_t data, uint8_t counter)
  * @param  counter PIT counter port to read from
  * @return         A byte of data
  */
-static inline uint8_t __pit_read_data (uint16_t counter) {
+static inline uint8_t __pit_read_data(uint16_t counter) {
 
 	uint8_t	port = (counter==PIT_OCW_COUNTER_0) ? PIT_REG_COUNTER0 :
 		((counter==PIT_OCW_COUNTER_1) ? PIT_REG_COUNTER1 : PIT_REG_COUNTER2);
