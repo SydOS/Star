@@ -18,6 +18,11 @@ void __idt_test_handler();
 #define INT_END asm volatile("popa"); \
 	asm volatile("iret");
 
+/**
+ * Register interrupt in IDT table at specific index
+ * @param i        uint8_t representing index number
+ * @param callback pointer to callback function
+ */
 void idt_register_interrupt(uint8_t i, uint32_t callback) {
 	if(!__idt_setup) {
 		vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
@@ -32,6 +37,9 @@ void idt_register_interrupt(uint8_t i, uint32_t callback) {
 	*(uint16_t*)(idt_location + 8*i + 6) = (uint16_t)((callback & 0xffff0000) >> 16);
 }
 
+/**
+ * Internal use stub for testing that IDT interrupts work
+ */
 void __idt_test_handler()
 {
 	INT_START;
@@ -39,6 +47,9 @@ void __idt_test_handler()
 	INT_END;
 }
 
+/**
+ * IDT table initialization code, should only be run once!
+ */
 void idt_init() {
 	__idt_setup = 1;
 
