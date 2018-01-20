@@ -1,4 +1,5 @@
 #include "main.h"
+#include "tools.h"
 #include "driver/gdt.h"
 #include "driver/vga.h"
 #include "driver/floppy.h"
@@ -27,6 +28,16 @@ void kernel_main(void) {
 	vga_writes("          __/ |                    \n");
 	vga_writes("         |___/                     \n");
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
+	
+	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+	char kernbase[32], kernend[32];
+	itoa((uint32_t)&kernel_base, kernbase, 16);
+	itoa((uint32_t)&kernel_end, kernend, 16);
+	vga_writes("Kernel start: 0x");
+	vga_writes(kernbase);
+	vga_writes(" | Kernel end: 0x");
+	vga_writes(kernend);
+	vga_writes("\n");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	vga_writes("Checking A20 line...\n");
