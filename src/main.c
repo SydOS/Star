@@ -14,7 +14,14 @@ extern void _enable_A20();
 void kernel_main(void) {
 	vga_initialize();
 	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-	vga_writes("   _____           _  ____   _____ \n  / ____|         | |/ __ \\ / ____|\n | (___  _   _  __| | |  | | (___  \n  \\___ \\| | | |/ _` | |  | |\\___ \\ \n  ____) | |_| | (_| | |__| |____) |\n |_____/ \\__, |\\__,_|\\____/|_____/ \n          __/ |                    \n         |___/                     \n");
+	vga_writes("   _____           _  ____   _____ \n");
+	vga_writes("  / ____|         | |/ __ \\ / ____|\n");
+	vga_writes(" | (___  _   _  __| | |  | | (___  \n");
+	vga_writes("  \\___ \\| | | |/ _` | |  | |\\___ \\ \n");
+	vga_writes("  ____) | |_| | (_| | |__| |____) |\n");
+	vga_writes(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
+	vga_writes("          __/ |                    \n");
+	vga_writes("         |___/                     \n");
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
