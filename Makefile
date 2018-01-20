@@ -14,6 +14,7 @@ all:
 	i686-elf-gcc -c driver/pic/pic.c -o pic.o $(CFLAGS)
 	i686-elf-gcc -c driver/gdt/gdt.c -o gdt.o $(CFLAGS)
 	i686-elf-gcc -c driver/idt/idt.c -o idt.o $(CFLAGS)
+	i686-elf-gcc -c driver/pit.c -o pit.o $(CFLAGS)
 	i686-elf-gcc -c driver/nmi.c -o nmi.o $(CFLAGS)
 
 	i686-elf-gcc -T linker.ld -o sydos.bin -ffreestanding -O2 -nostdlib *.o -lgcc

@@ -5,6 +5,7 @@
 #include "driver/nmi.h"
 #include "driver/pic.h"
 #include "driver/idt.h"
+#include "driver/pit.h"
 
 extern void _enable_A20();
 
@@ -52,6 +53,9 @@ void kernel_main(void) {
 
     vga_writes("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
+
+    vga_writes("Setting up PIT...\n");
+    //pit_init();
 
     // TODO: Setup PIT
 
