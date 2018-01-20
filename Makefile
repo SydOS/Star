@@ -21,7 +21,7 @@ all:
 
 	rm -rf *.o
 
-	qemu-system-x86_64 -kernel sydos.bin -fda DISK1.IMA
+	qemu-system-x86_64 -kernel sydos.bin -fda DISK1.IMA -m 512M
 
 clean:
 	rm -rf *.o *.bin
