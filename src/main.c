@@ -57,8 +57,6 @@ void kernel_main(void) {
     vga_writes("Setting up PIT...\n");
     pit_init();
 
-    // TODO: Setup PIT
-
     vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 	vga_writes("HALTING CPU...\n");
 }
