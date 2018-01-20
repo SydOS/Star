@@ -54,7 +54,7 @@ void kernel_main(void) {
     vga_writes("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
-    vga_writes("Setting up PIT...\n");
+    //vga_writes("Setting up PIT...\n");
     //pit_init();
 
     // TODO: Setup PIT
