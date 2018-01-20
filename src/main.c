@@ -7,6 +7,9 @@
 #include "driver/idt.h"
 #include "driver/pit.h"
 
+extern uint32_t kernel_end;
+extern uint32_t kernel_base;
+
 extern void _enable_A20();
 
 /**
