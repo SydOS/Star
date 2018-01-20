@@ -74,7 +74,7 @@ void idt_init() {
 
 	if(!test_success) {
 		vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-		vga_writes("IDT test timed out!");
+		vga_writes("IDT test timed out!\n");
 		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	}
 }
