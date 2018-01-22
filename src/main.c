@@ -8,9 +8,19 @@
 #include "driver/idt.h"
 #include "driver/pit.h"
 
+/**
+ * Kernel's ending address in RAM
+ */
 extern uint32_t kernel_end;
+/**
+ * Kernel's starting address in RAM
+ */
 extern uint32_t kernel_base;
 
+/**
+ * Function in enable_a20.asm to enable the A20 line.
+ * This should be moved to a header file :(
+ */
 extern void _enable_A20();
 
 /**
