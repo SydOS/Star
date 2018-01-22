@@ -9,10 +9,14 @@ static uint8_t __idt_setup = 0;
 static uint8_t test_success = 0;
 static uint32_t test_timeout = 0x1000;
 
+/**
+ * Set the Interrupt Descriptor Table Register (IDTR)
+ */
 extern void _set_idtr();
-
+/**
+ * Default (blank) handler for Interrupt Descriptor Table
+ */
 void __idt_default_handler();
-void __idt_test_handler();
 
 #define INT_START asm volatile("pusha");
 #define INT_END asm volatile("popa"); \
