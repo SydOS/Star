@@ -1,7 +1,13 @@
 #include <main.h>
 #include <driver/vga.h>
 
+/**
+ * Set GDT Register (GDTR)
+ */
 extern void _set_gdtr();
+/**
+ * Reload GDT segments
+ */
 extern void _reload_segments();
 
 static uint32_t gdt_pointer = 0x806;
