@@ -32,9 +32,21 @@ size_t strlen(const char* str) {
 	return len;
 }
 
+/**
+ * Current row position
+ */
 size_t terminal_row;
+/**
+ * Current column position
+ */
 size_t terminal_column;
+/**
+ * Current color, generated from vga_entry_color()
+ */
 uint8_t terminal_color;
+/**
+ * Pointer to RAM address where the framebuffer lives (0xB8000)
+ */
 uint16_t* terminal_buffer;
 
 /**
