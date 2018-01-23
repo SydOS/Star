@@ -24,18 +24,18 @@ void* memset (void * ptr, int value, size_t num )
 void memory_print_out()
 {
 	char temp1[32];
-	vga_writes("Memory used: 0x");
-	itoa((uint32_t)memory_used, temp1, 16);
+	vga_writes("Memory used: ");
+	itoa((uint32_t)memory_used, temp1, 10);
 	vga_writes(temp1);
 	vga_writes(" bytes\n");
 
-	vga_writes("Memory free: 0x");
-	itoa((uint32_t)heap_end - heap_begin - memory_used, temp1, 16);
+	vga_writes("Memory free: ");
+	itoa((uint32_t)heap_end - heap_begin - memory_used, temp1, 10);
 	vga_writes(temp1);
 	vga_writes(" bytes\n");
 
-	vga_writes("Heap size: 0x");
-	itoa((uint32_t)heap_end - heap_begin, temp1, 16);
+	vga_writes("Heap size: ");
+	itoa((uint32_t)heap_end - heap_begin, temp1, 10);
 	vga_writes(temp1);
 	vga_writes(" bytes\n");
 
