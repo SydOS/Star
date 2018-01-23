@@ -1,0 +1,142 @@
+#include <main.h>
+#include <tools.h>
+#include <driver/vga.h>
+#include <driver/memory.h>
+
+#define MAX_PAGE_ALIGNED_ALLOCS 32
+
+uint32_t last_alloc = 0;
+uint32_t heap_end = 0;
+uint32_t heap_begin = 0;
+uint32_t pheap_begin = 0;
+uint32_t pheap_end = 0;
+uint8_t *pheap_desc = 0;
+uint32_t memory_used = 0;
+
+void* memset (void * ptr, int value, size_t num )
+{
+	unsigned char* p=ptr;
+	while(num--)
+		*p++ = (unsigned char)value;
+	return ptr;
+}
+
+void memory_print_out()
+{
+	char temp1[32];
+	vga_writes("Memory used: 0x");
+	itoa((uint32_t)memory_used, temp1, 16);
+	vga_writes(temp1);
+	vga_writes(" bytes\n");
+
+	vga_writes("Memory free: 0x");
+	itoa((uint32_t)heap_end - heap_begin - memory_used, temp1, 16);
+	vga_writes(temp1);
+	vga_writes(" bytes\n");
+
+	vga_writes("Heap size: 0x");
+	itoa((uint32_t)heap_end - heap_begin, temp1, 16);
+	vga_writes(temp1);
+	vga_writes(" bytes\n");
+
+	vga_writes("Heap start: 0x");
+	itoa((uint32_t)heap_begin, temp1, 16);
+	vga_writes(temp1);
+	vga_writes("\n");
+
+	vga_writes("Heap end: 0x");
+	itoa((uint32_t)heap_end, temp1, 16);
+	vga_writes(temp1);
+	vga_writes("\n");
+
+	vga_writes("PHeap start: 0x");
+	itoa((uint32_t)pheap_begin, temp1, 16);
+	vga_writes(temp1);
+	vga_writes("\nPHeap end: 0x");
+	itoa((uint32_t)pheap_end, temp1, 16);
+	vga_writes(temp1);
+	vga_writes("\n");
+}
+
+void memory_init(uint32_t kernel_end) {
+	last_alloc = kernel_end + 0x1000;
+	heap_begin = last_alloc;
+	pheap_end = 0x400000;
+	pheap_begin = pheap_end - (MAX_PAGE_ALIGNED_ALLOCS * 4096);
+	heap_end = pheap_begin;
+	memset((char *)heap_begin, 0, heap_end - heap_begin);
+	pheap_desc = (uint8_t *)malloc(MAX_PAGE_ALIGNED_ALLOCS);
+}
+
+char* malloc(size_t size)
+{
+	if(!size) return 0;
+
+	/* Loop through blocks and find a block sized the same or bigger */
+	uint8_t *mem = (uint8_t *)heap_begin;
+	while((uint32_t)mem < last_alloc)
+	{
+		alloc_t *a = (alloc_t *)mem;
+		/* If the alloc has no size, we have reaced the end of allocation */
+		//mprint("mem=0x%x a={.status=%d, .size=%d}\n", mem, a->status, a->size);
+		if(!a->size)
+			goto nalloc;
+		/* If the alloc has a status of 1 (allocated), then add its size
+		 * and the sizeof alloc_t to the memory and continue looking.
+		 */
+		if(a->status) {
+			mem += a->size;
+			mem += sizeof(alloc_t);
+			mem += 4;
+			continue;
+		}
+		/* If the is not allocated, and its size is bigger or equal to the
+		 * requested size, then adjust its size, set status and return the location.
+		 */
+		if(a->size >= size)
+		{
+			/* Set to allocated */
+			a->status = 1;
+
+			//mprint("RE:Allocated %d bytes from 0x%x to 0x%x\n", size, mem + sizeof(alloc_t), mem + sizeof(alloc_t) + size);
+			memset(mem + sizeof(alloc_t), 0, size);
+			memory_used += size + sizeof(alloc_t);
+			return (char *)(mem + sizeof(alloc_t));
+		}
+		/* If it isn't allocated, but the size is not good, then
+		 * add its size and the sizeof alloc_t to the pointer and
+		 * continue;
+		 */
+		mem += a->size;
+		mem += sizeof(alloc_t);
+		mem += 4;
+	}
+
+	nalloc:;
+	if(last_alloc+size+sizeof(alloc_t) >= heap_end)
+	{
+		//set_task(0);
+		//panic("Cannot allocate %d bytes! Out of memory.\n", size);
+	}
+	alloc_t *alloc = (alloc_t *)last_alloc;
+	alloc->status = 1;
+	alloc->size = size;
+
+	last_alloc += size;
+	last_alloc += sizeof(alloc_t);
+	last_alloc += 4;
+	//mprint("Allocated %d bytes from 0x%x to 0x%x\n", size, (uint32_t)alloc + sizeof(alloc_t), last_alloc);
+	memory_used += size + 4 + sizeof(alloc_t);
+	memset((char *)((uint32_t)alloc + sizeof(alloc_t)), 0, size);
+	return (char *)((uint32_t)alloc + sizeof(alloc_t));
+/*
+	char* ret = (char*)last_alloc;
+	last_alloc += size;
+	if(last_alloc >= heap_end)
+	{
+		set_task(0);
+		panic("Cannot allocate %d bytes! Out of memory.\n", size);
+	}
+	mprint("Allocated %d bytes from 0x%x to 0x%x\n", size, ret, last_alloc);
+	return ret;*/
+}
