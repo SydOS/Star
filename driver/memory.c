@@ -167,9 +167,7 @@ char* pmalloc(size_t size)
 	{
 		if(pheap_desc[i]) continue;
 		pheap_desc[i] = 1;
-		mprint("PAllocated from 0x%x to 0x%x\n", pheap_begin + i*4096, pheap_begin + (i+1)*4096);
 		return (char *)(pheap_begin + i*4096);
 	}
-	mprint("pmalloc: FATAL: failure!\n");
 	return 0;
 }
