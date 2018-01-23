@@ -7,6 +7,7 @@
 #include "driver/pic.h"
 #include "driver/idt.h"
 #include "driver/pit.h"
+#include "driver/memory.h"
 
 /**
  * Kernel's ending address in RAM
@@ -48,6 +49,10 @@ void kernel_main(void) {
 	vga_writes(" | Kernel end: 0x");
 	vga_writes(kernend);
 	vga_writes("\n");
+
+	memory_init(&kernel_end);
+	memory_print_out();
+
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	vga_writes("Checking A20 line...\n");
