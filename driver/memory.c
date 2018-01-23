@@ -140,3 +140,36 @@ char* malloc(size_t size)
 	mprint("Allocated %d bytes from 0x%x to 0x%x\n", size, ret, last_alloc);
 	return ret;*/
 }
+
+void free(void *mem)
+{
+	alloc_t *alloc = (mem - sizeof(alloc_t));
+	memory_used -= alloc->size + sizeof(alloc_t);
+	alloc->status = 0;
+}
+
+void pfree(void *mem)
+{
+	if(mem < pheap_begin || mem > pheap_end) return;
+	/* Determine which page is it */
+	uint32_t ad = (uint32_t)mem;
+	ad -= pheap_begin;
+	ad /= 4096;
+	/* Now, ad has the id of the page */
+	pheap_desc[ad] = 0;
+	return;
+}
+
+char* pmalloc(size_t size)
+{
+	/* Loop through the avail_list */
+	for(int i = 0; i < MAX_PAGE_ALIGNED_ALLOCS; i++)
+	{
+		if(pheap_desc[i]) continue;
+		pheap_desc[i] = 1;
+		mprint("PAllocated from 0x%x to 0x%x\n", pheap_begin + i*4096, pheap_begin + (i+1)*4096);
+		return (char *)(pheap_begin + i*4096);
+	}
+	mprint("pmalloc: FATAL: failure!\n");
+	return 0;
+}
