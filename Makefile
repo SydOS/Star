@@ -20,6 +20,7 @@ all:
 	i686-elf-gcc -c driver/pit.c -o pit.o $(CFLAGS)
 	i686-elf-gcc -c driver/nmi.c -o nmi.o $(CFLAGS)
 	i686-elf-gcc -c driver/memory.c -o memory.o $(CFLAGS)
+	i686-elf-gcc -c driver/serial.c -o serial.o $(CFLAGS)
 
 	i686-elf-gcc -T linker.ld -o Star.kernel -ffreestanding -O2 -nostdlib *.o -lgcc
 
