@@ -108,8 +108,8 @@ void protected_mode_land() {
     log("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
-    log("Setting up PIT...\n");
-    pit_init();
+    //log("Setting up PIT...\n");
+    //pit_init();
     
     // Enable interrupts
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
@@ -119,7 +119,18 @@ void protected_mode_land() {
 
     paging_initialize();
 
-    vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-	log("HALTING CPU...\n");
-	for(;;) {}
+    vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
+	vga_writes("root@sydos ~: ");
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	for(;;) {
+		char c = serial_read();
+
+		if (c == '\r' || c == '\n') {
+			vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
+			vga_writes("\nroot@sydos ~: ");
+			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+		} else {
+			vga_putchar(c);
+		}
+	}
 }

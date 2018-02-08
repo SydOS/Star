@@ -29,7 +29,7 @@ all:
 
 	rm -rf *.o
 
-	qemu-system-x86_64 -kernel Star.kernel -m 32M -d guest_errors -fda DISK1.IMA -serial file:serial.log
+	qemu-system-x86_64 -kernel Star.kernel -m 32M -d guest_errors -fda DISK1.IMA
 
 
 clean:
