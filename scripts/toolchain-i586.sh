@@ -10,7 +10,7 @@ export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr
 export CLOOG_MIRROR_BASE=https://sydneyerickson.me/stuff
 
-export PATH=$HOME/SydKernel-toolchain:$PATH
+export PATH=$HOME/tools:$PATH
 
 function download_compile {
 	echo $1
