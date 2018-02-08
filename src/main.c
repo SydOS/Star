@@ -10,6 +10,7 @@
 #include "driver/memory.h"
 #include "driver/paging.h"
 #include "driver/serial.h"
+#include "driver/exceptions.h"
 
 #include "logging.h"
 
@@ -93,6 +94,9 @@ void kernel_main(void) {
 
 	log("Initializing IDT...\n");
 	idt_init();
+
+	log("Initializing exceptions handlers...\n");
+	exceptions_init();
 
 	log("Enabling NMI...\n");
 	NMI_enable();

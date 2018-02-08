@@ -23,6 +23,7 @@ all:
 	i686-elf-gcc -c driver/memory.c -o memory.o $(CFLAGS)
 	i686-elf-gcc -c driver/serial.c -o serial.o $(CFLAGS)
 	i686-elf-gcc -c driver/paging.c -o paging.o $(CFLAGS)
+	i686-elf-gcc -c driver/exceptions.c -o exceptions.o $(CFLAGS)
 
 	i686-elf-gcc -T linker.ld -o Star.kernel -ffreestanding -O2 -nostdlib *.o -lgcc
 	i686-elf-objcopy --only-keep-debug Star.kernel Star.sym
