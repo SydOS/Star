@@ -1,3 +1,5 @@
+set -e
+
 ./toolchain-i386.sh
 ./toolchain-i486.sh
 ./toolchain-i586.sh
