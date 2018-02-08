@@ -1,3 +1,6 @@
+#ifndef IO_H
+#define IO_H
+
 /**
  * Outputs a byte to the specified port
  * @param port uint16_t for the port address
@@ -32,3 +35,5 @@ static inline void io_wait(void)
                    "1:jmp 2f\n\t"
                    "2:" );
 }
+
+#endif
