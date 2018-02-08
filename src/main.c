@@ -65,42 +65,42 @@ void kernel_main(void) {
 	char kernbase[32], kernend[32];
 	itoa((uint32_t)&kernel_base, kernbase, 16);
 	itoa((uint32_t)&kernel_end, kernend, 16);
-	vga_writes("Kernel start: 0x");
-	vga_writes(kernbase);
-	vga_writes(" | Kernel end: 0x");
-	vga_writes(kernend);
-	vga_writes("\n");
+	log("Kernel start: 0x");
+	log(kernbase);
+	log(" | Kernel end: 0x");
+	log(kernend);
+	log("\n");
 
-	memory_init(&kernel_end);
+	memory_init((uint32_t)&kernel_end);
 	memory_print_out();
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	// -------------------------------------------------------------------------
 
-	vga_writes("Initializing GDT...\n");
+	log("Initializing GDT...\n");
 	gdt_init();
 
-	vga_writes("Initializing IDT...\n");
+	log("Initializing IDT...\n");
 	idt_init();
 
-	vga_writes("Enabling NMI...\n");
+	log("Enabling NMI...\n");
 	NMI_enable();
 
 	// TODO: Setup exceptions in our IDT table
 
-    vga_writes("Setting up PIC...\n");
+    log("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
-    //vga_writes("Setting up PIT...\n");
+    //log("Setting up PIT...\n");
     //pit_init();
     
     // Enable interrupts
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
     asm volatile("sti");
-    vga_writes("INTERRUPTS ARE ENABLED\n");
+    log("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
     vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-	vga_writes("HALTING CPU...\n");
+	log("HALTING CPU...\n");
 }
