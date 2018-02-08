@@ -8,7 +8,7 @@ export GCC_VERSION=7.2.0
 
 export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr
-export CLOOG_MIRROR_BASE=https://www.bastoul.net/cloog/pages/download/count.php3?url=./
+export CLOOG_MIRROR_BASE=https://syd.sh/stuff
 
 export PATH=$HOME/tools:$PATH
 
