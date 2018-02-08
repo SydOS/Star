@@ -1,3 +1,6 @@
+#ifndef VGA_H
+#define VGA_H
+
 enum vga_color {
 	VGA_COLOR_BLACK = 0,
 	VGA_COLOR_BLUE = 1,
@@ -23,3 +26,5 @@ static const size_t VGA_HEIGHT = 25;
 extern void vga_initialize(void);
 extern void vga_writes(const char* data);
 extern void vga_setcolor(enum vga_color fg, enum vga_color bg);
+
+#endif

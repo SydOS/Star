@@ -1,4 +1,5 @@
 #include "main.h"
+#include "tools.h"
 #include "driver/gdt.h"
 #include "driver/vga.h"
 #include "driver/floppy.h"
@@ -6,16 +7,31 @@
 #include "driver/pic.h"
 #include "driver/idt.h"
 #include "driver/pit.h"
+#include "driver/memory.h"
+#include "driver/paging.h"
 
+#include "logging.h"
+
+/**
+ * Kernel's ending address in RAM
+ */
 extern uint32_t kernel_end;
+/**
+ * Kernel's starting address in RAM
+ */
 extern uint32_t kernel_base;
 
+/**
+ * Function in enable_a20.asm to enable the A20 line.
+ * This should be moved to a header file :(
+ */
 extern void _enable_A20();
 
 /**
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main(void) {
+	serial_initialize();
 	vga_initialize();
 	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
 	vga_writes("   _____           _  ____   _____ \n");
@@ -27,7 +43,11 @@ void kernel_main(void) {
 	vga_writes("          __/ |                    \n");
 	vga_writes("         |___/                     \n");
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	
+	// -------------------------------------------------------------------------
+	// MEMORY RELATED STUFF
+
+	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 
 	vga_writes("Checking A20 line...\n");
 	int AX;
@@ -43,25 +63,47 @@ void kernel_main(void) {
     	vga_writes("A20 line detection returned invalid result!\n");
     }
 
-	vga_writes("Initializing GDT...\n");
+	char kernbase[32], kernend[32];
+	itoa((uint32_t)&kernel_base, kernbase, 16);
+	itoa((uint32_t)&kernel_end, kernend, 16);
+	log("Kernel start: 0x");
+	log(kernbase);
+	log(" | Kernel end: 0x");
+	log(kernend);
+	log("\n");
+
+	memory_init((uint32_t)&kernel_end);
+	memory_print_out();
+
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+	// -------------------------------------------------------------------------
+
+	log("Initializing GDT...\n");
 	gdt_init();
 
-	vga_writes("Initializing IDT...\n");
+	log("Initializing IDT...\n");
 	idt_init();
 
-	vga_writes("Enabling NMI...\n");
+	log("Enabling NMI...\n");
 	NMI_enable();
 
 	// TODO: Setup exceptions in our IDT table
 
-    vga_writes("Setting up PIC...\n");
+    log("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
-    //vga_writes("Setting up PIT...\n");
+    //log("Setting up PIT...\n");
     //pit_init();
+    
+    // Enable interrupts
+    vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
+    asm volatile("sti");
+    log("INTERRUPTS ARE ENABLED\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-    // TODO: Setup PIT
+    paging_initialize();
 
     vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-	vga_writes("HALTING CPU...\n");
+	log("HALTING CPU...\n");
 }
