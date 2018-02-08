@@ -1,4 +1,5 @@
 #include <main.h>
+#include <logging.h>
 #include <driver/vga.h>
 
 static uint32_t idt_location = 0x2000;
@@ -9,10 +10,14 @@ static uint8_t __idt_setup = 0;
 static uint8_t test_success = 0;
 static uint32_t test_timeout = 0x1000;
 
+/**
+ * Set the Interrupt Descriptor Table Register (IDTR)
+ */
 extern void _set_idtr();
-
+/**
+ * Default (blank) handler for Interrupt Descriptor Table
+ */
 void __idt_default_handler();
-void __idt_test_handler();
 
 #define INT_START asm volatile("pusha");
 #define INT_END asm volatile("popa"); \
@@ -66,7 +71,7 @@ void idt_init() {
 	asm volatile("int $0x2f");
 	while(test_timeout-- != 0) {
 		if (test_success != 0) {
-			vga_writes("IDT initialized\n");
+			log("IDT initialized\n");
 			idt_register_interrupt(0x2F, (uint32_t)&__idt_default_handler);
 			break;
 		}
@@ -74,7 +79,11 @@ void idt_init() {
 
 	if(!test_success) {
 		vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+<<<<<<< HEAD
 		vga_writes("IDT test timed out!\n");
+=======
+		log("IDT test timed out!");
+>>>>>>> master
 		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	}
 }

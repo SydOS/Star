@@ -1,4 +1,5 @@
 #include <main.h>
+#include <tools.h>
 #include <driver/vga.h>
 
 /**
@@ -22,19 +23,20 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color) {
 }
 
 /**
- * Gets the length of a given char array
- * @param  str Input char array
- * @return     A size_t containing the size of the char array
+ * Current row position
  */
-size_t strlen(const char* str) {
-	size_t len = 0;
-	while (str[len]) { len++; }
-	return len;
-}
-
 size_t terminal_row;
+/**
+ * Current column position
+ */
 size_t terminal_column;
+/**
+ * Current color, generated from vga_entry_color()
+ */
 uint8_t terminal_color;
+/**
+ * Pointer to RAM address where the framebuffer lives (0xB8000)
+ */
 uint16_t* terminal_buffer;
 
 /**
@@ -75,14 +77,35 @@ void vga_putentryat(char c, uint8_t color, size_t x, size_t y) {
 	terminal_buffer[index] = vga_entry(c, color);
 }
 
+void vga_scroll() {
+	terminal_row = VGA_HEIGHT-1;
+	for (size_t y = 1; y < VGA_HEIGHT; y++) {
+		for (size_t x = 0; x < VGA_WIDTH; x++) {
+			const size_t index = y * VGA_WIDTH + x;
+			terminal_buffer[index-VGA_WIDTH] = terminal_buffer[index];
+		}
+	}
+	for (size_t i = terminal_column; i < VGA_WIDTH; i++) {
+		vga_putentryat(' ', terminal_color, terminal_column, terminal_row);
+		terminal_column++;
+	}
+	terminal_column = 0;
+}
+
 /**
  * Put a character to the framebuffer in the nearest available slot
  * @param c Character to write
  */
 void vga_putchar(char c) {
 	if (c == '\n') {
+		for (size_t i = terminal_column; i < VGA_WIDTH; i++) {
+			vga_putentryat(' ', terminal_color, terminal_column, terminal_row);
+			terminal_column++;
+		}
 		terminal_column = 0;
-		terminal_row++;
+		if (++terminal_row == VGA_HEIGHT) {
+			vga_scroll();
+		}
 		return;
 	} else {
 		vga_putentryat(c, terminal_color, terminal_column, terminal_row);
@@ -91,7 +114,7 @@ void vga_putchar(char c) {
 	if (++terminal_column == VGA_WIDTH) {
 		terminal_column = 0;
 		if (++terminal_row == VGA_HEIGHT) {
-			terminal_row = 0;
+			vga_scroll();
 		}
 	}
 }

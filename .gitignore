@@ -28,9 +28,11 @@
 *.x86_64
 *.hex
 *.bin
+*.kernel
 
 # Debug files
 *.dSYM/
+*.log
 
 .DS_Store
 .DS_Store?
@@ -40,3 +42,5 @@
 ehthumbs.db
 Thumbs.db
 **/.DS_Store
+
+docs/
