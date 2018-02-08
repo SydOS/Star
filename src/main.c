@@ -119,6 +119,7 @@ void protected_mode_land() {
     log("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
+    log("Initializing paging...\n");
     paging_initialize();
 
     vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
