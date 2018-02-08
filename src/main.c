@@ -91,8 +91,12 @@ void kernel_main(void) {
 
     //vga_writes("Setting up PIT...\n");
     //pit_init();
-
-    // TODO: Setup PIT
+    
+    // Enable interrupts
+    vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
+    asm volatile("sti");
+    vga_writes("INTERRUPTS ARE ENABLED\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
     vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 	vga_writes("HALTING CPU...\n");
