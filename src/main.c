@@ -122,14 +122,14 @@ void protected_mode_land() {
     log("Initializing paging...\n");
     paging_initialize();
 
-    vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
+    vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	for(;;) {
 		char c = serial_read();
 
 		if (c == '\r' || c == '\n') {
-			vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
+			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 			vga_writes("\nroot@sydos ~: ");
 			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 		} else {
