@@ -8,6 +8,7 @@
 #include "driver/idt.h"
 #include "driver/pit.h"
 #include "driver/memory.h"
+#include "driver/paging.h"
 
 #include "logging.h"
 
@@ -100,6 +101,8 @@ void kernel_main(void) {
     asm volatile("sti");
     log("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+    paging_initialize();
 
     vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 	log("HALTING CPU...\n");
