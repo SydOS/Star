@@ -26,7 +26,7 @@ all:
 
 	rm -rf *.o
 
-	qemu-system-x86_64 -kernel Star.kernel -fda DISK1.IMA
+	qemu-system-x86_64 -kernel Star.kernel -fda DISK1.IMA -serial file:serial.log
 
 clean:
 	rm -rf *.o *.bin
