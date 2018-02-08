@@ -1,3 +1,5 @@
+#include <main.h>
+
 /**
  * Convert int to char array
  * @param  value  Input integer
