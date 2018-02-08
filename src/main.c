@@ -94,12 +94,8 @@ void kernel_main(void) {
     log("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
-<<<<<<< HEAD
-    vga_writes("Setting up PIT...\n");
+    log("Setting up PIT...\n");
     pit_init();
-=======
-    //log("Setting up PIT...\n");
-    //pit_init();
     
     // Enable interrupts
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
@@ -108,7 +104,6 @@ void kernel_main(void) {
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
     paging_initialize();
->>>>>>> master
 
     vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 	log("HALTING CPU...\n");
