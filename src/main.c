@@ -9,6 +9,7 @@
 #include "driver/pit.h"
 #include "driver/memory.h"
 #include "driver/paging.h"
+#include "driver/serial.h"
 
 #include "logging.h"
 

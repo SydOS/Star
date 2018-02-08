@@ -1,4 +1,5 @@
 #include <main.h>
+#include <tools.h>
 #include <logging.h>
 
 static uint32_t* page_directory = 0;
