@@ -26,8 +26,8 @@ _enable_protected_mode:
 	or al, 1       ; set PE (Protection Enable) bit in CR0 (Control Register 0)
 	mov cr0, eax
 
-	extern real_mode_land
-	call real_mode_land
+	extern protected_mode_land
+	call protected_mode_land
 
 global _start:function (_start.end - _start)
 _start:

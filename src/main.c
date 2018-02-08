@@ -102,7 +102,7 @@ void kernel_main(void) {
 	
 }
 
-void real_mode_land() {
+void protected_mode_land() {
 	log("Real mode\n");
 	// TODO: Setup exceptions in our IDT table
     log("Setting up PIC...\n");
