@@ -32,7 +32,14 @@ extern void _enable_A20();
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main(void) {
+	asm volatile("cli");
+	
 	serial_initialize();
+	const char* data = "If you're reading this, serial works.\n";
+	for (size_t i = 0; i < strlen(data); i++) {
+		serial_write(data[i]);
+	}
+
 	vga_initialize();
 	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
 	vga_writes("   _____           _  ____   _____ \n");
@@ -90,7 +97,6 @@ void kernel_main(void) {
 	NMI_enable();
 
 	// TODO: Setup exceptions in our IDT table
-
     log("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
