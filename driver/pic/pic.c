@@ -1,6 +1,7 @@
 #include "main.h"
 #include "driver/pic.h"
 #include "io.h"
+#include "logging.h"
 
 /**
  * Send end of interrupt command to PIC
