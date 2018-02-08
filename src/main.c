@@ -9,6 +9,8 @@
 #include "driver/pit.h"
 #include "driver/memory.h"
 
+#include "logging.h"
+
 /**
  * Kernel's ending address in RAM
  */
@@ -28,6 +30,7 @@ extern void _enable_A20();
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main(void) {
+	serial_initialize();
 	vga_initialize();
 	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
 	vga_writes("   _____           _  ____   _____ \n");
