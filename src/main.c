@@ -108,8 +108,8 @@ void protected_mode_land() {
     log("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
-    //log("Setting up PIT...\n");
-    //pit_init();
+    log("Setting up PIT...\n");
+    pit_init();
     
     // Enable interrupts
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);

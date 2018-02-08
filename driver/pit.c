@@ -1,6 +1,7 @@
 #include <main.h>
 #include <io.h>
 #include <tools.h>
+#include <logging.h>
 #include <driver/idt.h>
 #include <driver/pic.h>
 #include <driver/vga.h>
@@ -118,8 +119,6 @@ static void pit_start_counter (uint32_t freq, uint8_t counter, uint8_t mode) {
  */
 void pit_init() {
 	idt_register_interrupt(32, (uint32_t)pit_irq);
-	log("Registered IDT interrupt\n");
 	pit_start_counter(200,PIT_OCW_COUNTER_0, PIT_OCW_MODE_SQUAREWAVEGEN);
-	log("Started PIT counter\n");
 	log("PIT initialized!\n");
 }
