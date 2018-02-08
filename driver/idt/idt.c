@@ -1,4 +1,5 @@
 #include <main.h>
+#include <logging.h>
 #include <driver/vga.h>
 
 static uint32_t idt_location = 0x2000;
@@ -70,7 +71,7 @@ void idt_init() {
 	asm volatile("int $0x2f");
 	while(test_timeout-- != 0) {
 		if (test_success != 0) {
-			vga_writes("IDT initialized\n");
+			log("IDT initialized\n");
 			idt_register_interrupt(0x2F, (uint32_t)&__idt_default_handler);
 			break;
 		}
@@ -78,7 +79,7 @@ void idt_init() {
 
 	if(!test_success) {
 		vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-		vga_writes("IDT test timed out!");
+		log("IDT test timed out!");
 		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	}
 }

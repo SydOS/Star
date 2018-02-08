@@ -1,5 +1,6 @@
 #include <main.h>
 #include <tools.h>
+#include <logging.h>
 #include <driver/vga.h>
 #include <driver/memory.h>
 
@@ -24,38 +25,38 @@ void* memset (void * ptr, int value, size_t num )
 void memory_print_out()
 {
 	char temp1[32];
-	vga_writes("Memory used: ");
+	log("Memory used: ");
 	itoa((uint32_t)memory_used, temp1, 10);
-	vga_writes(temp1);
-	vga_writes(" bytes\n");
+	log(temp1);
+	log(" bytes\n");
 
-	vga_writes("Memory free: ");
+	log("Memory free: ");
 	itoa((uint32_t)heap_end - heap_begin - memory_used, temp1, 10);
-	vga_writes(temp1);
-	vga_writes(" bytes\n");
+	log(temp1);
+	log(" bytes\n");
 
-	vga_writes("Heap size: ");
+	log("Heap size: ");
 	itoa((uint32_t)heap_end - heap_begin, temp1, 10);
-	vga_writes(temp1);
-	vga_writes(" bytes\n");
+	log(temp1);
+	log(" bytes\n");
 
-	vga_writes("Heap start: 0x");
+	log("Heap start: 0x");
 	itoa((uint32_t)heap_begin, temp1, 16);
-	vga_writes(temp1);
-	vga_writes("\n");
+	log(temp1);
+	log("\n");
 
-	vga_writes("Heap end: 0x");
+	log("Heap end: 0x");
 	itoa((uint32_t)heap_end, temp1, 16);
-	vga_writes(temp1);
-	vga_writes("\n");
+	log(temp1);
+	log("\n");
 
-	vga_writes("PHeap start: 0x");
+	log("PHeap start: 0x");
 	itoa((uint32_t)pheap_begin, temp1, 16);
-	vga_writes(temp1);
-	vga_writes("\nPHeap end: 0x");
+	log(temp1);
+	log("\nPHeap end: 0x");
 	itoa((uint32_t)pheap_end, temp1, 16);
-	vga_writes(temp1);
-	vga_writes("\n");
+	log(temp1);
+	log("\n");
 }
 
 void memory_init(uint32_t kernel_end) {
