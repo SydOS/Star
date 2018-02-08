@@ -19,6 +19,16 @@ stack_top:
  
 
 section .text
+
+global _enable_protected_mode:
+_enable_protected_mode:
+	mov eax, cr0 
+	or al, 1       ; set PE (Protection Enable) bit in CR0 (Control Register 0)
+	mov cr0, eax
+
+	extern real_mode_land
+	call real_mode_land
+
 global _start:function (_start.end - _start)
 _start:
 	; point stack pointer to top

@@ -27,6 +27,7 @@ extern uint32_t kernel_base;
  * This should be moved to a header file :(
  */
 extern void _enable_A20();
+extern void _enable_protected_mode();
 
 /**
  * The main function for the kernel, called from boot.asm
@@ -96,12 +97,19 @@ void kernel_main(void) {
 	log("Enabling NMI...\n");
 	NMI_enable();
 
+	_enable_protected_mode();
+
+	
+}
+
+void real_mode_land() {
+	log("Real mode\n");
 	// TODO: Setup exceptions in our IDT table
     log("Setting up PIC...\n");
     PIC_remap(0x20, 0x28);
 
-    log("Setting up PIT...\n");
-    pit_init();
+    //log("Setting up PIT...\n");
+    //pit_init();
     
     // Enable interrupts
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
@@ -113,4 +121,5 @@ void kernel_main(void) {
 
     vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
 	log("HALTING CPU...\n");
+	for(;;) {}
 }
