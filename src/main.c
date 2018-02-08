@@ -103,9 +103,11 @@ void kernel_main(void) {
 }
 
 void protected_mode_land() {
-	log("Real mode\n");
+	vga_setcolor(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREEN);
+	log("Kernel has entered protected mode.\n");
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	// TODO: Setup exceptions in our IDT table
-    log("Setting up PIC...\n");
+    log("Remapping PIC...\n");
     PIC_remap(0x20, 0x28);
 
     //log("Setting up PIT...\n");

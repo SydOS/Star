@@ -47,4 +47,6 @@ void PIC_remap(int offset1, int offset2) {
 
 	outb(PIC1_DATA, a1);
 	outb(PIC2_DATA, a2);
+
+	log("PIC remapped!\n");
 }

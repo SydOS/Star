@@ -46,5 +46,5 @@ void gdt_init() {
 	gdt_add_descriptor(2, 0x00CF92000000FFFF);
 	gdt_add_descriptor(3, 0x008FFA000000FFFF);
 	gdt_set_descriptor(4, 0x008FF2000000FFFF);
-	log("GDT initialized\n");
+	log("GDT initialized!\n");
 }

@@ -82,5 +82,6 @@ void idt_init() {
 	if(!test_success) {
 		log("IDT link is offline (timeout).");
 	}
+	log("IDT Initialized!\n");
 	return;
 }
