@@ -40,20 +40,10 @@ void kernel_main(void) {
 	vga_writes("         |___/                     \n");
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
 	
+	// -------------------------------------------------------------------------
+	// MEMORY RELATED STUFF
+
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
-	char kernbase[32], kernend[32];
-	itoa((uint32_t)&kernel_base, kernbase, 16);
-	itoa((uint32_t)&kernel_end, kernend, 16);
-	vga_writes("Kernel start: 0x");
-	vga_writes(kernbase);
-	vga_writes(" | Kernel end: 0x");
-	vga_writes(kernend);
-	vga_writes("\n");
-
-	memory_init(&kernel_end);
-	memory_print_out();
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	vga_writes("Checking A20 line...\n");
 	int AX;
@@ -68,6 +58,22 @@ void kernel_main(void) {
     } else {
     	vga_writes("A20 line detection returned invalid result!\n");
     }
+
+	char kernbase[32], kernend[32];
+	itoa((uint32_t)&kernel_base, kernbase, 16);
+	itoa((uint32_t)&kernel_end, kernend, 16);
+	vga_writes("Kernel start: 0x");
+	vga_writes(kernbase);
+	vga_writes(" | Kernel end: 0x");
+	vga_writes(kernend);
+	vga_writes("\n");
+
+	memory_init(&kernel_end);
+	memory_print_out();
+
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+	// -------------------------------------------------------------------------
 
 	vga_writes("Initializing GDT...\n");
 	gdt_init();
