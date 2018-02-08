@@ -16,13 +16,13 @@ function download_compile {
 	echo $1
 	curl $1 > $2.archive
 	tar -xf $2.archive
-	cd $2
-	./configure --prefix=$HOME/tools $3
+	mkdir $2-build
+	cd $2-build
+	../$2/configure --prefix=$HOME/tools $3
 	make
 	make install
 	cd ..
-	rm -rf $2.archive
-	rm -rf $2
+	rm -rf $2*
 }
 
 set -e
