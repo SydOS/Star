@@ -12,6 +12,7 @@ all:
 
 	i686-elf-gcc -c src/main.c -o main.o $(CFLAGS)
 	i686-elf-gcc -c src/tools.c -o tools.o $(CFLAGS)
+	i686-elf-gcc -c src/logging.c -o logging.o $(CFLAGS)
 	i686-elf-gcc -c driver/vga.c -o vga.o $(CFLAGS)
 	i686-elf-gcc -c driver/floppy.c -o floppy.o $(CFLAGS)
 	i686-elf-gcc -c driver/pic/pic.c -o pic.o $(CFLAGS)
