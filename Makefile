@@ -32,7 +32,8 @@ all:
 	rm -rf *.o
 
 test:
-	qemu-system-x86_64 -kernel Star.kernel -m 32M -d guest_errors -fda DISK1.IMA
+	make
+	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -fda DISK1.IMA
 
 clean:
 	rm -rf *.o *.bin *.kernel *.sym
