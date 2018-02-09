@@ -1,10 +1,5 @@
-export GMP_VERSION=6.1.2
-export MPFR_VERSION=3.1.6
-export MPC_VERSION=1.0.3
-export ISL_VERSION=0.18
-export CLOOG_VERSION=0.18.4
-export BINUTILS_VERSION=2.29.1
-export GCC_VERSION=7.2.0
+export BINUTILS_VERSION=2.30
+export GCC_VERSION=7.3.0
 
 export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr
@@ -19,8 +14,15 @@ function download_compile {
 	mkdir $2-build
 	cd $2-build
 	../$2/configure --prefix=$HOME/tools $3
-	make
-	make install
+	if [ "$2" == "gcc-$GCC_VERSION" ]; then
+		make all-gcc -j$(getconf _NPROCESSORS_ONLN)
+		make all-target-libgcc -j$(getconf _NPROCESSORS_ONLN)
+		make install-gcc
+		make install-target-libgcc
+	else
+		make -j$(getconf _NPROCESSORS_ONLN)
+		make install
+	fi
 	cd ..
 	rm -rf $2*
 }
