@@ -88,18 +88,19 @@ void kernel_main(void) {
 
 	// TODO: detect CPUID support before calling for it
 	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-	uint16_t cpuid;
-	cpuid_string(CPUID_INTELBRANDSTRING, cpuid);
-	log((char*)cpuid);
-	log("|");
-	cpuid_string(CPUID_INTELBRANDSTRINGMORE, cpuid);
-	log((char*)cpuid);
-	log("|");
-	cpuid_string(CPUID_INTELBRANDSTRINGEND, cpuid);
-	log((char*)cpuid);
-	log("|");
-	log("\n");
+	char* cpuid[17];
+    cpuid_string(CPUID_INTELBRANDSTRING, cpuid);
+    cpuid[16] = '\0';
+    log((char*)cpuid);
 
+    cpuid_string(CPUID_INTELBRANDSTRINGMORE, cpuid);
+    cpuid[16] = '\0';
+    log((char*)cpuid);
+    
+    cpuid_string(CPUID_INTELBRANDSTRINGEND, cpuid);
+    cpuid[16] = '\0';
+    log((char*)cpuid);
+    log("\n");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	// -------------------------------------------------------------------------
