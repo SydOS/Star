@@ -1,9 +1,8 @@
 CFLAGS?=-std=gnu99 -ffreestanding -O3 -Wall -Wextra -I./include
 ARCH?=i686
+TIME?=$(shell date +%s)
 
 all:
-	make clean
-	
 	nasm -felf32 src/boot.asm -o boot.o
 	nasm -felf32 driver/a20/check_a20.asm -o check_a20.o
 	nasm -felf32 driver/a20/enable_a20.asm -o enable_a20.o
@@ -27,7 +26,7 @@ all:
 	$(ARCH)-elf-gcc -c driver/exceptions.c -o exceptions.o $(CFLAGS)
 
 	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -O2 -nostdlib *.o -lgcc
-	$(ARCH)-elf-objcopy --only-keep-debug Star.kernel Star-$(ARCH).sym
+	$(ARCH)-elf-objcopy --only-keep-debug Star-$(ARCH).kernel Star-$(ARCH).sym
 	$(ARCH)-elf-objcopy --strip-debug Star-$(ARCH).kernel
 
 	rm -rf *.o
@@ -43,3 +42,7 @@ all-arch:
 	ARCH=i486 make
 	ARCH=i586 make
 	ARCH=i686 make
+
+	[[ -d build ]] || mkdir build
+	mkdir build/$(TIME)
+	cp *.kernel *.sym build/$(TIME)
