@@ -138,10 +138,21 @@ void protected_mode_land() {
 			i++;
 			input[i] = '\0';
 
-			char* test_command = "about";
 			bool matches = true;
-			for (int i = 0; i < strlen(test_command); i++) {
-				if (input[i] != test_command[i]) {
+			for (int x = 0; x < 5; x++) {
+				char t;
+				switch(i) {
+					case 0: t = 'a'; break;
+					case 1: t = 'b'; break;
+					case 2: t = 'o'; break;
+					case 3: t = 'u'; break;
+					case 4: t = 't'; break;
+				}
+				char b = &input[x];
+				vga_putchar(b);
+				vga_putchar(t);
+				vga_putchar(' ');
+				if (input[i] != &t) {
 					matches = false;
 					break;
 				}
@@ -155,7 +166,7 @@ void protected_mode_land() {
 			vga_writes("\nroot@sydos ~: ");
 			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 		} else {
-			input[i] = c;
+			input[i] = &c;
 			i++;
 			vga_putchar(c);
 		}

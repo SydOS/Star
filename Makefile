@@ -42,11 +42,15 @@ build-kernel:
 	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -O2 -nostdlib *.o -lgcc
 	$(ARCH)-elf-objcopy --only-keep-debug Star-$(ARCH).kernel Star-$(ARCH).sym
 	$(ARCH)-elf-objcopy --strip-debug Star-$(ARCH).kernel
+	$(ARCH)-elf-objcopy -O binary Star-$(ARCH).kernel Star-$(ARCH).kernel.bin
 
 	rm -rf *.o
 
 test:
 	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -fda DISK1.IMA
 
+debug:
+	qemu-system-i386 -kernel Star-i686.kernel -S -s & gdb Star-i686.kerel -ex 'target remote localhost:1234'
+
 clean:
-	rm -rf *.o *.bin *.kernel *.sym
+	rm -rf *.o *.bin *.kernel *.sym *.bin
