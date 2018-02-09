@@ -3,6 +3,20 @@ ARCH?=i686
 TIME?=$(shell date +%s)
 
 all:
+	make clean
+
+	ARCH=i386 make build-kernel
+	ARCH=i486 make build-kernel
+	ARCH=i586 make build-kernel
+	ARCH=i686 make build-kernel
+
+	[[ -d build ]] || mkdir build
+	mkdir build/$(TIME)
+	cp *.kernel *.sym build/$(TIME)
+
+	make test
+
+build-kernel:
 	nasm -felf32 src/boot.asm -o boot.o
 	nasm -felf32 driver/a20/check_a20.asm -o check_a20.o
 	nasm -felf32 driver/a20/enable_a20.asm -o enable_a20.o
@@ -32,18 +46,7 @@ all:
 	rm -rf *.o
 
 test:
-	make
 	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -fda DISK1.IMA
 
 clean:
 	rm -rf *.o *.bin *.kernel *.sym
-
-all-arch:
-	ARCH=i386 make
-	ARCH=i486 make
-	ARCH=i586 make
-	ARCH=i686 make
-
-	[[ -d build ]] || mkdir build
-	mkdir build/$(TIME)
-	cp *.kernel *.sym build/$(TIME)
