@@ -130,13 +130,33 @@ void protected_mode_land() {
 	vga_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	for(;;) {
+		char* input[80];
+		int i = 0;
 		char c = serial_read();
 
 		if (c == '\r' || c == '\n') {
+			i++;
+			input[i] = '\0';
+
+			char* test_command = "about";
+			bool matches = true;
+			for (int i = 0; i < strlen(test_command); i++) {
+				if (input[i] != test_command[i]) {
+					matches = false;
+					break;
+				}
+			}
+
+			if (matches == true) {
+				log("SydOS");
+			}
+
 			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 			vga_writes("\nroot@sydos ~: ");
 			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 		} else {
+			input[i] = c;
+			i++;
 			vga_putchar(c);
 		}
 	}
