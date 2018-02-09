@@ -150,33 +150,6 @@ void protected_mode_land() {
 		char c = serial_read();
 
 		if (c == '\r' || c == '\n') {
-			i++;
-			input[i] = '\0';
-
-			bool matches = true;
-			for (int x = 0; x < 5; x++) {
-				char t;
-				switch(i) {
-					case 0: t = 'a'; break;
-					case 1: t = 'b'; break;
-					case 2: t = 'o'; break;
-					case 3: t = 'u'; break;
-					case 4: t = 't'; break;
-				}
-				char b = &input[x];
-				vga_putchar(b);
-				vga_putchar(t);
-				vga_putchar(' ');
-				if (input[i] != &t) {
-					matches = false;
-					break;
-				}
-			}
-
-			if (matches == true) {
-				log("SydOS");
-			}
-
 			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 			vga_writes("\nroot@sydos ~: ");
 			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
