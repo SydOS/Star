@@ -11,6 +11,7 @@
 #include "driver/paging.h"
 #include "driver/serial.h"
 #include "driver/exceptions.h"
+#include "driver/cpuid.h"
 
 #include "logging.h"
 
@@ -84,6 +85,19 @@ void kernel_main(void) {
 
 	memory_init((uint32_t)&kernel_end);
 	memory_print_out();
+
+	// TODO: detect CPUID support before calling for it
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+	int cpuid = 0;
+	cpuid_string(CPUID_INTELBRANDSTRING, cpuid);
+	vga_writes(cpuid);
+	cpuid = 0;
+	cpuid_string(CPUID_INTELBRANDSTRINGMORE, cpuid);
+	vga_writes(cpuid);
+	cpuid = 0;
+	cpuid_string(CPUID_INTELBRANDSTRINGEND, cpuid);
+	vga_writes(cpuid);
+	vga_writes("\n");
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
