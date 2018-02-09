@@ -1,8 +1,6 @@
 CFLAGS?=-std=gnu99 -ffreestanding -O3 -Wall -Wextra -I./include
 
 all:
-	doxygen Doxyfile
-
 	nasm -felf32 src/boot.asm -o boot.o
 	nasm -felf32 driver/a20/check_a20.asm -o check_a20.o
 	nasm -felf32 driver/a20/enable_a20.asm -o enable_a20.o
@@ -27,6 +25,7 @@ all:
 
 	i686-elf-gcc -T linker.ld -o Star.kernel -ffreestanding -O2 -nostdlib *.o -lgcc
 	i686-elf-objcopy --only-keep-debug Star.kernel Star.sym
+	i686-elf-objcopy --strip-debug Star.kernel
 
 	rm -rf *.o
 
