@@ -18,6 +18,7 @@ interesting demos.
 - A very very buggy and crashy PIT (Programmable Interval Timer) driver
 - Paging
 - Input to screen via serial
+- CPUID
 ```
 
 ### Building
