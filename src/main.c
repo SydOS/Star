@@ -86,22 +86,32 @@ void kernel_main(void) {
 	memory_init((uint32_t)&kernel_end);
 	memory_print_out();
 
-	// TODO: detect CPUID support before calling for it
-	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-	char* cpuid[17];
-    cpuid_string(CPUID_INTELBRANDSTRING, cpuid);
-    cpuid[16] = '\0';
-    log((char*)cpuid);
+	char EAX_1, EAX_2;
+	asm("call _detect_cpuid" : "=a" (EAX_1));
+	asm("call _cpuid_string_supported" : "=a" (EAX_2));
 
-    cpuid_string(CPUID_INTELBRANDSTRINGMORE, cpuid);
-    cpuid[16] = '\0';
-    log((char*)cpuid);
+    if (EAX_2 == 0) {
+    	// TODO: detect CPUID support before calling for it
+		vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+		char* cpuid[17];
+    	cpuid_string(CPUID_INTELBRANDSTRING, cpuid);
+    	cpuid[16] = '\0';
+    	log((char*)cpuid);
+
+    	cpuid_string(CPUID_INTELBRANDSTRINGMORE, cpuid);
+    	cpuid[16] = '\0';
+    	log((char*)cpuid);
     
-    cpuid_string(CPUID_INTELBRANDSTRINGEND, cpuid);
-    cpuid[16] = '\0';
-    log((char*)cpuid);
-    log("\n");
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    	cpuid_string(CPUID_INTELBRANDSTRINGEND, cpuid);
+    	cpuid[16] = '\0';
+    	log((char*)cpuid);
+    	log("\n");
+		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    } else {
+    	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+		log("CPUID not enabled\n");
+		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    }
 
 	// -------------------------------------------------------------------------
 
