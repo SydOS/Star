@@ -12,7 +12,7 @@ interesting demos.
 - GDT
 - IDT
 - Generic exceptions
-- MNI enabling/disabling
+- NMI enabling/disabling
 - Protected mode
 - PIC remapping
 - A very very buggy and crashy PIT driver
@@ -29,6 +29,8 @@ cd ./scripts/
 [package manager of your choice] install nasm qemu
 cd ..
 ```
+The toolchain will be build to `$HOME/tools`, so make sure to add it to your path.
+Make sure QEMU and NASM are in the path as well.
 
 Then to build the kernel:
 ```
