@@ -71,6 +71,12 @@ enum {
     CPUID_FEAT_EDX_PBE          = 1 << 31
 };
 
+static inline int cpuid_vendorstring(uint32_t where[3]) {
+  asm volatile("cpuid":"=b"(*where),"=d"(*(where+1)),
+               "=c"(*(where+2)):"a"(CPUID_GETVENDORSTRING));
+  return (int)where[0];
+}
+
 /** issue a single request to CPUID. Fits 'intel features', for instance
  *  note that even if only "eax" and "edx" are of interest, other registers
  *  will be modified by the operation, so we need to tell the compiler about it.

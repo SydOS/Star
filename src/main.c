@@ -86,12 +86,22 @@ void kernel_main(void) {
 	memory_init((uint32_t)&kernel_end);
 	memory_print_out();
 
+    // TODO: detect CPUID support before calling for it
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+
+	// Print CPUID vendor and brand.
+	log("Processor: ");
+	char* cpuvendor[13];
+	cpuid_vendorstring(cpuvendor);
+    cpuvendor[12] = '\0';
+    log((char*)cpuvendor);
+	log(" ");
+
 	char EAX = 1;
 	asm("call _cpuid_string_supported" : "=a" (EAX));
 
+	// Do we support extended CPUID functions?
     if (EAX == 0) {
-    	// TODO: detect CPUID support before calling for it
-		vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 		char* cpuid[17];
     	cpuid_string(CPUID_INTELBRANDSTRING, cpuid);
     	cpuid[16] = '\0';
@@ -108,7 +118,7 @@ void kernel_main(void) {
 		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     } else {
     	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-		log("CPUID not enabled\n");
+		log("(CPUID extensions not supported)\n");
 		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     }
 
