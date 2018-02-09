@@ -86,11 +86,10 @@ void kernel_main(void) {
 	memory_init((uint32_t)&kernel_end);
 	memory_print_out();
 
-	char EAX_1, EAX_2;
-	asm("call _detect_cpuid" : "=a" (EAX_1));
-	asm("call _cpuid_string_supported" : "=a" (EAX_2));
+	char EAX = 1;
+	asm("call _cpuid_string_supported" : "=a" (EAX));
 
-    if (EAX_2 == 0) {
+    if (EAX == 0) {
     	// TODO: detect CPUID support before calling for it
 		vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 		char* cpuid[17];
