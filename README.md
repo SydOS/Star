@@ -9,13 +9,13 @@ interesting demos.
 ```
 - Serial output
 - 80x25 VGA output
-- GDT
-- IDT
+- GDT (Global Descriptor Table) creation & management
+- IDT (Interrupt Descriptor Table) creation & management
 - Generic exceptions
-- NMI enabling/disabling
+- NMI (Non-Maskable Interrupts) enabling/disabling
 - Protected mode
-- PIC remapping
-- A very very buggy and crashy PIT driver
+- 8259 PIC (Programmable Interrupt Controller) remapping
+- A very very buggy and crashy PIT (Programmable Interval Timer) driver
 - Paging
 - Input to screen via serial
 ```
@@ -29,7 +29,7 @@ cd ./scripts/
 [package manager of your choice] install nasm qemu
 cd ..
 ```
-The toolchain will be build to `$HOME/tools`, so make sure to add it to your path.
+The toolchain will be built to `$HOME/tools`, so make sure to add it to your path.
 Make sure QEMU and NASM are in the path as well.
 
 Then to build the kernel:
