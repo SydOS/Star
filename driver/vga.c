@@ -109,7 +109,7 @@ void vga_putchar(char c) {
 			vga_scroll();
 		}
 		return;
-	} else if(c == '\b') {
+	} else if(c == '\b' || c == 127) { // 127 = DEL control code.
 		terminal_column--;
 		return;
 	} else if(c == '\r') {

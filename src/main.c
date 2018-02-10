@@ -138,7 +138,12 @@ void protected_mode_land() {
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
+	serial_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+    // Ring serial terminal.
+	serial_write('\a');
+
 	for(;;) {
 		char* input[80];
 		int i = 0;
@@ -147,11 +152,13 @@ void protected_mode_land() {
 		if (c == '\r' || c == '\n') {
 			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 			vga_writes("\nroot@sydos ~: ");
+			serial_writes("\nroot@sydos ~: ");
 			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 		} else {
 			input[i] = &c;
 			i++;
 			vga_putchar(c);
+			serial_write(c);
 		}
 	}
 }
