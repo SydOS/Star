@@ -38,7 +38,7 @@ _cpuid_string_supported:
 	mov eax, 0x80000000
 	cpuid
 	cmp eax, 0x80000004
-	jl	_cpuid_string_supported_errorret
+	jb	_cpuid_string_supported_errorret
 	xor eax, eax
 	ret
 _cpuid_string_supported_errorret:
