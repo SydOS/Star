@@ -107,6 +107,12 @@ void vga_putchar(char c) {
 			vga_scroll();
 		}
 		return;
+	} else if(c == '\b') {
+		terminal_column--;
+		return;
+	} else if(c == '\r') {
+		terminal_column = 0;
+		return;
 	} else {
 		vga_putentryat(c, terminal_color, terminal_column, terminal_row);
 	}

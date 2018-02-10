@@ -7,7 +7,7 @@
  * @param  base   Number base (ex: base 10)
  * @return        Char array of number
  */
-char* itoa(int value, char* result, int base) {
+char* itoa(uint32_t value, char* result, int base) {
 		// check that the base if valid
 	if (base < 2 || base > 36) { *result = '\0'; return result; }
 
