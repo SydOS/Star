@@ -43,6 +43,15 @@ void floppy_init() {
 	// Get controller version.
 	char* temp1;
 	uint32_t version = floppy_getversion();
+
+	// If version is 0xFF, that means there isn't a floppy controller.
+	if (version == 0xFF)
+	{
+		log("No floppy controller present, aborting!\n");
+		return;
+	}
+
+	// Print version for now.
 	utoa(version, temp1, 16);
 	log("Floppy controller version is 0x");
 	log(temp1);
