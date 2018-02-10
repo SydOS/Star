@@ -1,12 +1,5 @@
 section .text
 
-global _cpuid_clear
-_cpuid_clear:
-    xor ebx, ebx
-    xor ecx, ecx
-    xor edx, edx
-    ret
-
 global _cpuid_detect
 _cpuid_detect:
 	pushfd                               ;Save EFLAGS

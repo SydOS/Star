@@ -3,7 +3,6 @@
 #include <logging.h>
 #include <driver/cpuid.h>
 
-extern void _cpuid_clear();
 extern uint32_t _cpuid_detect();
 extern uint32_t _cpuid_gethighestfunction();
 extern uint32_t _cpuid_getsignature();
@@ -23,9 +22,9 @@ void cpuid_print_capabilities() {
 
         // Print vendor ID if supported (should be).
 	    log("Processor vendor: ");
-	    char* cpuvendor[13];
+	    uint32_t cpuvendor[4];
 	    cpuid_vendorstring(cpuvendor);
-        cpuvendor[12] = '\0';
+        cpuvendor[3] = '\0';
         log((char*)cpuvendor);
 	    log("\n");
 
@@ -189,17 +188,17 @@ void cpuid_print_capabilities() {
 
         // Does this processor support extended CPUID features?
         if (highestextended_cpuidfunc >= CPUID_INTELFEATURES) {
-            char* cpuid[17];
+            uint32_t cpuid[5];
     	    cpuid_string(CPUID_INTELBRANDSTRING, cpuid);
-    	    cpuid[16] = '\0';
+    	    cpuid[4] = '\0';
     	    log((char*)cpuid);
 
     	    cpuid_string(CPUID_INTELBRANDSTRINGMORE, cpuid);
-    	    cpuid[16] = '\0';
+    	    cpuid[4] = '\0';
     	    log((char*)cpuid);
     
     	    cpuid_string(CPUID_INTELBRANDSTRINGEND, cpuid);
-    	    cpuid[16] = '\0';
+    	    cpuid[4] = '\0';
     	    log((char*)cpuid);
     	    log("\n");
         }
