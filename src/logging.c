@@ -4,8 +4,6 @@
 #include <driver/vga.h>
 
 void log(const char* data) {
-	for (size_t i = 0; i < strlen(data); i++) {
-		serial_write(data[i]);
-	}
+	serial_writes(data);
 	vga_writes(data);
 }

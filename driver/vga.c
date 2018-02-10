@@ -1,5 +1,6 @@
 #include <main.h>
 #include <tools.h>
+#include <io.h>
 #include <driver/vga.h>
 
 /**
@@ -38,6 +39,7 @@ uint8_t terminal_color;
  * Pointer to RAM address where the framebuffer lives (0xB8000)
  */
 uint16_t* terminal_buffer;
+bool cursor_enabled = true;
 
 /**
  * Clear out the framebuffer with empty chars, 
@@ -107,6 +109,12 @@ void vga_putchar(char c) {
 			vga_scroll();
 		}
 		return;
+	} else if(c == '\b' || c == 127) { // 127 = DEL control code.
+		terminal_column--;
+		return;
+	} else if(c == '\r') {
+		terminal_column = 0;
+		return;
 	} else {
 		vga_putentryat(c, terminal_color, terminal_column, terminal_row);
 	}
@@ -116,6 +124,10 @@ void vga_putchar(char c) {
 		if (++terminal_row == VGA_HEIGHT) {
 			vga_scroll();
 		}
+	}
+
+	if (cursor_enabled == true) {
+		vga_update_cursor(terminal_column, terminal_row);
 	}
 }
 
@@ -127,6 +139,10 @@ void vga_putchar(char c) {
 void vga_write(const char* data, size_t size) {
 	for (size_t i = 0; i < size; i++) {
 		vga_putchar(data[i]);
+	}
+
+	if (cursor_enabled == true) {
+		vga_update_cursor(terminal_column, terminal_row);
 	}
 }
 
@@ -145,4 +161,37 @@ void vga_writes(const char* data) {
  */
 void vga_setcolor(enum vga_color fg, enum vga_color bg) {
 	terminal_color = vga_entry_color(fg, bg);
+}
+
+void vga_enable_cursor() {
+	outb(0x3D4, 0x0A);
+	outb(0x3D5, (inb(0x3D5) & 0xC0) | 0);
+ 
+	outb(0x3D4, 0x0B);
+	outb(0x3D5, (inb(0x3E0) & 0xE0) | 15);
+
+	cursor_enabled = true;
+}
+
+void vga_disable_cursor() {
+	outb(0x3D4, 0x0A);
+	outb(0x3D5, 0x20);
+
+	cursor_enabled = false;
+}
+
+void vga_update_cursor(int x, int y)
+{
+	uint16_t pos = y * VGA_WIDTH + x;
+ 
+	outb(0x3D4, 0x0F);
+	outb(0x3D5, (uint8_t) (pos & 0xFF));
+	outb(0x3D4, 0x0E);
+	outb(0x3D5, (uint8_t) ((pos >> 8) & 0xFF));
+}
+
+int* vga_cursor_pos(int* p) {
+	p[0] = terminal_column;
+	p[1] = terminal_row;
+	return p;
 }

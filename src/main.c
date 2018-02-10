@@ -10,6 +10,8 @@
 #include "driver/memory.h"
 #include "driver/paging.h"
 #include "driver/serial.h"
+#include "driver/exceptions.h"
+#include "driver/cpuid.h"
 
 #include "logging.h"
 
@@ -27,12 +29,22 @@ extern uint32_t kernel_base;
  * This should be moved to a header file :(
  */
 extern void _enable_A20();
+extern void _enable_protected_mode();
 
 /**
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main(void) {
+	asm volatile("cli");
+
+	vga_disable_cursor();
+	
 	serial_initialize();
+	const char* data = "If you're reading this, serial works.\n";
+	for (size_t i = 0; i < strlen(data); i++) {
+		serial_write(data[i]);
+	}
+
 	vga_initialize();
 	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
 	vga_writes("   _____           _  ____   _____ \n");
@@ -76,6 +88,11 @@ void kernel_main(void) {
 	memory_init((uint32_t)&kernel_end);
 	memory_print_out();
 
+    // TODO: detect CPUID support before calling for it
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+
+	// Print CPUID info.
+	cpuid_print_capabilities();
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	// -------------------------------------------------------------------------
@@ -86,12 +103,23 @@ void kernel_main(void) {
 	log("Initializing IDT...\n");
 	idt_init();
 
+	log("Initializing exceptions handlers...\n");
+	exceptions_init();
+
 	log("Enabling NMI...\n");
 	NMI_enable();
 
-	// TODO: Setup exceptions in our IDT table
+	_enable_protected_mode();
 
-    log("Setting up PIC...\n");
+	
+}
+
+void protected_mode_land() {
+	vga_setcolor(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREEN);
+	log("Kernel has entered protected mode.\n");
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	// TODO: Setup exceptions in our IDT table
+    log("Remapping PIC...\n");
     PIC_remap(0x20, 0x28);
 
     //log("Setting up PIT...\n");
@@ -103,8 +131,34 @@ void kernel_main(void) {
     log("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
+    log("Initializing paging...\n");
     paging_initialize();
 
-    vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-	log("HALTING CPU...\n");
+    vga_enable_cursor();
+
+    vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+	vga_writes("root@sydos ~: ");
+	serial_writes("root@sydos ~: ");
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+    // Ring serial terminal.
+	serial_write('\a');
+
+	for(;;) {
+		char* input[80];
+		int i = 0;
+		char c = serial_read();
+
+		if (c == '\r' || c == '\n') {
+			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+			vga_writes("\nroot@sydos ~: ");
+			serial_writes("\nroot@sydos ~: ");
+			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+		} else {
+			input[i] = &c;
+			i++;
+			vga_putchar(c);
+			serial_write(c);
+		}
+	}
 }

@@ -1,4 +1,5 @@
 #include <main.h>
+#include <tools.h>
 #include <io.h>
 
 #define PORT 0x3f8   /* COM1 */
@@ -21,6 +22,17 @@ void serial_write(char a) {
    while (is_transmit_empty() == 0);
  
    outb(PORT,a);
+}
+
+void serial_writes(const char* data) {
+    for (size_t i = 0; i < strlen(data); i++) {
+		if (data[i] == '\n') {
+			serial_write('\n');
+			serial_write('\r');
+		} else {
+			serial_write(data[i]);
+		}
+	}
 }
 
 int serial_received() {

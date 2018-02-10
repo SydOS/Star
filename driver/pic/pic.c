@@ -1,6 +1,7 @@
 #include "main.h"
 #include "driver/pic.h"
 #include "io.h"
+#include "logging.h"
 
 /**
  * Send end of interrupt command to PIC
@@ -47,4 +48,6 @@ void PIC_remap(int offset1, int offset2) {
 
 	outb(PIC1_DATA, a1);
 	outb(PIC2_DATA, a2);
+
+	log("PIC remapped!\n");
 }

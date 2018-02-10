@@ -33,6 +33,7 @@
 # Debug files
 *.dSYM/
 *.log
+*.sym
 
 .DS_Store
 .DS_Store?
@@ -44,3 +45,4 @@ Thumbs.db
 **/.DS_Store
 
 docs/
+build/
