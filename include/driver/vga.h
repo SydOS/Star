@@ -27,5 +27,8 @@ extern void vga_initialize(void);
 extern void vga_writes(const char* data);
 extern void vga_setcolor(enum vga_color fg, enum vga_color bg);
 extern void vga_putchar(char c);
+extern void vga_enable_cursor();
+extern void vga_disable_cursor();
+extern int* vga_cursor_pos(int* p);
 
 #endif
