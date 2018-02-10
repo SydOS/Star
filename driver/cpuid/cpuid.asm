@@ -85,3 +85,22 @@ _cpuid_gethighestextendedfunction:
     mov eax, 0x80000000
     cpuid
     ret
+
+;
+; EAX=0x80000001
+; https://en.wikipedia.org/wiki/CPUID#EAX=80000001h:_Extended_Processor_Info_and_Feature_Bits
+;
+; Gets extended feature flags.
+global _cpuid_getextendedprocessorfeatures
+_cpuid_getextendedprocessorfeatures:
+    mov eax, 80000001
+    cpuid
+    mov eax, edx
+    ret
+
+global _cpuid_getextendedprocessorfeatures2
+_cpuid_getextendedprocessorfeatures2:
+    mov eax, 80000001
+    cpuid
+    mov eax, ecx
+    ret
