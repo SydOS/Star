@@ -31,10 +31,6 @@ _cpuid_gethighestfunction:
 ; Gets the processor signature.
 global _cpuid_getsignature
 _cpuid_getsignature:
-    xor ebx, ebx
-    xor ecx, ecx
-    xor edx, edx
-
     mov eax, 0x1
     cpuid
     ret
@@ -42,37 +38,56 @@ _cpuid_getsignature:
 ; Gets misc. info about the processor.
 global _cpuid_getmiscinfo
 _cpuid_getmiscinfo:
-    xor ebx, ebx
-    xor ecx, ecx
-    xor edx, edx
-
     mov eax, 0x1
     cpuid
     mov eax, ebx
     ret
 
-; Gets the original set of processor features.
-global _cpuid_getfeatures
-_cpuid_getfeatures:
-    xor ebx, ebx
-    xor ecx, ecx
-    xor edx, edx
-
+; Gets the original set of processor features in EDX.
+global _cpuid_getfeatures_edx
+_cpuid_getfeatures_edx:
     mov eax, 0x1
     cpuid
     mov eax, edx
     ret
 
-; Gets the second set of processor features.
-global _cpuid_getfeatures2
-_cpuid_getfeatures2:
-    xor ebx, ebx
-    xor ecx, ecx
-    xor edx, edx
-
+; Gets the second set of processor features in ECX.
+global _cpuid_getfeatures_ecx
+_cpuid_getfeatures_ecx:
     mov eax, 0x1
     cpuid
     mov eax, ecx
+    ret
+
+;
+; EAX=0x7, ECX=0x0
+; https://en.wikipedia.org/wiki/CPUID#EAX=7,_ECX=0:_Extended_Features
+;
+; Gets the extended feature flags (in EBX) supported by the processor.
+global _cpuid_getextendedprocessorfeatures_ebx
+_cpuid_getextendedprocessorfeatures_ebx:
+    mov eax, 0x7
+    mov ecx, 0x0
+    cpuid
+    mov eax, ebx
+    ret
+
+; Gets the extended feature flags (in ECX) supported by the processor.
+global _cpuid_getextendedprocessorfeatures_ecx
+_cpuid_getextendedprocessorfeatures_ecx:
+    mov eax, 0x7
+    mov ecx, 0x0
+    cpuid
+    mov eax, ecx
+    ret
+
+; Gets the extended feature flags (in EDX) supported by the processor.
+global _cpuid_getextendedprocessorfeatures_edx
+_cpuid_getextendedprocessorfeatures_edx:
+    mov eax, 0x7
+    mov ecx, 0x0
+    cpuid
+    mov eax, edx
     ret
 
 ;
@@ -90,16 +105,17 @@ _cpuid_gethighestextendedfunction:
 ; EAX=0x80000001
 ; https://en.wikipedia.org/wiki/CPUID#EAX=80000001h:_Extended_Processor_Info_and_Feature_Bits
 ;
-; Gets extended feature flags.
-global _cpuid_getextendedprocessorfeatures
-_cpuid_getextendedprocessorfeatures:
+; Gets additional extended feature (in EDX) flags supported by the processor.
+global _cpuid_geteeprocessorfeatures_edx
+_cpuid_geteeprocessorfeatures_edx:
     mov eax, 80000001
     cpuid
     mov eax, edx
     ret
 
-global _cpuid_getextendedprocessorfeatures2
-_cpuid_getextendedprocessorfeatures2:
+; Gets additional extended feature (in ECX) flags supported by the processor.
+global _cpuid_geteeprocessorfeatures_ecx
+_cpuid_geteeprocessorfeatures_ecx:
     mov eax, 80000001
     cpuid
     mov eax, ecx
