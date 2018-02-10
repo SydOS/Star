@@ -36,6 +36,8 @@ extern void _enable_protected_mode();
  */
 void kernel_main(void) {
 	asm volatile("cli");
+
+	vga_disable_cursor();
 	
 	serial_initialize();
 	const char* data = "If you're reading this, serial works.\n";
@@ -160,6 +162,8 @@ void protected_mode_land() {
 
     log("Initializing paging...\n");
     paging_initialize();
+
+    vga_enable_cursor();
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
