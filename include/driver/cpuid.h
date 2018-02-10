@@ -1,3 +1,6 @@
+extern void _cpuid_clear();
+extern void cpuid_print_capabilities();
+
 enum cpuid_requests {
   CPUID_GETVENDORSTRING,
   CPUID_GETFEATURES,
@@ -71,7 +74,8 @@ enum {
     CPUID_FEAT_EDX_PBE          = 1 << 31
 };
 
-static inline int cpuid_vendorstring(uint32_t where[3]) {
+static inline int cpuid_vendorstring(char* where[3]) {
+  _cpuid_clear();
   asm volatile("cpuid":"=b"(*where),"=d"(*(where+1)),
                "=c"(*(where+2)):"a"(CPUID_GETVENDORSTRING));
   return (int)where[0];
@@ -87,8 +91,8 @@ static inline void cpuid(int code, uint32_t *a, uint32_t *d) {
  
 /** issue a complete request, storing general registers output as a string
  */
-static inline int cpuid_string(int code, uint32_t where[4]) {
+static inline int cpuid_string(int code, char* where[4]) {
   asm volatile("cpuid":"=a"(*where),"=b"(*(where+1)),
-               "=c"(*(where+2)),"=d"(*(where+3)):"a"(code));
+               "=c"(*(where+2)),"=d"(*(where+3)):"a"(code),"b"(0),"c"(0),"d"(0));
   return (int)where[0];
 }
