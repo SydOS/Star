@@ -1,6 +1,7 @@
-#include "main.h"
-#include "driver/vga.h"
-#include "io.h"
+#include <main.h>
+#include <io.h>
+#include <logging.h>
+#include <driver/floppy.h>
 
 /**
  * Temporary function to detect floppy disks in drives
@@ -14,9 +15,38 @@ void floppy_detect() {
 	b = c & 0xF; // Get low nibble by ANDing out low nibble
 
 	char *drive_type[6] = { "no floppy drive", "360kb 5.25in floppy drive", "1.2mb 5.25in floppy drive", "720kb 3.5in", "1.44mb 3.5in", "2.88mb 3.5in"};
-	vga_writes("Floppy drive A: ");
-	vga_writes(drive_type[a]);
-	vga_writes("\nFloppy drive B: ");
-	vga_writes(drive_type[b]);
-	vga_writes("\n");
+	log("Floppy drive A: ");
+	log(drive_type[a]);
+	log("\nFloppy drive B: ");
+	log(drive_type[b]);
+	log("\n");
+}
+
+unsigned char floppy_getversion() {
+	// Get version of floppy controller.
+	outb(FLOPPY_DATA_FIFO, FLOPPY_VERSION);
+	return inb(FLOPPY_DATA_FIFO);
+}
+
+void floppy_reset() {
+	// Reset floppy controller.
+	outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, 0x00);
+	outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, 0x0C);
+}
+
+void floppy_configure() {
+	// Send configure command.
+	outb(FLOPPY_DATA_FIFO, FLOPPY_CONFIGURE);
+}
+
+void floppy_init() {
+	// Get controller version.
+	char* temp1;
+	uint32_t version = floppy_getversion();
+	utoa(version, temp1, 16);
+	log("Floppy controller version is 0x");
+	log(temp1);
+	log("!\n");
+
+	floppy_reset();
 }

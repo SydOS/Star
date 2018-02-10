@@ -134,6 +134,11 @@ void protected_mode_land() {
     log("Initializing paging...\n");
     paging_initialize();
 
+	// Floppy test.
+	floppy_detect();
+	log("Initialize floppy drives...\n");
+	floppy_init();
+
     vga_enable_cursor();
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
