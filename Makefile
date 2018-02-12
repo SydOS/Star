@@ -43,7 +43,8 @@ build-kernel:
 	$(ARCH)-elf-gcc -c driver/vga.c -o vga.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/floppy.c -o floppy.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/speaker.c -o speaker.o $(CFLAGS)
-
+	$(ARCH)-elf-gcc -c driver/ps2/ps2.c -o ps2.o $(CFLAGS)
+	$(ARCH)-elf-gcc -c driver/ps2/keyboard.c -o ps2_keyboard.o $(CFLAGS)
 
 	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -O2 -nostdlib *.o -lgcc
 	$(ARCH)-elf-objcopy --only-keep-debug Star-$(ARCH).kernel Star-$(ARCH).sym
