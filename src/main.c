@@ -11,6 +11,7 @@
 #include "driver/vga.h"
 #include "driver/floppy.h"
 #include "driver/serial.h"
+#include "driver/speaker.h"
 
 #include "logging.h"
 
@@ -147,6 +148,9 @@ void protected_mode_land() {
 	utoa(pit_ticks(), temp, 10);
 	log(temp);
 	log(" milliseconds.\n");
+
+	// Play tone.
+	speaker_play_tone(2000, 500);
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
