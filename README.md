@@ -15,10 +15,11 @@ interesting demos.
 - NMI (Non-Maskable Interrupts) enabling/disabling
 - Protected mode
 - 8259 PIC (Programmable Interrupt Controller) remapping
-- A very very buggy and crashy PIT (Programmable Interval Timer) driver
+- PIT (Programmable Interval Timer) driver, with sleep mode
 - Paging
 - Input to screen via serial
 - CPUID
+- Basic floppy disk detection
 ```
 
 ### Building
