@@ -141,8 +141,6 @@ void protected_mode_land() {
 
     vga_enable_cursor();
 
-	log ("Sleeping for 5 seconds...\n");
-	sleep(5000);
 	log ("Current uptime: ");
 	char* temp;
 	utoa(pit_ticks(), temp, 10);
