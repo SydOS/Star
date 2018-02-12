@@ -5,7 +5,7 @@
 #include <driver/floppy.h>
 #include <kernel/interrupts.h>
 
-bool irq_triggered = false;
+static bool irq_triggered = false;
 
 /**
  * Temporary function to detect floppy disks in drives
