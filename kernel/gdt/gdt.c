@@ -1,6 +1,6 @@
 #include <main.h>
 #include <logging.h>
-#include <driver/gdt.h>
+#include <kernel/gdt.h>
 
 extern void _gdt_load(uint32_t ptr);
 

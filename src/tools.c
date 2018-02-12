@@ -1,5 +1,5 @@
 #include <main.h>
-#include <driver/pit.h>
+#include <kernel/pit.h>
 
 /**
  * Convert int to char array

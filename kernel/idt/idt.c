@@ -1,6 +1,6 @@
 #include <main.h>
 #include <logging.h>
-#include <driver/idt.h>
+#include <kernel/idt.h>
 #include <io.h>
 
 extern void _idt_load(uint32_t ptr);

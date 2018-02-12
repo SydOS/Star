@@ -2,7 +2,7 @@
 #include <tools.h>
 #include <logging.h>
 #include <driver/vga.h>
-#include <driver/memory.h>
+#include <kernel/memory.h>
 
 #define MAX_PAGE_ALIGNED_ALLOCS 32
 

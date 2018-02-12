@@ -1,8 +1,8 @@
 #include <main.h>
 #include <logging.h>
 #include <io.h>
-#include <driver/idt.h>
-#include <driver/interrupts.h>
+#include <kernel/idt.h>
+#include <kernel/interrupts.h>
 
 // Functions defined by Intel for service extensions.
 extern void _isr0();
