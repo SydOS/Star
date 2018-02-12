@@ -18,7 +18,8 @@ void floppy_detect() {
 	a = c >> 4; // Get high nibble
 	b = c & 0xF; // Get low nibble by ANDing out low nibble
 
-	char *drive_type[6] = { "no floppy drive", "360kb 5.25in floppy drive", "1.2mb 5.25in floppy drive", "720kb 3.5in", "1.44mb 3.5in", "2.88mb 3.5in"};
+	char *drive_type[6] = { "no floppy drive", "360kb 5.25in floppy drive", 
+	"1.2mb 5.25in floppy drive", "720kb 3.5in", "1.44mb 3.5in", "2.88mb 3.5in"};
 	log("Floppy drive A: ");
 	log(drive_type[a]);
 	log("\nFloppy drive B: ");
