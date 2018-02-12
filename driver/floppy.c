@@ -30,7 +30,7 @@ void floppy_write_command(uint8_t cmd)
 {
 	uint16_t timeout = 300;
 	while(--timeout) {
-		if(inb(FLOPPY_MAIN_STATUS_REGISTER) & 128) {
+		if(inb(FLOPPY_MAIN_STATUS_REGISTER) & FLOPPY_RQM) {
 			outb(FLOPPY_DATA_FIFO, cmd);
 			return;
 		}
@@ -51,9 +51,9 @@ void floppy_wait_for_irq(uint16_t timeout) {
 	return ret;
 }
 
-void floppy_irq() {
+void floppy_irq(registers_t* regs) {
 	irq_triggered = true;
-	//send_eoi(6);
+	log("IRQ6 raised!\n");
 }
 
 unsigned char floppy_getversion() {
@@ -64,8 +64,9 @@ unsigned char floppy_getversion() {
 
 void floppy_reset() {
 	// Reset floppy controller.
-	floppy_write_command(0x00);
-	floppy_write_command(0x0C);
+	outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, 0x00);
+	outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, FLOPPY_IRQ | FLOPPY_RESET);
+	floppy_wait_for_irq(300);
 }
 
 void floppy_configure() {
@@ -105,23 +106,23 @@ void floppy_set_motor(uint8_t drive, uint8_t status) {
 	switch(drive)
 	{
 		case 0:
-			motor = 16;
+			motor = FLOPPY_MOTA;
 			break;
 		case 1:
-			motor = 32;
+			motor = FLOPPY_MOTB;
 			break;
 		case 2:
-			motor = 64;
+			motor = FLOPPY_MOTC;
 			break;
 		case 3:
-			motor = 128;
+			motor = FLOPPY_MOTD;
 			break;
 	}
 
 	if(status) {
-		outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, drive | motor | 4 | 8);
+		outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, motor | FLOPPY_IRQ | FLOPPY_RESET);
 	} else {
-		outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, 4);
+		outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, FLOPPY_IRQ | FLOPPY_RESET);
 	}
 	sleep(500);
 }
@@ -141,13 +142,17 @@ void floppy_init() {
 	}
 
 	log("Installing floppy drive IRQ...\n");
-	interrupts_irq_install_handler(38, &floppy_irq);
+	interrupts_irq_install_handler(6, floppy_irq);
 
 	// Print version for now.
 	utoa(version, temp1, 16);
 	log("Floppy controller version is 0x");
 	log(temp1);
 	log("!\n");
+
+		// Reset floppy drive
+	log("Resetting floppy drive controller...\n");
+	floppy_reset();
 
 	// Set and lock base config
 	log("Configuring floppy drive controller...\n");
@@ -163,7 +168,7 @@ void floppy_init() {
 	floppy_recalibrate(0);
 
 	log("Turning on drive 0 motor...\n");
-	floppy_set_motor(0, 0);
+	floppy_set_motor(0, 1);
 
 	log("Seeking drive 0 to cylinder 0...\n");
 	floppy_seek(0, 1);
