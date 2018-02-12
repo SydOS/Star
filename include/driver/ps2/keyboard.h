@@ -1,4 +1,4 @@
+// https://wiki.osdev.org/Keyboard
 
 
-
-extern void keyboard_init();
+extern void ps2_keyboard_init();

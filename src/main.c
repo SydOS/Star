@@ -141,7 +141,7 @@ void protected_mode_land() {
 	// Floppy test.
 	floppy_detect();
 	log("Initialize floppy drives...\n");
-	floppy_init();
+	//floppy_init();
 
     vga_enable_cursor();
 

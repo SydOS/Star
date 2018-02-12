@@ -3,42 +3,43 @@
 #include <logging.h>
 #include <tools.h>
 #include <driver/ps2/keyboard.h>
+#include <driver/ps2/ps2.h>
 #include <kernel/interrupts.h>
 #include <driver/vga.h>
-
-// Port used for comms with PS/2.
-#define PS2_DATA_PORT 0x60
 
 // Keyboard commands.
 enum
 {
-    KEYBOARD_CMD_SETLEDS    = 0xED,
-    KEYBOARD_CMD_ECHO       = 0XEE,
-    KEYBOARD_CMD_RESET      = 0xFF
+    PS2_KEYBOARD_CMD_SETLEDS    = 0xED,
+    PS2_KEYBOARD_CMD_ECHO       = 0XEE,
+    PS2_KEYBOARD_CMD_RESET      = 0xFF
 
 };
 
 // Keyboard responses.
 enum
 {
-    KEYBOARD_RESPONSE_ERROR             = 0x00,
-    KEYBOARD_RESPONSE_SELFTEST_PASS     = 0xAA,
-    KEYBOARD_RESPONSE_ECHO              = 0xEE,
-    KEYBOARD_RESPONSE_ACK               = 0xFA,
-    KEYBOARD_RESPONSE_SELFTEST_FAIL     = 0xFC,
-    KEYBOARD_RESPONSE_SELFTEST_FAIL2    = 0xFD,
-    KEYBOARD_RESPONSE_SELFTEST_RESEND   = 0xFE,
-    KEYBOARD_RESPONSE_ERROR2            = 0xFF
+    PS2_KEYBOARD_RESPONSE_ERROR             = 0x00,
+    PS2_KEYBOARD_RESPONSE_SELFTEST_PASS     = 0xAA,
+    PS2_KEYBOARD_RESPONSE_ECHO              = 0xEE,
+    PS2_KEYBOARD_RESPONSE_ACK               = 0xFA,
+    PS2_KEYBOARD_RESPONSE_SELFTEST_FAIL     = 0xFC,
+    PS2_KEYBOARD_RESPONSE_SELFTEST_FAIL2    = 0xFD,
+    PS2_KEYBOARD_RESPONSE_SELFTEST_RESEND   = 0xFE,
+    PS2_KEYBOARD_RESPONSE_ERROR2            = 0xFF
 };
 
 // Keyboard LEDs.
 enum
 {
-    KEYBOARD_LED_NONE           = 0x00,
-    KEYBOARD_LED_SCROLL_LOCK    = 0x01,
-    KEYBOARD_LED_NUM_LOCK       = 0x02,
-    KEYBOARD_LED_CAPS_LOCK      = 0x04
+    PS2_KEYBOARD_LED_NONE           = 0x00,
+    PS2_KEYBOARD_LED_SCROLL_LOCK    = 0x01,
+    PS2_KEYBOARD_LED_NUM_LOCK       = 0x02,
+    PS2_KEYBOARD_LED_CAPS_LOCK      = 0x04
 };
+
+// Used for IRQ waiting.
+static bool irq_triggered = false;
 
 // United States keyboard layout.
 const char keyboard_layout_us[] =
@@ -62,20 +63,32 @@ const char keyboard_layout_us[] =
 
 };
 
-static void keyboard_wait_ack()
+void ps2_keyboard_wait_irq()
 {
-    while(inb(PS2_DATA_PORT) != KEYBOARD_RESPONSE_ACK);
+    uint8_t timeout = 300;
+    while (!irq_triggered) {
+		if(!timeout) break;
+		timeout--;
+		sleep(10);
+	}
+	if(!irq_triggered) { log("KEYBOARD IRQ TIMEOUT\n"); }
+    irq_triggered = false;
 }
 
-static void keyboard_reset()
+void ps2_keyboard_send_cmd(uint8_t cmd)
 {
+    // Send command.
+    outb(PS2_DATA_PORT, cmd);
 
+    // Wait for IRQ.
+    ps2_keyboard_wait_irq();
 }
 
-// Callback for PIT channel 0 on IRQ0.
-static void keyboard_callback(registers_t* regs)
+// Callback for keyboard on IRQ1.
+static void ps2_keyboard_callback(registers_t* regs)
 {	
-	//log("Keyboard pressed!");
+	log("IRQ1 raised!\n");
+    irq_triggered = true;
 
     // Read scancode from keyboard.
     
@@ -85,28 +98,23 @@ static void keyboard_callback(registers_t* regs)
 }
 
 // Initializes the keyboard.
-void keyboard_init()
+void ps2_keyboard_init()
 {
-
-
-    // Send echo to keyboard.
-    //outb(PS2_DATA_PORT, KEYBOARD_CMD_ECHO);
-    //keyboard_wait_ack();
-
-    outb(PS2_DATA_PORT, KEYBOARD_CMD_RESET);
-    //keyboard_wait_ack();
-    sleep(2000);
-    outb(PS2_DATA_PORT, KEYBOARD_CMD_SETLEDS);
-    keyboard_wait_ack();
-    outb(PS2_DATA_PORT, KEYBOARD_LED_NUM_LOCK | KEYBOARD_LED_CAPS_LOCK | KEYBOARD_LED_SCROLL_LOCK);
-    keyboard_wait_ack();
-    sleep(2000);
-    outb(PS2_DATA_PORT, KEYBOARD_CMD_SETLEDS);
-    keyboard_wait_ack();
-    outb(PS2_DATA_PORT, KEYBOARD_LED_NONE);
-    keyboard_wait_ack();
+    // Test port.
+    if (ps2_send_cmd_response(PS2_CMD_TEST_KEYBPORT) != PS2_CMD_RESPONSE_PORTTEST_PASS)
+    {
+        log("Keyboard PS/2 port self-test failed!\n");
+        return;
+    }
 
     // Register IRQ1 for the keyboard.
-    interrupts_irq_install_handler(1, keyboard_callback);
-    log("Keyboard initialized!\n");
+    interrupts_irq_install_handler(1, ps2_keyboard_callback);
+
+    // Enable keyboard.
+    log ("Enable keyboard port...\n");
+    ps2_send_cmd(PS2_CMD_ENABLE_KEYBPORT);
+    log("Resetting keyboard...");
+    ps2_keyboard_send_cmd(PS2_KEYBOARD_CMD_RESET);
+
+    log("PS/2 keyboard initialized!\n");
 }
