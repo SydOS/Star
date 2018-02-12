@@ -54,7 +54,7 @@ build-kernel:
 	rm -rf *.o
 
 test:
-	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -fda DISK1.IMA
+	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -drive format=raw,file=fat12.img,index=0,if=floppy
 
 debug:
 	qemu-system-i386 -kernel Star-i686.kernel -S -s & gdb Star-i686.kerel -ex 'target remote localhost:1234'
