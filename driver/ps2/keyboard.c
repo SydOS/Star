@@ -113,7 +113,7 @@ void ps2_keyboard_init()
     // Enable keyboard.
     log ("Enable keyboard port...\n");
     ps2_send_cmd(PS2_CMD_ENABLE_KEYBPORT);
-    log("Resetting keyboard...");
+    log("Resetting keyboard...\n");
     ps2_keyboard_send_cmd(PS2_KEYBOARD_CMD_RESET);
 
     log("PS/2 keyboard initialized!\n");

@@ -19,7 +19,7 @@ enum
     PS2_CMD_WRITE_BYTE0         = 0x60,
     PS2_CMD_DISABLE_MOUSEPORT   = 0xA7, // Disable mouse PS/2 port (only if 2 PS/2 ports supported).
     PS2_CMD_ENABLE_MOUSEPORT    = 0xA8, // Enable mouse PS/2 port (only if 2 PS/2 ports supported).
-    PS2_CMD_TEST_MOUSEPORT2     = 0xA9, // Test mouse PS/2 port (only if 2 PS/2 ports supported).
+    PS2_CMD_TEST_MOUSEPORT      = 0xA9, // Test mouse PS/2 port (only if 2 PS/2 ports supported).
     PS2_CMD_SELFTEST            = 0xAA, // Test PS/2 Controller. Response: 0x55 test passed; 0xFC test failed.
     PS2_CMD_TEST_KEYBPORT       = 0xAB, // Test keyboard PS/2 port. Response: 0x00 test passed; 0x01, 0x02, 0x03, 0x04 = error.
     PS2_CMD_DISABLE_KEYBPORT    = 0xAD, // Disable keyboard PS/2 port.

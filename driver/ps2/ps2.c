@@ -4,6 +4,7 @@
 #include <tools.h>
 #include <driver/ps2/ps2.h>
 #include <driver/ps2/keyboard.h>
+#include <driver/ps2/mouse.h>
 
 // Ports used for comms with controller.
 #define PS2_REG_PORT    0x64
@@ -62,6 +63,7 @@ void ps2_init()
 
     // Hand it off to devices here.
     ps2_keyboard_init();
+    ps2_mouse_init();
 
     log("PS/2 controller initialized!\n");
 }
