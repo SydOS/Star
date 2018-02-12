@@ -120,18 +120,15 @@ void protected_mode_land() {
 	vga_setcolor(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREEN);
 	log("Kernel has entered protected mode.\n");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-	// TODO: Setup exceptions in our IDT table
-    //log("Remapping PIC...\n");
-    //PIC_remap(0x20, 0x28);
-
-	asm volatile("sti");
-    log("Setting up PIT...\n");
-    pit_init();
     
-    // Enable interrupts
+    // Enable interrupts.
+	asm volatile("sti");
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
     log("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+	log("Setting up PIT...\n");
+    pit_init();
 
     log("Initializing paging...\n");
     paging_initialize();
@@ -142,6 +139,14 @@ void protected_mode_land() {
 	floppy_init();
 
     vga_enable_cursor();
+
+	log ("Sleeping for 5 seconds...\n");
+	sleep(5000);
+	log ("Current uptime: ");
+	char* temp;
+	utoa(pit_ticks(), temp, 10);
+	log(temp);
+	log(" milliseconds.\n");
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");

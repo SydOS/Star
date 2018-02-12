@@ -1,4 +1,5 @@
 #include <main.h>
+#include <driver/pit.h>
 
 /**
  * Convert int to char array
@@ -59,4 +60,13 @@ size_t strlen(const char* str) {
 	size_t len = 0;
 	while (str[len]) { len++; }
 	return len;
+}
+
+// Sleep for the specified number of milliseconds.
+void sleep(uint32_t ms)
+{
+	// 1 tick = 1 ms.
+	uint64_t startTick = pit_ticks();
+	uint64_t endTick = startTick + ms;
+	while (pit_ticks() < endTick);
 }
