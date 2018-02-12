@@ -1,87 +1,40 @@
 #include <main.h>
 #include <logging.h>
-#include <driver/vga.h>
+#include <driver/idt.h>
+#include <io.h>
 
-static uint32_t idt_location = 0x2000;
-static uint32_t idtr_location = 0x10F0;
-static uint32_t idt_size = 0x800;
+extern void _idt_load(uint32_t ptr);
 
-static uint8_t __idt_setup = 0;
-static uint8_t test_success = 0;
-static uint32_t test_timeout = 0x1000;
+// Create an IDT with 256 entries.
+idt_entry_t idt[256];
+idt_ptr_t idt_ptr;
 
-/**
- * Set the Interrupt Descriptor Table Register (IDTR)
- */
-extern void _set_idtr();
-/**
- * Default (blank) handler for Interrupt Descriptor Table
- */
-void __idt_default_handler();
-
-#define INT_START asm volatile("pusha");
-#define INT_END asm volatile("popa"); \
-	asm volatile("iret");
-
-/**
- * Register interrupt in IDT table at specific index
- * @param i        uint8_t representing index number
- * @param callback pointer to callback function
- */
-void idt_register_interrupt(uint8_t i, uint32_t callback) {
-	if(!__idt_setup) {
-		vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
-		vga_writes("IDT not setup!\n");
-		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-	}
-
-	*(uint16_t*)(idt_location + 8*i + 0) = (uint16_t)(callback & 0x0000ffff);
-	*(uint16_t*)(idt_location + 8*i + 2) = (uint16_t)0x8;
-	*(uint8_t*) (idt_location + 8*i + 4) = 0x00;
-	*(uint8_t*) (idt_location + 8*i + 5) = 0x8e;//0 | IDT_32BIT_INTERRUPT_GATE | IDT_PRESENT;
-	*(uint16_t*)(idt_location + 8*i + 6) = (uint16_t)((callback & 0xffff0000) >> 16);
-	return;
-}
-
-/**
- * Internal use stub for testing that IDT interrupts work
- */
-void __idt_test_handler()
+// Sets an entry in the IDT.
+void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags)
 {
-	INT_START;
-	test_success = 1;
-	INT_END;
+    // The base address of the interrupt routine.
+    idt[num].base_lo = base & 0xFFFF;
+    idt[num].base_hi = (base >> 16) & 0xFFFF;
+
+    // The segment of the IDT entry.
+    idt[num].sel = sel;
+    idt[num].always0 = 0;
+    // We must uncomment the OR below when we get to using user-mode.
+    // It sets the interrupt gate's privilege level to 3.
+    idt[num].flags   = flags /* | 0x60 */;
 }
 
-/**
- * IDT table initialization code, should only be run once!
- */
-void idt_init() {
-	idt_location = 0x2000;
-	idtr_location = 0x10F0;
-	__idt_setup = 1;
-	for(uint8_t i = 0; i < 255; i++)
-	{
-		idt_register_interrupt(i, (uint32_t)&__idt_default_handler);
-	}
-	idt_register_interrupt(0x2f, (uint32_t)&__idt_test_handler);
-	//idt_register_interrupt(0x2e, (uint32_t)&schedule);
-	/* create IDTR now */
-	*(uint16_t*)idtr_location = idt_size - 1;
-	*(uint32_t*)(idtr_location + 2) = idt_location;
-	_set_idtr();
-	asm volatile("int $0x2f");
-	while(test_timeout-- != 0)
-	{
-		if(test_success != 0)
-		{
-			idt_register_interrupt(0x2F, (uint32_t)&__idt_default_handler);
-			break;
-		}
-	}
-	if(!test_success) {
-		log("IDT link is offline (timeout).");
-	}
-	log("IDT Initialized!\n");
-	return;
+// Initializes the IDT.
+void idt_init()
+{
+    // Set up the IDT pointer and limit.
+    idt_ptr.limit = (sizeof(idt_entry_t) * 256) - 1;
+    idt_ptr.base = &idt;
+
+    // Clear out the IDT with zeros.
+    memset(&idt, 0, sizeof(idt_entry_t) * 256);
+
+    // Load the IDT into the processor.
+    _idt_load((uint32_t)&idt_ptr);
+    log("IDT initialized!\n");
 }

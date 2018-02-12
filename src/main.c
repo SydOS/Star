@@ -1,16 +1,15 @@
 #include "main.h"
 #include "tools.h"
 #include "driver/gdt.h"
+#include "driver/nmi.h"
+#include "driver/idt.h"
+#include "driver/interrupts.h"
+#include "driver/pit.h"
 #include "driver/vga.h"
 #include "driver/floppy.h"
-#include "driver/nmi.h"
-#include "driver/pic.h"
-#include "driver/idt.h"
-#include "driver/pit.h"
 #include "driver/memory.h"
 #include "driver/paging.h"
 #include "driver/serial.h"
-#include "driver/exceptions.h"
 #include "driver/cpuid.h"
 
 #include "logging.h"
@@ -30,12 +29,16 @@ extern uint32_t kernel_base;
  */
 extern void _enable_A20();
 extern void _enable_protected_mode();
+extern void _disable_protected_mode();
+extern int _get_protected_mode();
 
 /**
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main(void) {
+	
 	asm volatile("cli");
+	
 
 	vga_disable_cursor();
 	
@@ -59,7 +62,6 @@ void kernel_main(void) {
 	
 	// -------------------------------------------------------------------------
 	// MEMORY RELATED STUFF
-
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 
 	vga_writes("Checking A20 line...\n");
@@ -103,14 +105,14 @@ void kernel_main(void) {
 	log("Initializing IDT...\n");
 	idt_init();
 
-	log("Initializing exceptions handlers...\n");
-	exceptions_init();
+	log("Initializing interrupts...\n");
+	interrupts_init();
 
 	log("Enabling NMI...\n");
 	NMI_enable();
 
-	_enable_protected_mode();
-
+	//_enable_protected_mode();
+	protected_mode_land();
 	
 }
 
@@ -119,15 +121,15 @@ void protected_mode_land() {
 	log("Kernel has entered protected mode.\n");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	// TODO: Setup exceptions in our IDT table
-    log("Remapping PIC...\n");
-    PIC_remap(0x20, 0x28);
+    //log("Remapping PIC...\n");
+    //PIC_remap(0x20, 0x28);
 
-    //log("Setting up PIT...\n");
-    //pit_init();
+	asm volatile("sti");
+    log("Setting up PIT...\n");
+    pit_init();
     
     // Enable interrupts
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
-    asm volatile("sti");
     log("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 

@@ -1,1 +1,0 @@
-extern void exceptions_init();

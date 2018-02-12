@@ -1,33 +1,15 @@
-.global _set_gdtr
-.type _set_gdtr, @function
-_set_gdtr:
-	push %ebp
-	movl %esp, %ebp
+; Sets up the new GDT into the processor while flushing out the old one.
+global _gdt_load
+_gdt_load:
+	mov eax, [esp+4] ; Get the pointer to the GDT, passed as a parameter.
+	lgdt [eax]       ; Load the GDT pointer.
 
-	lgdt 0x800
-
-	movl %ebp, %esp
-	pop %ebp
+	mov ax, 0x10
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov ss, ax
+	jmp 0x08:.flush2
+.flush2:
 	ret
-
-.global _reload_segments
-.type _reload_segments, @function
-_reload_segments:
-	push %ebp
-	movl %esp, %ebp
-
-	push %eax
-	mov $0x10, %ax
-	mov %ax, %ds
-	mov %ax, %es
-	mov %ax, %fs
-	mov %ax, %gs
-	mov %ax, %ss
-	pop %eax
-
-	ljmp $0x8, $me
-me:
-	movl %ebp, %esp
-	pop %ebp
-	ret
-	

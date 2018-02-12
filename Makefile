@@ -20,26 +20,26 @@ build-kernel:
 	nasm -felf32 src/boot.asm -o boot.o
 	nasm -felf32 driver/a20/check_a20.asm -o check_a20.o
 	nasm -felf32 driver/a20/enable_a20.asm -o enable_a20.o
-	nasm -felf32 driver/pic/disable.asm -o pic_disable.o
 	nasm -felf32 driver/cpuid/cpuid.asm -o cpuid_asm.o
-	$(ARCH)-elf-as driver/gdt/gdt.asm -o gdt_asm.o
-	$(ARCH)-elf-as driver/idt/idt.asm -o idt_asm.o
+	nasm -felf32 driver/gdt/gdt.asm -o gdt_asm.o
+	nasm -felf32 driver/idt/idt.asm -o idt_asm.o
+	nasm -felf32 driver/interrupts/interrupts.asm -o interrupts_asm.o
 
 	$(ARCH)-elf-gcc -c src/main.c -o main.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c src/tools.c -o tools.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c src/logging.c -o logging.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/vga.c -o vga.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/floppy.c -o floppy.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/pic/pic.c -o pic.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/gdt/gdt.c -o gdt.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/idt/idt.c -o idt.o $(CFLAGS)
+	$(ARCH)-elf-gcc -c driver/interrupts/interrupts.c -o interrupts.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/cpuid/cpuid.c -o cpuid.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/pit.c -o pit.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/nmi.c -o nmi.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/memory.c -o memory.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/serial.c -o serial.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/paging.c -o paging.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/exceptions.c -o exceptions.o $(CFLAGS)
+
 
 	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -O2 -nostdlib *.o -lgcc
 	$(ARCH)-elf-objcopy --only-keep-debug Star-$(ARCH).kernel Star-$(ARCH).sym
