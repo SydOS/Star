@@ -20,6 +20,8 @@ interesting demos.
 - Input to screen via serial
 - CPUID
 - Basic floppy disk detection
+- Parallel port output (should work with a printer)
+- Random integers
 ```
 
 ### Building
