@@ -26,6 +26,19 @@ void floppy_detect() {
 	log("\n");
 }
 
+void floppy_write_command(uint8_t cmd)
+{
+	uint16_t timeout = 300;
+	while(--timeout) {
+		if(inb(FLOPPY_MAIN_STATUS_REGISTER) & 128) {
+			outb(FLOPPY_DATA_FIFO, cmd);
+			return;
+		}
+		sleep(10);
+	} 
+	log("FLOPPY DRIVE DATA TIMEOUT\n");
+}
+
 void floppy_wait_for_irq(uint16_t timeout) {
 	uint8_t ret = 0;
 	while (!irq_triggered) {
@@ -51,23 +64,66 @@ unsigned char floppy_getversion() {
 
 void floppy_reset() {
 	// Reset floppy controller.
-	outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, 0x00);
-	outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, 0x0C);
+	floppy_write_command(0x00);
+	floppy_write_command(0x0C);
 }
 
 void floppy_configure() {
 	// Send configure command.
-	outb(FLOPPY_DATA_FIFO, FLOPPY_CONFIGURE);
-	outb(FLOPPY_DATA_FIFO, 0x0);
+	floppy_write_command(FLOPPY_CONFIGURE);
+	floppy_write_command(0x0);
 	char data = (1 << 6) | (1 << 5) | (0 << 4) | (15 - 1);
-	outb(FLOPPY_DATA_FIFO, data);
-	outb(FLOPPY_DATA_FIFO, 0x0);
+	floppy_write_command(data);
+	floppy_write_command(0x0);
 }
 
 void floppy_recalibrate(uint8_t drive) {
-	outb(FLOPPY_DATA_FIFO, FLOPPY_RECALIBRATE);
-	outb(FLOPPY_DATA_FIFO, drive);
+	floppy_write_command(FLOPPY_RECALIBRATE);
+	floppy_write_command(drive);
 	floppy_wait_for_irq(300);
+}
+
+void floppy_seek(uint8_t drive, uint8_t cylinder) {
+	floppy_write_command(FLOPPY_SEEK);
+	floppy_write_command((0 << 2) | drive);
+	floppy_write_command(cylinder);
+	floppy_wait_for_irq(300);
+}
+
+void floppy_drive_set(uint8_t step, uint8_t loadt, uint8_t unloadt, uint8_t dma)
+{
+	floppy_write_command(FLOPPY_SPECIFY);
+	uint8_t data = 0;
+	data = ((step&0xf)<<4) | (unloadt & 0xf);
+	floppy_write_command(data);
+	data = ((loadt << 1) | (dma?0:1));
+	floppy_write_command(data);
+}
+
+void floppy_set_motor(uint8_t drive, uint8_t status) {
+	uint8_t motor = 0;
+	switch(drive)
+	{
+		case 0:
+			motor = 16;
+			break;
+		case 1:
+			motor = 32;
+			break;
+		case 2:
+			motor = 64;
+			break;
+		case 3:
+			motor = 128;
+			break;
+	}
+
+	if(status) {
+		outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, drive | motor | 4 | 8);
+	} else {
+		outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, 4);
+	}
+	sleep(500);
 }
 
 void floppy_init() {
@@ -104,5 +160,14 @@ void floppy_init() {
 	floppy_reset();
 
 	log("Recalibrating floppy drives...\n");
-	floppy_recalibrate(0x0);
+	floppy_recalibrate(0);
+
+	log("Turning on drive 0 motor...\n");
+	floppy_set_motor(0, 0);
+
+	log("Seeking drive 0 to cylinder 0...\n");
+	floppy_seek(0, 1);
+
+	log("Turning off drive 0 motor...\n");
+	floppy_set_motor(0, 0);
 }
