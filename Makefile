@@ -39,6 +39,7 @@ build-kernel:
 	$(ARCH)-elf-gcc -c kernel/paging.c -o paging.o $(CFLAGS)
 	
 	$(ARCH)-elf-gcc -c driver/serial.c -o serial.o $(CFLAGS)
+	$(ARCH)-elf-gcc -c driver/parallel.c -o parallel.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/vga.c -o vga.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/floppy.c -o floppy.o $(CFLAGS)
 	$(ARCH)-elf-gcc -c driver/speaker.c -o speaker.o $(CFLAGS)
