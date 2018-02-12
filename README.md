@@ -1,4 +1,4 @@
-# Project Title
+# SydOS
 
 Welcome to SydOS! Me, along with a couple of friends (and hopefully you!) are working on a small toy kernel. Someday it
 might be suitable for some form of use. I'm targetting getting it to run inside virtual machines as the guest, but you're
