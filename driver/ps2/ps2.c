@@ -9,9 +9,26 @@
 // Ports used for comms with controller.
 #define PS2_REG_PORT    0x64
 
+void ps2_wait_send()
+{
+    uint32_t timeout = 1000000;
+    while (timeout--)
+        if((inb(PS2_REG_PORT) & PS2_STATUS_INPUTBUFFERFULL) == PS2_STATUS_INPUTBUFFERFULL)
+            return;
+}
+
+void ps2_wait_receive()
+{
+    uint32_t timeout = 1000000;
+    while (timeout--)
+        if((inb(PS2_REG_PORT) & PS2_STATUS_OUTPUTBUFFERFULL) == PS2_STATUS_OUTPUTBUFFERFULL)
+            return;
+}
+
 void ps2_send_cmd(uint8_t cmd)
 {
     // Send command to PS/2 controller.
+    //ps2_wait_send();
     outb(PS2_REG_PORT, cmd);
 }
 
@@ -21,12 +38,13 @@ uint8_t ps2_send_cmd_response(uint8_t cmd)
     ps2_send_cmd(cmd);
 
     // Wait for and get response.
-    while(!(inb(PS2_REG_PORT) & PS2_STATUS_OUTPUTBUFFERFULL));
+    ps2_wait_receive();
     return inb(PS2_DATA_PORT);
 }
 
 uint8_t ps2_read_configuration()
 {
+    // Wait for buffer to be clear, and then send response.
     return ps2_send_cmd_response(PS2_CMD_READ_BYTE0);
 }
 
@@ -34,7 +52,7 @@ void ps2_configure(uint8_t configuration)
 {
     //Send configuration.
     ps2_send_cmd(PS2_CMD_WRITE_BYTE0);
-    while((inb(PS2_REG_PORT) & PS2_STATUS_INPUTBUFFERFULL));
+    ps2_wait_send();
     outb(PS2_DATA_PORT, configuration);
 }
 

@@ -23,7 +23,11 @@ enum
     PS2_CMD_SELFTEST            = 0xAA, // Test PS/2 Controller. Response: 0x55 test passed; 0xFC test failed.
     PS2_CMD_TEST_KEYBPORT       = 0xAB, // Test keyboard PS/2 port. Response: 0x00 test passed; 0x01, 0x02, 0x03, 0x04 = error.
     PS2_CMD_DISABLE_KEYBPORT    = 0xAD, // Disable keyboard PS/2 port.
-    PS2_CMD_ENABLE_KEYBPORT     = 0xAE  // Enable keyboard PS/2 port.
+    PS2_CMD_ENABLE_KEYBPORT     = 0xAE, // Enable keyboard PS/2 port.
+    PS2_CMD_WRITE_CONTROLLER    = 0xD1, // Write next byte to Controller Output Port.
+    PS2_CMD_WRITE_KEYBOARD_OUT  = 0xD2, // Write next byte to first PS/2 port output buffer (makes it look like the byte written was received from the first PS/2 port).
+    PS2_CMD_WRITE_MOUSE_OUT     = 0xD3, // Write next byte to second PS/2 port output buffer (makes it look like the byte written was received from the second PS/2 port).
+    PS2_CMD_WRITE_MOUSE_IN      = 0xD4  // Write next byte to second PS/2 port input buffer (sends next byte to the second PS/2 port).
 };
 
 // PS/2 command responses.
@@ -41,7 +45,8 @@ enum
 
 enum
 {
-    PS2_CONFIG_KEYBPORT_INTERRUPT               = 0x01
+    PS2_CONFIG_KEYBPORT_INTERRUPT               = 0x01,
+    PS2_CONFIG_MOUSEPORT_INTERRUPT              = 0x02
 };
 
 // Port used for comms with PS/2.
