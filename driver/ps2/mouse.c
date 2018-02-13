@@ -44,54 +44,31 @@ void ps2_mouse_wait_irq()
 uint8_t ps2_mouse_send_cmd(uint8_t cmd)
 {
     // Prepare to send byte to mouse.
-    //ps2_send_cmd(PS2_CMD_WRITE_MOUSE_IN);
+    ps2_send_cmd(PS2_CMD_WRITE_MOUSE_IN);
 
     // Send command.
-    //ps2_wait_send();
-    //outb(PS2_DATA_PORT, cmd);
-
-ps2_mouse_wait(1);
-
-    outb(0x64, 0xD4);
-
-    // Send command.
-
-    ps2_mouse_wait(1);
-
+    ps2_wait_send();
     outb(PS2_DATA_PORT, cmd);
 
     // Read result.
-    //ps2_wait_receive();
+    ps2_wait_receive();
     return inb(PS2_DATA_PORT);
-}
-
-void ps2_mouse_wait(uint8_t type)
-{
-    uint32_t timeout = 1000000;
-    if (type == 0)
-    {
-        while (timeout--)
-            if((inb(0x64) & 1) == 1)
-                return;
-    }
-    else
-    {
-        while (timeout--)
-            if((inb(0x64) & 2) == 0)
-                return;
-    }
 }
 
 // Callback for mouse on IRQ12.
 static void ps2_mouse_callback(registers_t* regs)
 {	
-	log("IRQ12 raised!\n");
+	log("IRQ12 raised! 0x");
     irq_triggered = false;
     
     
     //ps2_mouse_send_cmd(PS2_MOUSE_CMD_READ_DATA);
    // inb(PS2_DATA_PORT);
-    inb(PS2_DATA_PORT);
+   char* tmp;
+
+    log(utoa(inb(PS2_DATA_PORT), tmp, 16));
+    log("\n");
+   // inb(PS2_DATA_PORT);
 }
 
 // Initializes the mouse.
@@ -108,63 +85,17 @@ void ps2_mouse_init()
     interrupts_irq_install_handler(12, ps2_mouse_callback);
 
     // Enable mouse.
-    log ("Enable mouse...\n");
+    log ("Enabling mouse...\n");
     ps2_send_cmd(PS2_CMD_ENABLE_MOUSEPORT);
 
-//ps2_mouse_wait(1);
-
-    outb(0x64, 0x20);
-
-    ps2_mouse_wait(0);
-
-    uint8_t status = inb(0x60) | 2;
-
-    ps2_mouse_wait(1);
-
-outb(0x64, 0x60);
- ps2_mouse_wait(1);
-
-    outb(0x60, status);
-
     // Enable interrupts from mouse.
-    //uint8_t config = ps2_read_configuration();
-    //ps2_configure(config | PS2_CONFIG_MOUSEPORT_INTERRUPT);
-
-ps2_mouse_send_cmd(0xFF);
-
-    ps2_mouse_wait(0);
-
-    inb(0x60);
-
-    //ps2_mouse_send_cmd(0xEA);
-
-   // log(utoa(inb(PS2_DATA_PORT), tmp, 16));
-
-    ps2_mouse_send_cmd(0xF6);
-
-    ps2_mouse_wait(0);
-
-    inb(0x60);
-
-   // log(utoa(inb(PS2_DATA_PORT), tmp, 16));
-
-    //log(utoa(inb(PS2_DATA_PORT), tmp, 16));
-
-    //log(utoa(inb(PS2_DATA_PORT), tmp, 16));
-
-    //log(utoa(inb(PS2_DATA_PORT), tmp, 16));
-
-
-
-    ps2_mouse_send_cmd(0xF4);
-
-    ps2_mouse_wait(0);
-
-    inb(0x60);
+    uint8_t config = ps2_read_configuration() | PS2_CONFIG_MOUSEPORT_INTERRUPT;
+    ps2_configure(config);
 
     // Reset mouse and enable data.
-    //ps2_mouse_send_cmd(PS2_MOUSE_CMD_RESET);
-   // ps2_mouse_send_cmd(PS2_MOUSE_CMD_SET_DEFAULTS);
-   // ps2_mouse_send_cmd(PS2_MOUSE_CMD_ENABLE_DATA);
+    ps2_mouse_send_cmd(PS2_MOUSE_CMD_RESET);
+    sleep(500);
+    ps2_mouse_send_cmd(PS2_MOUSE_CMD_SET_DEFAULTS);
+    ps2_mouse_send_cmd(PS2_MOUSE_CMD_ENABLE_DATA);
     log("PS/2 mouse initialized!\n");
 }

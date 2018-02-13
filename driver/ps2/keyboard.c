@@ -101,11 +101,11 @@ static void ps2_keyboard_callback(registers_t* regs)
 void ps2_keyboard_init()
 {
     // Test port.
-    if (ps2_send_cmd_response(PS2_CMD_TEST_KEYBPORT) != PS2_CMD_RESPONSE_PORTTEST_PASS)
+    /*if (ps2_send_cmd_response(PS2_CMD_TEST_KEYBPORT) != PS2_CMD_RESPONSE_PORTTEST_PASS)
     {
         log("Keyboard PS/2 port self-test failed!\n");
         return;
-    }
+    }*/
 
     // Register IRQ1 for the keyboard.
     interrupts_irq_install_handler(1, ps2_keyboard_callback);

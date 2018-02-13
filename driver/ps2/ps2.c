@@ -11,24 +11,26 @@
 
 void ps2_wait_send()
 {
+    // Input buffer must be clear before sending data.
     uint32_t timeout = 1000000;
     while (timeout--)
-        if((inb(PS2_REG_PORT) & PS2_STATUS_INPUTBUFFERFULL) == PS2_STATUS_INPUTBUFFERFULL)
+        if((inb(PS2_REG_PORT) & PS2_STATUS_INPUTBUFFERFULL) == 0)
             return;
 }
 
 void ps2_wait_receive()
 {
+    // Output buffer must be set before we can get data.
     uint32_t timeout = 1000000;
     while (timeout--)
-        if((inb(PS2_REG_PORT) & PS2_STATUS_OUTPUTBUFFERFULL) == PS2_STATUS_OUTPUTBUFFERFULL)
+        if((inb(PS2_REG_PORT) & PS2_STATUS_OUTPUTBUFFERFULL) == 1)
             return;
 }
 
 void ps2_send_cmd(uint8_t cmd)
 {
     // Send command to PS/2 controller.
-    //ps2_wait_send();
+    ps2_wait_send();
     outb(PS2_REG_PORT, cmd);
 }
 
