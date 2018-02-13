@@ -24,6 +24,7 @@ enum
     PS2_CMD_TEST_KEYBPORT       = 0xAB, // Test keyboard PS/2 port. Response: 0x00 test passed; 0x01, 0x02, 0x03, 0x04 = error.
     PS2_CMD_DISABLE_KEYBPORT    = 0xAD, // Disable keyboard PS/2 port.
     PS2_CMD_ENABLE_KEYBPORT     = 0xAE, // Enable keyboard PS/2 port.
+    PS2_CMD_READ_CONTROLLER     = 0xD0, // Read Controller Output Port.
     PS2_CMD_WRITE_CONTROLLER    = 0xD1, // Write next byte to Controller Output Port.
     PS2_CMD_WRITE_KEYBOARD_OUT  = 0xD2, // Write next byte to first PS/2 port output buffer (makes it look like the byte written was received from the first PS/2 port).
     PS2_CMD_WRITE_MOUSE_OUT     = 0xD3, // Write next byte to second PS/2 port output buffer (makes it look like the byte written was received from the second PS/2 port).
@@ -43,15 +44,29 @@ enum
     PS2_CMD_RESPONSE_SELFTEST_FAIL              = 0xFC,
 };
 
+// PS/2 configuration.
 enum
 {
     PS2_CONFIG_KEYBPORT_INTERRUPT               = 0x01,
     PS2_CONFIG_MOUSEPORT_INTERRUPT              = 0x02
 };
 
+// PS/2 output port values.
+enum
+{
+    PS2_OUTPUT_IN_KEYB_FULL     = 0x10,
+    PS2_OUTPUT_IN_MOUSE_FULL    = 0x20
+};
+
 // Port used for comms with PS/2.
 #define PS2_DATA_PORT 0x60
 
-extern uint8_t ps2_read_configuration();
-extern void ps2_configure(uint8_t configuration);
+extern void ps2_wait_send();
+extern void ps2_wait_receive();
+extern void ps2_send_cmd(uint8_t cmd);
+extern uint8_t ps2_send_cmd_response(uint8_t cmd);
+extern void ps2_send_cmd_data(uint8_t cmd, uint8_t data);
+extern uint8_t ps2_send_cmd_data_response(uint8_t cmd, uint8_t data);
+extern uint8_t ps2_get_data();
+extern void ps2_flush();
 extern void ps2_init();

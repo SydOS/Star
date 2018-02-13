@@ -6,6 +6,11 @@
 #include <driver/ps2/ps2.h>
 #include <kernel/interrupts.h>
 
+// https://wiki.osdev.org/Mouse
+// https://wiki.osdev.org/PS/2_Mouse
+// http://www.computer-engineering.org/ps2mouse/
+// https://houbysoft.com/download/ps2mouse.html
+
 // Mouse commands.
 enum
 {
@@ -26,8 +31,24 @@ enum
 
 };
 
+// Mouse responses.
+enum
+{
+    PS2_MOUSE_RESPONSE_TEST_PASS    = 0xAA,
+    PS2_MOUSE_RESPONSE_ACK          = 0xFA
+};
+
+// Mouse types.
+enum
+{
+    PS2_MOUSE_TYPE_STANARD          = 0x00, // Standard PS/2 mouse.
+    PS2_MOUSE_TYPE_WHEEL            = 0x03, // Mouse with scroll wheel.
+    PS2_MOUSE_TYPE_FIVEBUTTON       = 0x04  // 5-button mouse.
+};
+
 // Used for IRQ waiting.
 static bool irq_triggered = false;
+static uint8_t irq_data;
 
 void ps2_mouse_wait_irq()
 {
@@ -43,32 +64,41 @@ void ps2_mouse_wait_irq()
 
 uint8_t ps2_mouse_send_cmd(uint8_t cmd)
 {
-    // Prepare to send byte to mouse.
-    ps2_send_cmd(PS2_CMD_WRITE_MOUSE_IN);
+    // Send command to mouse.
+    return ps2_send_cmd_data_response(PS2_CMD_WRITE_MOUSE_IN, cmd);
+}
 
-    // Send command.
-    ps2_wait_send();
-    outb(PS2_DATA_PORT, cmd);
-
-    // Read result.
-    ps2_wait_receive();
-    return inb(PS2_DATA_PORT);
+void ps2_mouse_connect()
+{
+    // Set defaults.
+    ps2_mouse_send_cmd(PS2_MOUSE_CMD_SET_DEFAULTS);
+    ps2_mouse_send_cmd(PS2_MOUSE_CMD_ENABLE_DATA);
 }
 
 // Callback for mouse on IRQ12.
 static void ps2_mouse_callback(registers_t* regs)
 {	
-	log("IRQ12 raised! 0x");
-    irq_triggered = false;
-    
-    
-    //ps2_mouse_send_cmd(PS2_MOUSE_CMD_READ_DATA);
-   // inb(PS2_DATA_PORT);
-   char* tmp;
+    // Get data.
+    uint8_t data = ps2_get_data();
 
-    log(utoa(inb(PS2_DATA_PORT), tmp, 16));
+	log("IRQ12 raised! 0x");
+    if (!irq_triggered)
+    {
+        irq_triggered = true;
+        irq_data = inb(PS2_DATA_PORT);
+    }
+   char* tmp;
+    log(utoa(data, tmp, 16));
     log("\n");
-   // inb(PS2_DATA_PORT);
+
+    // If the data is a self-test complete command, its likely a new mouse connected.
+    // If so, initialize it.
+    if (data == PS2_MOUSE_RESPONSE_TEST_PASS)
+    {
+        // Initialize mouse.
+        log("A new PS/2 mouse was connected!\n");
+        ps2_mouse_connect();
+    }
 }
 
 // Initializes the mouse.
@@ -81,21 +111,31 @@ void ps2_mouse_init()
         return;
     }*/
 
-    // Register IRQ12 for the mouse.
-    interrupts_irq_install_handler(12, ps2_mouse_callback);
-
-    // Enable mouse.
+    // Enable mouse port.
     log ("Enabling mouse...\n");
     ps2_send_cmd(PS2_CMD_ENABLE_MOUSEPORT);
 
-    // Enable interrupts from mouse.
-    uint8_t config = ps2_read_configuration() | PS2_CONFIG_MOUSEPORT_INTERRUPT;
-    ps2_configure(config);
+    // Register IRQ12 for the mouse.
+    interrupts_irq_install_handler(12, ps2_mouse_callback);
 
-    // Reset mouse and enable data.
+    // Enable interrupts from mouse.
+    uint8_t config = ps2_send_cmd_response(PS2_CMD_READ_BYTE0) | PS2_CONFIG_MOUSEPORT_INTERRUPT;
+    ps2_send_cmd_data(PS2_CMD_WRITE_BYTE0, config);
+
+    // Reset mouse.
     ps2_mouse_send_cmd(PS2_MOUSE_CMD_RESET);
+    ps2_mouse_wait_irq();
     sleep(500);
-    ps2_mouse_send_cmd(PS2_MOUSE_CMD_SET_DEFAULTS);
-    ps2_mouse_send_cmd(PS2_MOUSE_CMD_ENABLE_DATA);
-    log("PS/2 mouse initialized!\n");
+
+    // Check if mouse is present. If so, set it up.
+    if (irq_data == PS2_MOUSE_RESPONSE_ACK || irq_data == PS2_MOUSE_RESPONSE_TEST_PASS)
+    {
+        ps2_mouse_connect();
+        log("PS/2 mouse initialized!\n");
+    }
+    else
+    {
+        // No mouse found, but one could be plugged in later.
+        log("No PS/2 mouse found. System is ready for a mouse to be connected later.\n");
+    }
 }

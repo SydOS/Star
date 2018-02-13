@@ -44,18 +44,31 @@ uint8_t ps2_send_cmd_response(uint8_t cmd)
     return inb(PS2_DATA_PORT);
 }
 
-uint8_t ps2_read_configuration()
+void ps2_send_cmd_data(uint8_t cmd, uint8_t data)
 {
-    // Wait for buffer to be clear, and then send response.
-    return ps2_send_cmd_response(PS2_CMD_READ_BYTE0);
+    // Send command to PS/2 controller.
+    ps2_send_cmd(cmd);
+
+    // Send data packet.
+    ps2_wait_send();
+    outb(PS2_DATA_PORT, data);
 }
 
-void ps2_configure(uint8_t configuration)
+uint8_t ps2_send_cmd_data_response(uint8_t cmd, uint8_t data)
 {
-    //Send configuration.
-    ps2_send_cmd(PS2_CMD_WRITE_BYTE0);
-    ps2_wait_send();
-    outb(PS2_DATA_PORT, configuration);
+    // Send command to PS/2 controller.
+    ps2_send_cmd_data(cmd, data);
+
+    // Wait for and get response.
+    ps2_wait_receive();
+    return inb(PS2_DATA_PORT);
+}
+
+uint8_t ps2_get_data()
+{
+    // Wait for and get response.
+    ps2_wait_receive();
+    return inb(PS2_DATA_PORT);
 }
 
 void ps2_flush()
