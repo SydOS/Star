@@ -96,8 +96,8 @@ static void ps2_mouse_callback(registers_t* regs)
     if (data == PS2_MOUSE_RESPONSE_TEST_PASS)
     {
         // Initialize mouse.
-        log("A new PS/2 mouse was connected!\n");
         ps2_mouse_connect();
+        log("PS/2 mouse installed!\n");   
     }
 }
 
@@ -131,11 +131,8 @@ void ps2_mouse_init()
     if (irq_data == PS2_MOUSE_RESPONSE_ACK || irq_data == PS2_MOUSE_RESPONSE_TEST_PASS)
     {
         ps2_mouse_connect();
-        log("PS/2 mouse initialized!\n");
+        log("PS/2 mouse installed!\n");
     }
-    else
-    {
-        // No mouse found, but one could be plugged in later.
-        log("No PS/2 mouse found. System is ready for a mouse to be connected later.\n");
-    }
+
+    log("PS/2 mouse initialized!\n");
 }
