@@ -6,8 +6,8 @@ enum
     PS2_STATUS_INPUTBUFFERFULL  = 0x02, // Input buffer status (0 = empty, 1 = full).
     PS2_STATUS_SYSTEM_FLAG      = 0x04, // Meant to be cleared on reset and set by firmware. 
     PS2_STATUS_CONTROLLERCMD    = 0x08, // Command/data (0 = data written to input buffer is data for PS/2 device, 1 = data written to input buffer is data for PS/2 controller command).
-    PS2_STATUS_RESERVED1        = 0x10, // Unknown (chipset specific).
-    PS2_STATUS_RESERVED2        = 0x20, // Unknown (chipset specific).
+    PS2_STATUS_RESERVED         = 0x10, // Unknown (chipset specific).
+    PS2_STATUS_MOUSEFULL        = 0x20, // Mouse buffer full.
     PS2_STATUS_TIMEOUTERROR     = 0x40, // Time-out error (0 = no error, 1 = time-out error).
     PS2_STATUS_PARITYERROR      = 0x80  // Parity error (0 = no error, 1 = parity error).
 };
@@ -65,8 +65,9 @@ extern void ps2_wait_send();
 extern void ps2_wait_receive();
 extern void ps2_send_cmd(uint8_t cmd);
 extern uint8_t ps2_send_cmd_response(uint8_t cmd);
-extern void ps2_send_cmd_data(uint8_t cmd, uint8_t data);
-extern uint8_t ps2_send_cmd_data_response(uint8_t cmd, uint8_t data);
+extern void ps2_send_data(uint8_t data);
+extern uint8_t ps2_send_data_response(uint8_t data);
 extern uint8_t ps2_get_data();
+extern uint8_t ps2_get_status();
 extern void ps2_flush();
 extern void ps2_init();

@@ -12,7 +12,7 @@
 void ps2_wait_send()
 {
     // Input buffer must be clear before sending data.
-    uint32_t timeout = 1000000;
+    uint32_t timeout = 10000;
     while (timeout--)
         if((inb(PS2_REG_PORT) & PS2_STATUS_INPUTBUFFERFULL) == 0)
             return;
@@ -21,7 +21,7 @@ void ps2_wait_send()
 void ps2_wait_receive()
 {
     // Output buffer must be set before we can get data.
-    uint32_t timeout = 1000000;
+    uint32_t timeout = 10000;
     while (timeout--)
         if((inb(PS2_REG_PORT) & PS2_STATUS_OUTPUTBUFFERFULL) == 1)
             return;
@@ -44,20 +44,17 @@ uint8_t ps2_send_cmd_response(uint8_t cmd)
     return inb(PS2_DATA_PORT);
 }
 
-void ps2_send_cmd_data(uint8_t cmd, uint8_t data)
+void ps2_send_data(uint8_t data)
 {
-    // Send command to PS/2 controller.
-    ps2_send_cmd(cmd);
-
     // Send data packet.
     ps2_wait_send();
     outb(PS2_DATA_PORT, data);
 }
 
-uint8_t ps2_send_cmd_data_response(uint8_t cmd, uint8_t data)
+uint8_t ps2_send_data_response(uint8_t data)
 {
-    // Send command to PS/2 controller.
-    ps2_send_cmd_data(cmd, data);
+    // Send data to PS/2 device.
+    ps2_send_data(data);
 
     // Wait for and get response.
     ps2_wait_receive();
@@ -69,6 +66,12 @@ uint8_t ps2_get_data()
     // Wait for and get response.
     ps2_wait_receive();
     return inb(PS2_DATA_PORT);
+}
+
+uint8_t ps2_get_status()
+{
+    // Return status register.
+    return inb(PS2_REG_PORT);
 }
 
 void ps2_flush()
