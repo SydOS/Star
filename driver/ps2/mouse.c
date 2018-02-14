@@ -53,7 +53,11 @@ enum
     PS2_MOUSE_PACKET_LEFT_BTN       = 0x01,
     PS2_MOUSE_PACKET_RIGHT_BTN      = 0x02,
     PS2_MOUSE_PACKET_MIDDLE_BTN     = 0x04,
-    PS2_MOUSE_PACKET_MAGIC          = 0x08
+    PS2_MOUSE_PACKET_MAGIC          = 0x08,
+    PS2_MOUSE_PACKET_SIGN_X         = 0x10,
+    PS2_MOUSE_PACKET_SIGN_Y         = 0x20,
+    PS2_MOUSE_PACKET_OVERFLOW_X     = 0x40,
+    PS2_MOUSE_PACKET_OVERFLOW_Y     = 0x80
 };
 
 #define PS2_MOUSE_INTELLIMOUSE_SAMPLERATE1 200
@@ -104,6 +108,13 @@ void ps2_mouse_connect()
         else
             break;
     }
+
+    // If the ID is 0xFE at this point, likely no mouse is present.
+    if (mouse_id == PS2_DATA_RESPONSE_RESEND)
+    {
+        log("A working mouse couldn't be found!\n");
+        return;
+    }
     
     char* tmp;
     log("PS/2 mouse ID: 0x");
@@ -119,34 +130,79 @@ void ps2_mouse_connect()
     log("PS/2 mouse installed!\n");
 }
 
+static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
+{
+    // If either overflow value is set, ignore it.
+    if (mouse_bytes[0] & PS2_MOUSE_PACKET_OVERFLOW_X || mouse_bytes[0] & PS2_MOUSE_PACKET_OVERFLOW_Y)
+        return;
+
+    int16_t x = ((mouse_bytes[0] & PS2_MOUSE_PACKET_SIGN_X) ? 0xFFFFFF00 : 0) | mouse_bytes[1];
+    int16_t y = -(((mouse_bytes[0] & PS2_MOUSE_PACKET_SIGN_Y) ? 0xFFFFFF00 : 0) | mouse_bytes[2]);
+    int16_t z = 0;
+
+    // Get mouse wheel.
+    if (packet_size == 4)
+    {
+        z = ((((mouse_bytes[3] << 4)) >> 4));
+    }
+
+    // If we get values of 255 or higher, discard.
+    if (x > 255 || x < -255 || y > 255 || y < -255)
+        return;
+
+    char* tmp;
+    if (mouse_bytes[0] & PS2_MOUSE_PACKET_LEFT_BTN)
+        log("Left mouse button pressed!\n");
+    if (mouse_bytes[0] & PS2_MOUSE_PACKET_RIGHT_BTN)
+        log("Right mouse button pressed!\n");
+    if (mouse_bytes[0] & PS2_MOUSE_PACKET_MIDDLE_BTN)
+        log("Middle mouse button pressed!\n");
+
+    // Print status.
+    if (x != 0 || y != 0 || z != 0)
+    {
+        log("Mouse moved: X:");
+        log(itoa(x, tmp, 10));
+        log(" Y:");
+        log(itoa(y, tmp, 10));
+        log(" Z:");
+        log(itoa(z, tmp, 10));
+        log("\n");
+    }
+}
+
 // Callback for mouse on IRQ12.
 static void ps2_mouse_callback(registers_t* regs)
 {	
     // Get data.
     uint8_t data = ps2_get_data();
+    static uint8_t last_data = 0;
 
-    /*// Diag info.
+    // Diag info.
     char* tmp;
-    log(utoa(cycle, tmp, 10));
-    log(":");
-    log(utoa(data, tmp, 16));
-    log("\n");*/
+    //log(utoa(cycle, tmp, 10));
+    //log(":");
+    //log(utoa(data, tmp, 16));
+    //log("\n");
 
     // Attempt to decode input into mouse packets.
     static uint8_t cycle = 0;
     static uint8_t bad_packet_count = 0;
-    static uint8_t mouse_bytes[5];
+    static uint8_t mouse_bytes[4];
     mouse_bytes[cycle++] = data;
 
-    // If the data is a self-test complete command, its likely a new mouse connected.
+    // If the data is a self-test complete command, it's likely a new mouse connected.
     // If so, initialize it.
-    if (data == PS2_MOUSE_RESPONSE_TEST_PASS)
+    if (last_data == PS2_MOUSE_RESPONSE_TEST_PASS && data == PS2_MOUSE_TYPE_STANDARD)
     {
         // Initialize mouse.
         ps2_mouse_connect();
         cycle = 0;
         return;
     }
+
+    // Save data.
+    last_data = data;
 
     // If the data is just an ACK, throw it out.
     if (data == PS2_MOUSE_RESPONSE_ACK)
@@ -159,44 +215,28 @@ static void ps2_mouse_callback(registers_t* regs)
     if ((mouse_bytes[0] & PS2_MOUSE_PACKET_MAGIC) != PS2_MOUSE_PACKET_MAGIC)
     {
         cycle = 0;
-        log("Invalid mouse packet!\n");
-        bad_packet_count++;
+        //log("Invalid mouse packet!\n");
+       // bad_packet_count++;
         return;
     }
 
     // If the bad packet count reaches 3, reset the mouse as something is wrong.
-    if (bad_packet_count >= 3)
-    {
-        bad_packet_count = 0;
-        ps2_mouse_send_cmd(PS2_MOUSE_CMD_RESET);
-        log("Resetting mouse!\n");
-        return;
-    }
+   // if (bad_packet_count >= 3)
+  //  {
+        //bad_packet_count = 0;
+        //ps2_mouse_send_cmd(PS2_MOUSE_CMD_RESET);
+       // log("Resetting mouse!\n");
+      //  return;
+   // }
 
     // Have we reached the third byte?
-    if (mouse_type == PS2_MOUSE_TYPE_STANDARD && cycle == 3)
+    if ((mouse_type == PS2_MOUSE_TYPE_STANDARD && cycle == 3) || (mouse_type == PS2_MOUSE_TYPE_WHEEL && cycle == 4))
     {
         // Reset counter.
         cycle = 0;
 
-        if (mouse_bytes[0] & PS2_MOUSE_PACKET_LEFT_BTN)
-            log("Left mouse button pressed!\n");
-        if (mouse_bytes[0] & PS2_MOUSE_PACKET_RIGHT_BTN)
-            log("Right mouse button pressed!\n");
-        if (mouse_bytes[0] & PS2_MOUSE_PACKET_MIDDLE_BTN)
-            log("Middle mouse button pressed!\n");
-    }
-    else if (mouse_type == PS2_MOUSE_TYPE_WHEEL && cycle == 4)
-    {
-        // Reset counter.
-        cycle = 0;
-
-        if (mouse_bytes[0] & PS2_MOUSE_PACKET_LEFT_BTN)
-            log("Left mouse button pressed!\n");
-        if (mouse_bytes[0] & PS2_MOUSE_PACKET_RIGHT_BTN)
-            log("Right mouse button pressed!\n");
-        if (mouse_bytes[0] & PS2_MOUSE_PACKET_MIDDLE_BTN)
-            log("Middle mouse button pressed!\n");
+        // Process packet.
+        ps2_mouse_process_packet(mouse_bytes, cycle);
     }
 }
 
