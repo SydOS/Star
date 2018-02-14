@@ -60,30 +60,21 @@ enum
 #define PS2_MOUSE_INTELLIMOUSE_SAMPLERATE2 100
 #define PS2_MOUSE_INTELLIMOUSE_SAMPLERATE3 80
 
-// Used for IRQ waiting.
-static bool irq_triggered = false;
-static uint8_t irq_data;
-
 // Stores current mouse type.
 static uint8_t mouse_type = PS2_MOUSE_TYPE_STANDARD;
-
-void ps2_mouse_wait_irq()
-{
-    uint8_t timeout = 300;
-    while (!irq_triggered) {
-		if(!timeout) break;
-		timeout--;
-		sleep(10);
-	}
-	if(!irq_triggered) { log("MOUSE IRQ TIMEOUT\n"); }
-    irq_triggered = false;
-}
 
 uint8_t ps2_mouse_send_cmd(uint8_t cmd)
 {
     // Send command to mouse.
-    ps2_send_cmd_response(PS2_CMD_WRITE_MOUSE_IN);
-    return ps2_send_data_response(cmd);
+    for (uint8_t i = 0; i < 10; i++)
+    {
+        ps2_send_cmd_response(PS2_CMD_WRITE_MOUSE_IN);
+        uint8_t response = ps2_send_data_response(cmd);
+
+        // If the response is valid, return it.
+        if (response != PS2_DATA_RESPONSE_RESEND)
+            return response;
+    }
 }
 
 void ps2_mouse_connect()
@@ -93,8 +84,7 @@ void ps2_mouse_connect()
 
     // Set defaults.
     ps2_mouse_send_cmd(PS2_MOUSE_CMD_SET_DEFAULTS);
-    char* tmp;
-
+    
     // Send sample rate sequence to test if mouse is an Intellimouse (wheel mouse).
     ps2_mouse_send_cmd(PS2_MOUSE_CMD_SET_SAMPLERATE);
     ps2_mouse_send_cmd(PS2_MOUSE_INTELLIMOUSE_SAMPLERATE1);
@@ -104,16 +94,26 @@ void ps2_mouse_connect()
     ps2_mouse_send_cmd(PS2_MOUSE_INTELLIMOUSE_SAMPLERATE3);
 
     // Query device ID.
-    ps2_mouse_send_cmd(PS2_MOUSE_CMD_GET_DEVICEID);
-    uint8_t mouse_id = ps2_get_data();
+    uint8_t mouse_id = ps2_mouse_send_cmd(PS2_MOUSE_CMD_GET_DEVICEID);
+
+    // If ID is an ACK or something, try to get the ID again.
+    for (uint8_t i = 0; i < 50; i++)
+    {
+        if (mouse_id == PS2_DATA_RESPONSE_SELFTEST_PASS || mouse_id == PS2_DATA_RESPONSE_ACK)
+            mouse_id = ps2_get_data();
+        else
+            break;
+    }
     
-    log(utoa(mouse_id, tmp, 16));log("\n");
+    char* tmp;
+    log("PS/2 mouse ID: 0x");
+    log(utoa(mouse_id, tmp, 16));
+    log("\n");
     if (mouse_id == PS2_MOUSE_TYPE_WHEEL)
     {
-        log("INTELLIMOUSE\n");
+        log("Intellimouse detected.\n");
         mouse_type = mouse_id;
     }
-
     
     ps2_mouse_send_cmd(PS2_MOUSE_CMD_ENABLE_DATA);
     log("PS/2 mouse installed!\n");
@@ -125,13 +125,6 @@ static void ps2_mouse_callback(registers_t* regs)
     // Get data.
     uint8_t data = ps2_get_data();
 
-	//log("IRQ12 raised! 0x");
-    if (!irq_triggered)
-    {
-        irq_triggered = true;
-        irq_data = data;
-    }
-
     /*// Diag info.
     char* tmp;
     log(utoa(cycle, tmp, 10));
@@ -141,6 +134,7 @@ static void ps2_mouse_callback(registers_t* regs)
 
     // Attempt to decode input into mouse packets.
     static uint8_t cycle = 0;
+    static uint8_t bad_packet_count = 0;
     static uint8_t mouse_bytes[5];
     mouse_bytes[cycle++] = data;
 
@@ -166,6 +160,16 @@ static void ps2_mouse_callback(registers_t* regs)
     {
         cycle = 0;
         log("Invalid mouse packet!\n");
+        bad_packet_count++;
+        return;
+    }
+
+    // If the bad packet count reaches 3, reset the mouse as something is wrong.
+    if (bad_packet_count >= 3)
+    {
+        bad_packet_count = 0;
+        ps2_mouse_send_cmd(PS2_MOUSE_CMD_RESET);
+        log("Resetting mouse!\n");
         return;
     }
 
@@ -199,29 +203,11 @@ static void ps2_mouse_callback(registers_t* regs)
 // Initializes the mouse.
 void ps2_mouse_init()
 {
-    // Test port.
-    /*if (ps2_send_cmd_response(PS2_CMD_TEST_MOUSEPORT) != PS2_CMD_RESPONSE_PORTTEST_PASS)
-    {
-        log("Mouse PS/2 port self-test failed!\n");
-        return;
-    }*/
-
-    // Enable mouse port.
-    log ("Enabling mouse...\n");
-    ps2_send_cmd(PS2_CMD_ENABLE_MOUSEPORT);
-
     // Register IRQ12 for the mouse.
     interrupts_irq_install_handler(12, ps2_mouse_callback);
 
-    // Enable interrupts from mouse.
-    uint8_t config = ps2_send_cmd_response(PS2_CMD_READ_BYTE0) | PS2_CONFIG_MOUSEPORT_INTERRUPT;
-    ps2_send_cmd_response(PS2_CMD_WRITE_BYTE0);
-    ps2_send_data_response(config);
-
     // Reset mouse.
-    ps2_mouse_send_cmd(PS2_MOUSE_CMD_RESET);
-    sleep(500);
+    ps2_mouse_send_cmd(PS2_DATA_RESET);
     ps2_mouse_connect();
-
     log("PS/2 mouse initialized!\n");
 }

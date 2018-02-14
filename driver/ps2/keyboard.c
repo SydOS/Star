@@ -90,9 +90,13 @@ static void ps2_keyboard_callback(registers_t* regs)
 	log("IRQ1 raised!\n");
     irq_triggered = true;
 
+
     // Read scancode from keyboard.
     
     uint8_t scancode = inb(PS2_DATA_PORT);
+    if(scancode == 1)
+        outb(0x64, 0xFE);
+
     if (scancode < sizeof(keyboard_layout_us))
     vga_putchar(keyboard_layout_us[scancode]);
 }
@@ -100,21 +104,11 @@ static void ps2_keyboard_callback(registers_t* regs)
 // Initializes the keyboard.
 void ps2_keyboard_init()
 {
-    // Test port.
-    /*if (ps2_send_cmd_response(PS2_CMD_TEST_KEYBPORT) != PS2_CMD_RESPONSE_PORTTEST_PASS)
-    {
-        log("Keyboard PS/2 port self-test failed!\n");
-        return;
-    }*/
-
     // Register IRQ1 for the keyboard.
     interrupts_irq_install_handler(1, ps2_keyboard_callback);
 
-    // Enable keyboard.
-    log ("Enable keyboard port...\n");
-    ps2_send_cmd(PS2_CMD_ENABLE_KEYBPORT);
-    log("Resetting keyboard...\n");
-    ps2_keyboard_send_cmd(PS2_KEYBOARD_CMD_RESET);
-
+    // Restore keyboard defaults and enable it.
+    ps2_send_data_response(PS2_DATA_SET_DEFAULTS);
+    ps2_send_data_response(PS2_DATA_ENABLE);
     log("PS/2 keyboard initialized!\n");
 }

@@ -152,7 +152,7 @@ void protected_mode_land() {
 	log(" milliseconds.\n");
 
 	// Play tone.
-	//speaker_play_tone(2000, 500);
+	speaker_play_tone(2000, 50);
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
