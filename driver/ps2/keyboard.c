@@ -7,28 +7,6 @@
 #include <kernel/interrupts.h>
 #include <driver/vga.h>
 
-// Keyboard commands.
-enum
-{
-    PS2_KEYBOARD_CMD_SETLEDS    = 0xED,
-    PS2_KEYBOARD_CMD_ECHO       = 0XEE,
-    PS2_KEYBOARD_CMD_RESET      = 0xFF
-
-};
-
-// Keyboard responses.
-enum
-{
-    PS2_KEYBOARD_RESPONSE_ERROR             = 0x00,
-    PS2_KEYBOARD_RESPONSE_SELFTEST_PASS     = 0xAA,
-    PS2_KEYBOARD_RESPONSE_ECHO              = 0xEE,
-    PS2_KEYBOARD_RESPONSE_ACK               = 0xFA,
-    PS2_KEYBOARD_RESPONSE_SELFTEST_FAIL     = 0xFC,
-    PS2_KEYBOARD_RESPONSE_SELFTEST_FAIL2    = 0xFD,
-    PS2_KEYBOARD_RESPONSE_SELFTEST_RESEND   = 0xFE,
-    PS2_KEYBOARD_RESPONSE_ERROR2            = 0xFF
-};
-
 // Keyboard LEDs.
 enum
 {

@@ -67,9 +67,30 @@ enum
 // PS/2 device (data port) commands.
 enum
 {
-    PS2_DATA_ENABLE             = 0xF4, // Enable device.
-    PS2_DATA_SET_DEFAULTS       = 0xF6, // Set default parameters.
-    PS2_DATA_RESET              = 0xFF  // Reset and start self-test.
+    PS2_DATA_SET_MOUSE_SCALING_1TO1                 = 0xE6, // Set mouse scaling 1:1.
+    PS2_DATA_SET_MOUSE_SCALING_2TO1                 = 0xE7, // Set mouse scaling 2:1.
+    PS2_DATA_SET_MOUSE_RESOLUTION                   = 0xE8, // Set mouse resolution.
+    PS2_DATA_GET_MOUSE_STATUS                       = 0xE9, // Get mouse status.
+    PS2_DATA_SET_MOUSE_STREAMMODE                   = 0xEA, // Set mouse stream mode.
+    PS2_DATA_READ_MOUSE_DATA                        = 0xEB, // Read mouse data.
+    PS2_DATA_SET_KEYBOARD_LEDS                      = 0xED, // Set keyboard LEDs.
+    PS2_DATA_ECHO_KEYBOARD                          = 0xEE, // Echo keyboard.
+    PS2_DATA_GETSET_KEYBOARD_SCANCODES              = 0xF0, // Get/set current keyboard scan code.
+    PS2_DATA_IDENTIFY                               = 0xF2, // Identify device.
+    PS2_DATA_SET_KEYBOARD_TYPEMATIC                 = 0xF3, // Set keyboard typematic rate and delay.
+    PS2_DATA_SET_MOUSE_SAMPLERATE                   = 0xF3, // Set mouse sample rate.
+    PS2_DATA_ENABLE                                 = 0xF4, // Enable device.
+    PS2_DATA_DISABLE                                = 0xF5, // Disable device.
+    PS2_DATA_SET_DEFAULTS                           = 0xF6, // Set default parameters.
+    PS2_DATA_SET_KEYBOARD_ALL_TYPEMATIC             = 0xF7, // Set all keys to typematic/autorepeat only (scancode set 3 only).
+    PS2_DATA_SET_KEYBOARD_ALL_MAKERELEASE           = 0xF8, // Set all keys to make/release (scancode set 3 only).
+    PS2_DATA_SET_KEYBOARD_ALL_MAKEONLY              = 0xF9, // Set all keys to make only (scancode set 3 only).
+    PS2_DATA_SET_KEYBOARD_ALL_TYPEMATICMAKERELEASE  = 0xFA, // Set all keys to typematic/autorepeat/make/release (scancode set 3 only).
+    PS2_DATA_SET_KEYBOARD_KEY_TYPEMATIC             = 0xFB, // Set specific key to typematic/autorepeat only (scancode set 3 only).
+    PS2_DATA_SET_KEYBOARD_KEY_MAKERELEASE           = 0xFC, // Set specific key to make/release (scancode set 3 only).
+    PS2_DATA_SET_KEYBOARD_KEY_MAKEONLY              = 0xFD, // Set specific key to make only (scancode set 3 only).
+    PS2_DATA_RESEND                                 = 0xFE, // Resend last byte.
+    PS2_DATA_RESET                                  = 0xFF  // Reset and start self-test.
 };
 
 enum

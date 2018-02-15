@@ -203,7 +203,7 @@ void ps2_init()
     log(utoa(config, tmp, 16));
     log("\n");
 
-    // Enable interrupts for the mouse.
+    // Enable interrupts.
     config |= PS2_CONFIG_ENABLE_KEYBPORT_INTERRUPT | PS2_CONFIG_ENABLE_MOUSEPORT_INTERRUPT;
 
     // Write config to controller.
