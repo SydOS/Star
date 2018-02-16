@@ -1,5 +1,6 @@
 #include "main.h"
 #include "tools.h"
+#include "io.h"
 #include "kernel/gdt.h"
 #include "kernel/nmi.h"
 #include "kernel/idt.h"
@@ -161,6 +162,19 @@ void protected_mode_land() {
 
     // Ring serial terminal.
 	serial_write('\a');
+
+	/*char* bee_movie = "According to all known laws\r\nof aviation,\r\nthere is no way a bee\r\nshould be able to fly.\r\nIts wings are too small to get\r\nits fat little body off the ground.\r\nThe bee, of course, flies anyway\r\nbecause bees don't care\r\nwhat humans think is impossible.\r\nYellow, black. Yellow, black.\r\nYellow, black. Yellow, black.\r\nOoh, black and yellow!\r\nLet's shake it up a little.\r\nBarry! Breakfast is ready!";
+	for (size_t i = 0; i < strlen(bee_movie); i++)
+	{
+		parallel_sendbyte(0x378, bee_movie[i]);
+	}
+
+	// Send eject page PCL command.
+	parallel_sendbyte(0x378, 0x1B);
+	parallel_sendbyte(0x378, 0x26);
+	parallel_sendbyte(0x378, 0x6C);
+	parallel_sendbyte(0x378, 0x30);
+	parallel_sendbyte(0x378, 0x48);*/
 
 	for(;;) {
 		char* input[80];

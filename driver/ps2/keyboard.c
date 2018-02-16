@@ -115,10 +115,5 @@ void ps2_keyboard_init()
     // Restore keyboard defaults and enable it.
     ps2_send_data_response(PS2_DATA_SET_DEFAULTS);
     ps2_send_data_response(PS2_DATA_ENABLE);
-
-    // Enable num lock by default.
-    sleep(500);
-    num_lock = true;
-    ps2_keyboard_set_leds();
     log("PS/2 keyboard initialized!\n");
 }
