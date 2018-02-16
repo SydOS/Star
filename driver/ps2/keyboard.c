@@ -73,6 +73,9 @@ static void ps2_keyboard_set_leds()
     ps2_keyboard_send_cmd(PS2_DATA_SET_KEYBOARD_LEDS);
     ps2_keyboard_send_cmd((scroll_lock ? PS2_KEYBOARD_LED_SCROLL_LOCK : 0) |
         (num_lock ? PS2_KEYBOARD_LED_NUM_LOCK : 0) | (caps_lock ? PS2_KEYBOARD_LED_CAPS_LOCK : 0));
+    ps2_keyboard_send_cmd(PS2_DATA_SET_KEYBOARD_LEDS);
+    ps2_keyboard_send_cmd((scroll_lock ? PS2_KEYBOARD_LED_SCROLL_LOCK : 0) |
+        (num_lock ? PS2_KEYBOARD_LED_NUM_LOCK : 0) | (caps_lock ? PS2_KEYBOARD_LED_CAPS_LOCK : 0));
 }
 
 // Callback for keyboard on IRQ1.
