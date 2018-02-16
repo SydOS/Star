@@ -3,6 +3,7 @@
 #include <io.h>
 #include <kernel/idt.h>
 #include <kernel/interrupts.h>
+#include <kernel/pic.h>
 
 // Functions defined by Intel for service extensions.
 extern void _isr0();
@@ -146,29 +147,16 @@ void interrupts_irq_handler(registers_t *regs)
     if (handler)
         handler(regs);
 
-    // If the IDT entry was greater than 40 (IRQ 8 to 15),
-    // we need to send an EOI to the slave PCI too.
-    if (regs->int_no >= 40)
-        outb(0xA0, 0x20);
-
-    // Send EOI to master PIC.
-    outb(0x20, 0x20);
+    // Send EOI to PIC.
+    pic_eoi(regs->int_no);
 }
 
 // Initializes interrupts.
 void interrupts_init()
 {
-    // Remap the IRQ table.
-    outb(0x20, 0x11);
-    outb(0xA0, 0x11);
-    outb(0x21, 0x20);
-    outb(0xA1, 0x28);
-    outb(0x21, 0x04);
-    outb(0xA1, 0x02);
-    outb(0x21, 0x01);
-    outb(0xA1, 0x01);
-    outb(0x21, 0x0);
-    outb(0xA1, 0x0);
+    // Enable PIC.
+    pic_init();
+    //apic_init();
 
     // Add each of the 32 exception ISRs to the IDT.
     idt_set_gate(0, (uint32_t)_isr0, 0x08, 0x8E);
