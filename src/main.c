@@ -153,16 +153,14 @@ void protected_mode_land() {
 	log(temp);
 	log(" milliseconds.\n");
 
-	// Play tone.
-	speaker_play_tone(2000, 50);
-
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
 	serial_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-    // Ring serial terminal.
+    // Ring serial and VGA terminals.
 	serial_write('\a');
+	vga_putchar('\a');
 
 	/*char* bee_movie = "According to all known laws\r\nof aviation,\r\nthere is no way a bee\r\nshould be able to fly.\r\nIts wings are too small to get\r\nits fat little body off the ground.\r\nThe bee, of course, flies anyway\r\nbecause bees don't care\r\nwhat humans think is impossible.\r\nYellow, black. Yellow, black.\r\nYellow, black. Yellow, black.\r\nOoh, black and yellow!\r\nLet's shake it up a little.\r\nBarry! Breakfast is ready!";
 	for (size_t i = 0; i < strlen(bee_movie); i++)
@@ -176,11 +174,6 @@ void protected_mode_land() {
 	parallel_sendbyte(0x378, 0x6C);
 	parallel_sendbyte(0x378, 0x30);
 	parallel_sendbyte(0x378, 0x48);*/
-
-	if(strcmp("Tets1", "Tets1"))
-		log("Yes");
-	else
-		log("No");
 
 	for(;;) {
 		char* input[80];

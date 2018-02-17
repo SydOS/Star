@@ -3,6 +3,7 @@
 #include <io.h>
 #include <string.h>
 #include <driver/vga.h>
+#include <driver/speaker.h>
 
 /**
  * Returns a uint8_t for internal usage in coloring the terminal
@@ -115,6 +116,9 @@ void vga_putchar(char c) {
 		return;
 	} else if(c == '\r') {
 		terminal_column = 0;
+		return;
+	} else if(c == '\a') {
+		speaker_play_tone(2000, 50);
 		return;
 	} else {
 		vga_putentryat(c, terminal_color, terminal_column, terminal_row);
