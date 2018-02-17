@@ -1,6 +1,7 @@
 #include <main.h>
 #include <tools.h>
 #include <io.h>
+#include <string.h>
 #include <driver/vga.h>
 
 /**

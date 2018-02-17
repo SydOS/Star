@@ -1,6 +1,7 @@
-#include "main.h"
-#include "tools.h"
-#include "io.h"
+#include <main.h>
+#include <tools.h>
+#include <io.h>
+#include <string.h>
 #include "kernel/gdt.h"
 #include "kernel/nmi.h"
 #include "kernel/idt.h"
@@ -175,6 +176,11 @@ void protected_mode_land() {
 	parallel_sendbyte(0x378, 0x6C);
 	parallel_sendbyte(0x378, 0x30);
 	parallel_sendbyte(0x378, 0x48);*/
+
+	if(strcmp("Tets1", "Tets1"))
+		log("Yes");
+	else
+		log("No");
 
 	for(;;) {
 		char* input[80];
