@@ -63,3 +63,5 @@ enum FloppyMSRFlags
     FLOPPY_DIO =        0x40, // Set if FIFO IO port expects an IN opcode.
     FLOPPY_RQM =        0x80, // Set if it's OK (or mandatory) to exchange bytes with the FIFO IO port.
 };
+
+#define FLPY_SECTORS_PER_TRACK 18
