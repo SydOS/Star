@@ -2,6 +2,14 @@ CFLAGS?=-std=gnu99 -ffreestanding -O3 -Wall -Wextra -I./include
 ARCH?=i686
 TIME?=$(shell date +%s)
 
+# Get source files.
+C_SOURCES = $(shell find src -name '*.c')
+ASM_SOURCES = $(shell find src -iname '*.asm')
+
+# Get object files.
+C_OBJECTS = $(subst src, build, $(C_SOURCES:.c=.o))
+ASM_OBJECTS = $(subst src, build, $(ASM_SOURCES:.asm=_asm.o))
+
 all:
 	make clean
 
@@ -16,43 +24,27 @@ all:
 
 	make test
 
-build-kernel:
-	nasm -felf32 src/boot.asm -o boot.o
-	nasm -felf32 kernel/a20/check_a20.asm -o check_a20.o
-	nasm -felf32 kernel/a20/enable_a20.asm -o enable_a20.o
-	nasm -felf32 kernel/cpuid/cpuid.asm -o cpuid_asm.o
-	nasm -felf32 kernel/gdt/gdt.asm -o gdt_asm.o
-	nasm -felf32 kernel/idt/idt.asm -o idt_asm.o
-	nasm -felf32 kernel/interrupts/interrupts.asm -o interrupts_asm.o
+build-kernel: $(ASM_OBJECTS) $(C_OBJECTS)
+	# Link objects together into binary.
+	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -O2 -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc
 
-	$(ARCH)-elf-gcc -c src/main.c -o main.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c src/tools.c -o tools.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c src/logging.c -o logging.o $(CFLAGS)
-
-	$(ARCH)-elf-gcc -c kernel/gdt/gdt.c -o gdt.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c kernel/idt/idt.c -o idt.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c kernel/interrupts/interrupts.c -o interrupts.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c kernel/cpuid/cpuid.c -o cpuid.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c kernel/pit.c -o pit.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c kernel/nmi.c -o nmi.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c kernel/memory.c -o memory.o $(CFLAGS)	
-	$(ARCH)-elf-gcc -c kernel/paging.c -o paging.o $(CFLAGS)
-	
-	$(ARCH)-elf-gcc -c driver/serial.c -o serial.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/parallel.c -o parallel.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/vga.c -o vga.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/floppy.c -o floppy.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/speaker.c -o speaker.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/ps2/ps2.c -o ps2.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/ps2/keyboard.c -o ps2_keyboard.o $(CFLAGS)
-	$(ARCH)-elf-gcc -c driver/ps2/mouse.c -o ps2_mouse.o $(CFLAGS)
-
-	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -O2 -nostdlib *.o -lgcc
+	# Strip out debug info into separate files.
 	$(ARCH)-elf-objcopy --only-keep-debug Star-$(ARCH).kernel Star-$(ARCH).sym
 	$(ARCH)-elf-objcopy --strip-debug Star-$(ARCH).kernel
 	$(ARCH)-elf-objcopy -O binary Star-$(ARCH).kernel Star-$(ARCH).kernel.bin
 
-	rm -rf *.o
+	# Clean the build directory.
+	rm -rfd build
+
+# Compile assembly source files.
+$(ASM_OBJECTS):
+	mkdir -p $(dir $@)
+	nasm -felf32 $(subst build, src, $(subst _asm.o,.asm,$@)) -o $@
+
+# Compile C source files.
+$(C_OBJECTS):
+	mkdir -p $(dir $@)
+	$(ARCH)-elf-gcc -c $(subst build, src, $(subst .o,.c,$@)) -o $@ $(CFLAGS)
 
 test:
 	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -drive format=raw,file=fat12.img,index=0,if=floppy -serial stdio
@@ -61,4 +53,6 @@ debug:
 	qemu-system-i386 -kernel Star-i686.kernel -S -s & gdb Star-i686.kerel -ex 'target remote localhost:1234'
 
 clean:
+	# Clean up binaries.
+	rm -rfd build
 	rm -rf *.o *.bin *.kernel *.sym *.bin
