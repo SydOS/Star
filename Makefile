@@ -1,4 +1,4 @@
-CFLAGS?=-std=gnu99 -O3 -ffreestanding -fno-omit-frame-pointer -ggdb -gdwarf-2 -Wall -Wextra -I./include
+CFLAGS?=-std=gnu99 -O3 -ffreestanding -fno-omit-frame-pointer -ggdb -gdwarf-2 -Wall -Wextra -I./src/include
 ARCH?=i686
 TIME?=$(shell date +%s)
 
