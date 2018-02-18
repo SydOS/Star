@@ -44,7 +44,7 @@ $(ASM_OBJECTS):
 # Compile C source files.
 $(C_OBJECTS):
 	mkdir -p $(dir $@)
-	$(ARCH)-elf-gcc -c $(subst build, src, $(subst .o,.c,$@)) -o $@ $(CFLAGS)
+	$(ARCH)-elf-gcc -c $(subst build, src, $(subst .o,.c,$@)) -o $@ $(CFLAGS) -ggdb
 
 test:
 	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -drive format=raw,file=fat12.img,index=0,if=floppy -serial stdio
