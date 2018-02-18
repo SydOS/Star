@@ -1,4 +1,4 @@
-CFLAGS?=-std=gnu99 -ffreestanding -O3 -Wall -Wextra -I./include
+CFLAGS?=-std=gnu99 -O3 -ffreestanding -fno-omit-frame-pointer -ggdb -gdwarf-2 -Wall -Wextra -I./include
 ARCH?=i686
 TIME?=$(shell date +%s)
 
@@ -44,7 +44,7 @@ $(ASM_OBJECTS):
 # Compile C source files.
 $(C_OBJECTS):
 	mkdir -p $(dir $@)
-	$(ARCH)-elf-gcc -c $(subst build, src, $(subst .o,.c,$@)) -o $@ $(CFLAGS) -ggdb
+	$(ARCH)-elf-gcc -c $(subst build, src, $(subst .o,.c,$@)) -o $@ $(CFLAGS)
 
 test:
 	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -drive format=raw,file=fat12.img,index=0,if=floppy -serial stdio
