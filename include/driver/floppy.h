@@ -65,3 +65,4 @@ enum FloppyMSRFlags
 };
 
 #define FLPY_SECTORS_PER_TRACK 18
+#define FLOPPY_VERSION_ENHANCED 0x90
