@@ -2,6 +2,7 @@
 #include <logging.h>
 #include <kernel/idt.h>
 #include <io.h>
+#include <string.h>
 
 extern void _idt_load(uint32_t ptr);
 
@@ -29,7 +30,7 @@ void idt_init()
 {
     // Set up the IDT pointer and limit.
     idt_ptr.limit = (sizeof(idt_entry_t) * 256) - 1;
-    idt_ptr.base = &idt;
+    idt_ptr.base = (uint32_t)&idt;
 
     // Clear out the IDT with zeros.
     memset(&idt, 0, sizeof(idt_entry_t) * 256);
