@@ -39,7 +39,11 @@ build-kernel: $(ASM_OBJECTS) $(C_OBJECTS)
 # Compile assembly source files.
 $(ASM_OBJECTS):
 	mkdir -p $(dir $@)
+ifeq ($(ARCH), x86_64)
+	nasm -felf64 $(subst build, src, $(subst _asm.o,.asm,$@)) -o $@
+else
 	nasm -felf32 $(subst build, src, $(subst _asm.o,.asm,$@)) -o $@
+endif
 
 # Compile C source files.
 $(C_OBJECTS):

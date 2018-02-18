@@ -12,6 +12,6 @@
 #error "You don't appear to be using the proper cross-compiler toolchain! (Wrong target OS)"
 #endif
 
-#if !defined(__i386__)
+#if !(defined(__i386__) || defined(__x86_64__))
 #error "You don't appear to be using the proper cross-compiler toolchain! (Wrong architecture)"
 #endif
