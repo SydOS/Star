@@ -1,3 +1,5 @@
+[bits 32]
+
 ; Exception ISRs
 global _isr0
 global _isr1

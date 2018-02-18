@@ -1,3 +1,4 @@
+[bits 32]
 ; Loads the IDT into the processor.
 global _idt_load
 _idt_load:

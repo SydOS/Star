@@ -1,3 +1,4 @@
+[bits 32]
 ; Sets up the new GDT into the processor while flushing out the old one.
 global _gdt_load
 _gdt_load:

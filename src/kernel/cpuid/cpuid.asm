@@ -1,3 +1,4 @@
+[bits 32]
 section .text
 
 global _cpuid_detect
