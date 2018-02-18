@@ -173,11 +173,19 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	uint32_t ram = 0;
 	if (mboot_info->flags & MULTIBOOT_INFO_MEM_MAP)
 	{
-		
+		log("MEMMAP!\n");
+			uint64_t memory = 0;
+	multiboot_memory_map_t* mmap = (multiboot_memory_map_t*)mboot_info->mmap_addr;
+	while(mmap < mboot_info->mmap_addr + mboot_info->mmap_length) {
+		mmap = (multiboot_memory_map_t*) ( (uint32_t)mmap + mmap->size + sizeof(mmap->size) );
+		if(mmap->type == 1)
+			memory += mmap->len;
+		}
+		ram = memory / 1024 / 1024;
 	}
 	else
 	{
-		uint32_t ram = (mboot_info->mem_lower + mboot_info->mem_upper) / 1024;
+		ram = (mboot_info->mem_lower + mboot_info->mem_upper) / 1024;
 	}
 	
 	log(utoa(ram, temp, 10));
