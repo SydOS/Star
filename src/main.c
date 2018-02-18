@@ -2,6 +2,7 @@
 #include <tools.h>
 #include <io.h>
 #include <string.h>
+#include <multiboot.h>
 #include "kernel/gdt.h"
 #include "kernel/nmi.h"
 #include "kernel/idt.h"
@@ -32,18 +33,18 @@ extern uint32_t kernel_base;
  * This should be moved to a header file :(
  */
 extern void _enable_A20();
-extern void _enable_protected_mode();
-extern void _disable_protected_mode();
-extern int _get_protected_mode();
+//extern void _enable_protected_mode();
+
+
+extern uint32_t _check();
 
 /**
  * The main function for the kernel, called from boot.asm
  */
-void kernel_main(void) {
-	
+void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
+{
+	// Ensure interrupts are disabled.
 	asm volatile("cli");
-	
-
 	vga_disable_cursor();
 	
 	serial_initialize();
@@ -64,11 +65,32 @@ void kernel_main(void) {
 	vga_writes("         |___/                     \n");
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
 	
+	// Ensure multiboot magic value is good.
+	if (mboot_magic != MULTIBOOT_BOOTLOADER_MAGIC)
+	{
+		log("MULTIBOOT BOOTLOADER MAGIC NUMBER IS INVALID!\n");
+		// Kernel should die at this point.....
+		return;
+	}
+
+	// Ensure a memory info is present.
+	if ((mboot_info->flags & MULTIBOOT_INFO_MEMORY) == 0)
+	{
+		log("NO MULTIBOOT MEMORY INFO FOUND!\n");
+		// Kernel should die at this point.....
+		return;
+	}
+
 	// -------------------------------------------------------------------------
 	// MEMORY RELATED STUFF
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 
-	vga_writes("Checking A20 line...\n");
+	if(_check())
+	{
+		log("A20 is enabled here?\n");
+	}
+
+	/*vga_writes("Checking A20 line...\n");
 	int AX;
 	asm( "movl $0, %0"
    		: "=a" (AX)
@@ -80,7 +102,7 @@ void kernel_main(void) {
     	vga_writes("A20 line already enabled.\n");
     } else {
     	vga_writes("A20 line detection returned invalid result!\n");
-    }
+    }*/
 
 	char kernbase[32], kernend[32];
 	itoa((uint32_t)&kernel_base, kernbase, 16);
@@ -115,15 +137,9 @@ void kernel_main(void) {
 	log("Enabling NMI...\n");
 	NMI_enable();
 
-	//_enable_protected_mode();
-	protected_mode_land();
-	
-}
-
-void protected_mode_land() {
-	vga_setcolor(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREEN);
-	log("Kernel has entered protected mode.\n");
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	//vga_setcolor(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREEN);
+	//log("Kernel has entered protected mode.\n");
+	//vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
     // Enable interrupts.
 	asm volatile("sti");
@@ -142,8 +158,8 @@ void protected_mode_land() {
 
 	// Floppy test.
 	floppy_detect();
-	log("Initialize floppy drives...\n");
-	floppy_init();
+	//log("Initialize floppy drives...\n");
+	//floppy_init();
 
     vga_enable_cursor();
 
@@ -152,6 +168,20 @@ void protected_mode_land() {
 	utoa(pit_ticks(), temp, 10);
 	log(temp);
 	log(" milliseconds.\n");
+
+	log("Detected RAM: ");
+	uint32_t ram = 0;
+	if (mboot_info->flags & MULTIBOOT_INFO_MEM_MAP)
+	{
+		
+	}
+	else
+	{
+		uint32_t ram = (mboot_info->mem_lower + mboot_info->mem_upper) / 1024;
+	}
+	
+	log(utoa(ram, temp, 10));
+	log("MB\n");
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");

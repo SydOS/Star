@@ -232,7 +232,6 @@ uint8_t floppy_read_sector(uint32_t sector_lba)
 
 	// Wait for IRQ.
 	floppy_wait_for_irq(1000);
-	floppy_sense_interrupt(&st0, &cyl)
 
 	// Read data.
 	uint8_t data[512];
