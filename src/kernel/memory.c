@@ -1,6 +1,7 @@
 #include <main.h>
 #include <tools.h>
 #include <logging.h>
+#include <multiboot.h>
 #include <driver/vga.h>
 #include <kernel/memory.h>
 
@@ -59,7 +60,7 @@ void memory_print_out()
 	log("\n");
 }
 
-void memory_init(uint32_t kernel_end) {
+void memory_init(multiboot_info_t* mboot_info, uint32_t kernel_end) {
 	last_alloc = kernel_end + 0x1000;
 	heap_begin = last_alloc;
 	pheap_end = 0x400000;
@@ -67,6 +68,36 @@ void memory_init(uint32_t kernel_end) {
 	heap_end = pheap_begin;
 	memset((char *)heap_begin, 0, heap_end - heap_begin);
 	pheap_desc = (uint8_t *)malloc(MAX_PAGE_ALIGNED_ALLOCS);
+
+	log("Physical memory map:\n");
+		uint64_t memory = 0;
+
+		uint32_t base = mboot_info->mmap_addr;
+		uint32_t end = base + mboot_info->mmap_length;
+		multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
+char* temp;
+		for(; base < end; base += entry->size + sizeof(uint32_t))
+		{
+			entry = (multiboot_memory_map_t*)base;
+
+			// Print out info.
+			log("region start: 0x");
+			log(utoa(entry->addr, temp, 16));
+			log(" length: 0x");
+			log(utoa(entry->len, temp, 16));
+			log(" type: 0x");
+			log(utoa(entry->type, temp, 10));
+			log("\n");
+
+			if(entry->type == 1)
+				memory += entry->len;
+		}
+
+		memory = memory / 1024 / 1024;
+	
+			log("Detected RAM: ");
+	log(utoa(memory, temp, 10));
+	log("MB\n");
 }
 
 char* malloc(size_t size)

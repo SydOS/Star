@@ -32,7 +32,7 @@ extern uint32_t kernel_base;
  * Function in enable_a20.asm to enable the A20 line.
  * This should be moved to a header file :(
  */
-extern void _enable_A20();
+//extern void _enable_A20();
 //extern void _enable_protected_mode();
 
 
@@ -73,8 +73,8 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 		return;
 	}
 
-	// Ensure a memory info is present.
-	if ((mboot_info->flags & MULTIBOOT_INFO_MEMORY) == 0)
+	// Ensure a memory map is present.
+	if ((mboot_info->flags & MULTIBOOT_INFO_MEM_MAP) == 0)
 	{
 		log("NO MULTIBOOT MEMORY INFO FOUND!\n");
 		// Kernel should die at this point.....
@@ -113,10 +113,9 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	log(kernend);
 	log("\n");
 
-	memory_init((uint32_t)&kernel_end);
+	memory_init(mboot_info, (uint32_t)&kernel_end);
 	memory_print_out();
 
-    // TODO: detect CPUID support before calling for it
 	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
 	// Print CPUID info.
@@ -168,45 +167,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	utoa(pit_ticks(), temp, 10);
 	log(temp);
 	log(" milliseconds.\n");
-
-	
-	uint32_t ram = 0;
-	if (mboot_info->flags & MULTIBOOT_INFO_MEM_MAP)
-	{
-		log("Physical memory map:\n");
-		uint64_t memory = 0;
-
-		uint32_t base = mboot_info->mmap_addr;
-		uint32_t end = base + mboot_info->mmap_length;
-		multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
-
-		for(; base < end; base += entry->size + sizeof(uint32_t))
-		{
-			entry = (multiboot_memory_map_t*)base;
-
-			// Print out info.
-			log("region start: 0x");
-			log(utoa(entry->addr, temp, 16));
-			log(" length: 0x");
-			log(utoa(entry->len, temp, 16));
-			log(" type: 0x");
-			log(utoa(entry->type, temp, 10));
-			log("\n");
-
-			if(entry->type == 1)
-				memory += entry->len;
-		}
-
-		ram = memory / 1024 / 1024;
-	}
-	else
-	{
-		ram = (mboot_info->mem_lower + mboot_info->mem_upper) / 1024;
-	}
-	
-	log("Detected RAM: ");
-	log(utoa(ram, temp, 10));
-	log("MB\n");
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
