@@ -39,7 +39,7 @@ void kputstring(const char *str)
 }
 
 // Print an integer.
-void kprint_int(int32_t num)
+void kprint_int(int64_t num)
 {
     // If zero, just print zero.
     if (num == 0)
@@ -53,7 +53,7 @@ void kprint_int(int32_t num)
     num = negative ? -num : num;
 
     // Create buffer.
-    char buffer[1 + 11 + 1]; // Sign, maximum size of 64-bit int, null terminator.
+    char buffer[1 + 20 + 1]; // Sign, maximum size of 64-bit int, null terminator.
     buffer[sizeof(buffer) - 1] = '\0';
 
     // Walk through the number backwards.
@@ -73,7 +73,7 @@ void kprint_int(int32_t num)
 }
 
 // Print an unsigned integer.
-void kprint_uint(uint32_t num)
+void kprint_uint(uint64_t num)
 {
     // If zero, just print zero.
     if (num == 0)
@@ -83,7 +83,7 @@ void kprint_uint(uint32_t num)
     }
 
     // Create buffer.
-    char buffer[11 + 1]; // Maximum size of unsigned 64-bit int, null terminator.
+    char buffer[20 + 1]; // Maximum size of unsigned 64-bit int, null terminator.
     buffer[sizeof(buffer) - 1] = '\0';
 
     // Walk through the number backwards.
@@ -99,7 +99,7 @@ void kprint_uint(uint32_t num)
 }
 
 // Print unsigned int as hexadecimal.
-void kprint_hex(uint32_t num, bool capital, bool pad)
+void kprint_hex(uint64_t num, bool capital, bool pad)
 {
     // If zero, just print zero.
     if (num == 0)
@@ -141,55 +141,114 @@ void kprintf(const char* format, ...)
         // Do we have the start of a variable?
         if (c == '%')
         {
-            // Determine type of formatting.
-            switch (*format++)
+            // Get type of formatting.
+            char f = *format++;
+
+            // Do we have a long long?
+            if (f == 'l' && *format++ == 'l')
             {
-                // If we have a null, skip over.
-                case '\0':
-                    break;
-                
-                // If we have a %, print a literal %.
-                case '%':
-                    kputchar('%');
-                    break;
+                // Handle 32-bit integers.
+                switch (*format++)
+                {
+                    // If we have a null, skip over.
+                    case '\0':
+                        break;
+                    
+                    // If we have a %, print a literal %.
+                    case '%':
+                        kputchar('%');
+                        break;
 
-                // Print integer.
-                case 'd':
-                case 'i':
-                    kprint_int((int32_t)va_arg(args, int32_t));
-                    break;
+                    // Print integer.
+                    case 'd':
+                    case 'i':
+                        kprint_int((int64_t)va_arg(args, int64_t));
+                        break;
 
-                // Print unsigned integer.
-                case 'u':
-                    kprint_uint((uint32_t)va_arg(args, uint32_t));
-                    break;
+                    // Print unsigned integer.
+                    case 'u':
+                        kprint_uint((uint64_t)va_arg(args, uint64_t));
+                        break;
 
-                // Print floating point.
-                case 'f':
-                case 'F':
-                    // TODO.
-                    break;
-                
-                // Print hexadecimal.
-                case 'x':
-                    kprint_hex((uint32_t)va_arg(args, uint32_t), false, false);
-                    break;
+                    // Print floating point.
+                    case 'f':
+                    case 'F':
+                        // TODO.
+                        break;
+                    
+                    // Print hexadecimal.
+                    case 'x':
+                        kprint_hex((uint64_t)va_arg(args, uint64_t), false, false);
+                        break;
 
-                // Print hexadecimal (uppercase).
-                case 'X':
-                    kprint_hex((uint32_t)va_arg(args, uint32_t), true, false);
-                    break;
+                    // Print hexadecimal (uppercase).
+                    case 'X':
+                        kprint_hex((uint64_t)va_arg(args, uint64_t), true, false);
+                        break;
 
-                // Print string.
-                case 's':
-                    kputstring((const char*)va_arg(args, const char*));
-                    break;
+                    // Print string.
+                    case 's':
+                        kputstring((const char*)va_arg(args, const char*));
+                        break;
 
-                // Print character.
-                case 'c':
-                    kputchar((char)va_arg(args, int32_t));
-                    break;
+                    // Print character.
+                    case 'c':
+                        kputchar((char)va_arg(args, int32_t));
+                        break;
+                }
             }
+            else
+            {
+                // Handle 32-bit integers.
+                switch (f)
+                {
+                    // If we have a null, skip over.
+                    case '\0':
+                        break;
+                    
+                    // If we have a %, print a literal %.
+                    case '%':
+                        kputchar('%');
+                        break;
+
+                    // Print integer.
+                    case 'd':
+                    case 'i':
+                        kprint_int((int32_t)va_arg(args, int32_t));
+                        break;
+
+                    // Print unsigned integer.
+                    case 'u':
+                        kprint_uint((uint32_t)va_arg(args, uint32_t));
+                        break;
+
+                    // Print floating point.
+                    case 'f':
+                    case 'F':
+                        // TODO.
+                        break;
+                    
+                    // Print hexadecimal.
+                    case 'x':
+                        kprint_hex((uint32_t)va_arg(args, uint32_t), false, false);
+                        break;
+
+                    // Print hexadecimal (uppercase).
+                    case 'X':
+                        kprint_hex((uint32_t)va_arg(args, uint32_t), true, false);
+                        break;
+
+                    // Print string.
+                    case 's':
+                        kputstring((const char*)va_arg(args, const char*));
+                        break;
+
+                    // Print character.
+                    case 'c':
+                        kputchar((char)va_arg(args, int32_t));
+                        break;
+                }
+            }       
         }
         else
         {
