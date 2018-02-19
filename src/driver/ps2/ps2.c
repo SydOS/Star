@@ -1,6 +1,6 @@
 #include <main.h>
 #include <io.h>
-#include <logging.h>
+#include <kprint.h>
 #include <tools.h>
 #include <driver/ps2/ps2.h>
 #include <driver/ps2/keyboard.h>
@@ -98,10 +98,7 @@ void ps2_init()
 
     // Read the current configuration byte.
     uint8_t config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-    char* tmp;
-    log("Initial PS/2 configuration byte: 0x");
-    log(utoa(config, tmp, 16));
-    log("\n");
+    kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
 
     // Perform test of the PS/2 controller.
     uint8_t test_byte = ps2_send_cmd_response(PS2_CMD_TEST_CONTROLLER);
@@ -116,7 +113,7 @@ void ps2_init()
     // If the test still isn't returning the correct byte, abort.
     if (test_byte != PS2_CMD_RESPONSE_SELFTEST_PASS)
     {
-        log("PS/2 controller self-test failed, aborting!\n");
+        kprintf("PS/2 controller self-test failed, aborting!\n");
         return;
     }
 
@@ -132,7 +129,7 @@ void ps2_init()
 
     // If the test still isn't returning the correct byte, show error.
     if (test_byte != PS2_CMD_RESPONSE_PORTTEST_PASS)
-        log("Keyboard PS/2 port self-test failed!\n");
+        kprintf("Keyboard PS/2 port self-test failed!\n");
 
     // Test mouse port.
     test_byte = ps2_send_cmd_response(PS2_CMD_TEST_MOUSEPORT);
@@ -146,7 +143,7 @@ void ps2_init()
 
     // If the test still isn't returning the correct byte, show error.
     if (test_byte != PS2_CMD_RESPONSE_PORTTEST_PASS)
-        log("Mouse PS/2 port self-test failed!\n");
+        kprintf("Mouse PS/2 port self-test failed!\n");
 
     // Ensure IRQs for the mouse and keyboard are disabled, but the ports are enabled.
     config &= ~(PS2_CONFIG_ENABLE_KEYBPORT_INTERRUPT | PS2_CONFIG_ENABLE_MOUSEPORT_INTERRUPT |
@@ -157,9 +154,7 @@ void ps2_init()
     ps2_send_cmd(PS2_CMD_WRITE_BYTE);
     ps2_send_data(config);
     config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-    log("New PS/2 configuration byte: 0x");
-    log(utoa(config, tmp, 16));
-    log("\n");
+    kprintf("New PS/2 configuration byte: 0x%X\n", config);
 
     // Reset and test keyboard.
     test_byte = ps2_send_data_response(PS2_DATA_RESET);
@@ -174,7 +169,7 @@ void ps2_init()
 
     // If the test still isn't returning the correct byte, show error.
     if(!(test_byte == PS2_DATA_RESPONSE_SELFTEST_PASS || test_byte == PS2_DATA_RESPONSE_ACK))
-        log("Keyboard self-test failed!\n");
+        kprintf("Keyboard self-test failed!\n");
 
     // Reset and test mouse.
     ps2_send_cmd(PS2_CMD_WRITE_MOUSE_IN);
@@ -190,7 +185,7 @@ void ps2_init()
 
     // If the test still isn't returning the correct byte, show error.
     if(!(test_byte == PS2_DATA_RESPONSE_SELFTEST_PASS || test_byte == PS2_DATA_RESPONSE_ACK))
-        log("Mouse self-test failed!\n");
+        kprintf("Mouse self-test failed!\n");
 
     // Initialize devices.
     ps2_keyboard_init();
@@ -198,10 +193,7 @@ void ps2_init()
 
     // Read the current configuration byte.
     config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-
-    log("Initial PS/2 configuration byte: 0x");
-    log(utoa(config, tmp, 16));
-    log("\n");
+    kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
 
     // Enable interrupts.
     config |= PS2_CONFIG_ENABLE_KEYBPORT_INTERRUPT | PS2_CONFIG_ENABLE_MOUSEPORT_INTERRUPT;
@@ -210,9 +202,7 @@ void ps2_init()
     ps2_send_cmd(PS2_CMD_WRITE_BYTE);
     ps2_send_data(config);
     config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-    log("New PS/2 configuration byte: 0x");
-    log(utoa(config, tmp, 16));
-    log("\n");
+    kprintf("New PS/2 configuration byte: 0x%X\n", config);
 
-    log("PS/2 controller initialized!\n");
+    kprintf("PS/2 controller initialized!\n");
 }

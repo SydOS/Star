@@ -1,13 +1,13 @@
 #include <main.h>
 #include <io.h>
-#include <logging.h>
+#include <kprint.h>
 
 /**
  * Enable non-maskable interrupts
  */
 void NMI_enable() {
 	outb(0x70, inb(0x70)&0x7F);
-	log("NMI enabled!\n");
+	kprintf("NMI enabled!\n");
 }
 
 /**
@@ -15,5 +15,5 @@ void NMI_enable() {
  */
 void NMI_disable() {
 	outb(0x70, inb(0x70)|0x80);
-	log("NMI disabled!\n");
+	kprintf("NMI disabled!\n");
 }

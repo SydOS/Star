@@ -1,7 +1,7 @@
 #include <main.h>
 #include <tools.h>
 #include <io.h>
-#include <logging.h>
+#include <kprint.h>
 #include <driver/parallel.h>
 
 // https://wiki.osdev.org/Parallel_port

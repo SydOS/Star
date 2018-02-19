@@ -1,6 +1,6 @@
 #include <main.h>
 #include <io.h>
-#include <logging.h>
+#include <kprint.h>
 #include <tools.h>
 #include <driver/ps2/keyboard.h>
 #include <driver/ps2/ps2.h>
@@ -247,10 +247,6 @@ static void ps2_keyboard_callback(registers_t* regs)
     if (data == PS2_DATA_RESPONSE_ACK)
         return;
 
-
-
-	//log("IRQ1 raised!\n");
-
     bool press = !(data & 0x80);
     uint16_t key = ps2_scancodes[data & ~0x80];
 
@@ -309,5 +305,5 @@ void ps2_keyboard_init()
     // Restore keyboard defaults and enable it.
     ps2_send_data_response(PS2_DATA_SET_DEFAULTS);
     ps2_send_data_response(PS2_DATA_ENABLE);
-    log("PS/2 keyboard initialized!\n");
+    kprintf("PS/2 keyboard initialized!\n");
 }

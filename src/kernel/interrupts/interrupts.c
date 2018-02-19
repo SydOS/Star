@@ -1,5 +1,5 @@
 #include <main.h>
-#include <logging.h>
+#include <kprint.h>
 #include <io.h>
 #include <kernel/idt.h>
 #include <kernel/interrupts.h>
@@ -109,12 +109,7 @@ void interrupts_irq_install_handler(uint8_t irq, void (*handler)(registers_t *re
 {
     // Add handler for IRQ to array.
     irq_handlers[irq] = handler;
-
-    char* temp;
-    log("Interrupt for IRQ");
-    utoa(irq, temp, 10);
-    log(temp);
-    log(" installed!\n");
+    kprintf("Interrupt for IRQ%u installed!\n", irq);
 }
 
 // Removes an IRQ handler.
@@ -130,8 +125,7 @@ void interrupts_fault_handler(registers_t *regs)
     if(regs->int_no < 32)
     {
         // Log exception and stop. Maybe have panic thingy.
-        log(exception_messages[regs->int_no]);
-        log("\nHalted.");
+        kprintf("%s\nHalted.", exception_messages[regs->int_no]);
         for (;;);
     }
 }
@@ -213,5 +207,5 @@ void interrupts_init()
     idt_set_gate(46, (uint32_t)_irq14, 0x08, 0x8E);
     idt_set_gate(47, (uint32_t)_irq15, 0x08, 0x8E);
 
-    log("Interrupts initialized!\n");
+    kprintf("Interrupts initialized!\n");
 }

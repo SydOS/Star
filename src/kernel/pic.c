@@ -1,5 +1,5 @@
 #include <main.h>
-#include <logging.h>
+#include <kprint.h>
 #include <io.h>
 #include <kernel/pic.h>
 
@@ -53,7 +53,7 @@ void pic_enable()
     // Enable PICs (unmask interrupts).
     outb(PIC1_DATA, 0x0);
     outb(PIC2_DATA, 0x0);
-    log("PIC enabled!\n");
+    kprintf("PIC enabled!\n");
 }
 
 // Disables the PIC.
@@ -65,7 +65,7 @@ void pic_disable()
     // Disable PICs (mask all interrupts).
     outb(PIC1_DATA, 0xFF);
     outb(PIC2_DATA, 0xFF);
-    log("PIC disabled!\n");
+    kprintf("PIC disabled!\n");
 }
 
 void pic_init()

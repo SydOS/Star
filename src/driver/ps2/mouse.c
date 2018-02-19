@@ -1,5 +1,5 @@
 #include <main.h>
-#include <logging.h>
+#include <kprint.h>
 #include <tools.h>
 #include <driver/ps2/mouse.h>
 #include <driver/ps2/ps2.h>
@@ -73,10 +73,7 @@ void ps2_mouse_connect(bool from_irq)
     {
         // Read the current configuration byte.
         uint8_t config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-        char* tmp;
-        log("Initial PS/2 configuration byte: 0x");
-        log(utoa(config, tmp, 16));
-        log("\n");
+        kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
 
         // Disable IRQse.
         config &= ~(PS2_CONFIG_ENABLE_KEYBPORT_INTERRUPT | PS2_CONFIG_ENABLE_MOUSEPORT_INTERRUPT);
@@ -85,9 +82,7 @@ void ps2_mouse_connect(bool from_irq)
         ps2_send_cmd(PS2_CMD_WRITE_BYTE);
         ps2_send_data(config);
         config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-        log("New PS/2 configuration byte: 0x");
-        log(utoa(config, tmp, 16));
-        log("\n");
+        kprintf("New PS/2 configuration byte: 0x%X\n", config);
     }
 
     // Mouse is a standard mouse by default.
@@ -118,7 +113,7 @@ void ps2_mouse_connect(bool from_irq)
     
     if (mouse_id == PS2_MOUSE_TYPE_WHEEL)
     {
-        log("Intellimouse detected.\n");
+        kprintf("Intellimouse detected.\n");
         mouse_type = mouse_id;
 
         // Attempt to enter 5-button mode.
@@ -144,7 +139,7 @@ void ps2_mouse_connect(bool from_irq)
 
         if (mouse_id == PS2_MOUSE_TYPE_FIVEBUTTON)
         {
-            log("5-button mouse detected.\n");
+            kprintf("5-button mouse detected.\n");
             mouse_type = mouse_id;
         }
     }
@@ -152,11 +147,8 @@ void ps2_mouse_connect(bool from_irq)
     if (from_irq)
     {
         // Read the current configuration byte.
-        char* tmp;
         uint8_t config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-        log("Initial PS/2 configuration byte: 0x");
-        log(utoa(config, tmp, 16));
-        log("\n");
+        kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
 
         // Enable interrupts.
         config |= PS2_CONFIG_ENABLE_KEYBPORT_INTERRUPT | PS2_CONFIG_ENABLE_MOUSEPORT_INTERRUPT;
@@ -165,25 +157,20 @@ void ps2_mouse_connect(bool from_irq)
         ps2_send_cmd(PS2_CMD_WRITE_BYTE);
         ps2_send_data(config);
         config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-        log("New PS/2 configuration byte: 0x");
-        log(utoa(config, tmp, 16));
-        log("\n");
+        kprintf("New PS/2 configuration byte: 0x%X\n", config);
     }
 
     // If the ID is 0xFE at this point, likely no mouse is present.
     if (mouse_id == PS2_DATA_RESPONSE_RESEND)
     {
-        log("A working mouse couldn't be found!\n");
+        kprintf("A working mouse couldn't be found!\n");
         return;
     } 
 
-    char* tmp;
-    log("PS/2 mouse ID: 0x");
-    log(utoa(mouse_id, tmp, 16));
-    log("\n");
+    kprintf("PS/2 mouse ID: 0x%X\n", mouse_id);
     
     ps2_mouse_send_cmd(PS2_DATA_ENABLE);
-    log("PS/2 mouse installed!\n");
+    kprintf("PS/2 mouse installed!\n");
 }
 
 // Processes a packet.
@@ -208,9 +195,9 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
                 return;
 
             if (mouse_bytes[3] & PS2_MOUSE_PACKET_FOURTH_BTN)
-                log("Fourth mouse button pressed!\n");
+                kprintf("Fourth mouse button pressed!\n");
             if (mouse_bytes[3] & PS2_MOUSE_PACKET_FIFTH_BTN)
-                log("Fifth mouse button pressed!\n");
+                kprintf("Fifth mouse button pressed!\n");
         }
 
         // Get Z-value (wheel).
@@ -223,23 +210,15 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
 
     char* tmp;
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_LEFT_BTN)
-        log("Left mouse button pressed!\n");
+        kprintf("Left mouse button pressed!\n");
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_RIGHT_BTN)
-        log("Right mouse button pressed!\n");
+        kprintf("Right mouse button pressed!\n");
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_MIDDLE_BTN)
-        log("Middle mouse button pressed!\n");
+        kprintf("Middle mouse button pressed!\n");
 
     // Print status.
     if (x != 0 || y != 0 || z != 0)
-    {
-        log("Mouse moved: X:");
-        log(itoa(x, tmp, 10));
-        log(" Y:");
-        log(itoa(y, tmp, 10));
-        log(" Z:");
-        log(itoa(z, tmp, 10));
-        log("\n");
-    }
+        kprintf("Mouse moved: X: %i Y: %i Z: %i\n", x, y, z);
 }
 
 // Callback for mouse on IRQ12.
@@ -300,5 +279,5 @@ void ps2_mouse_init()
     // Reset mouse.
     ps2_mouse_send_cmd(PS2_DATA_RESET);
     ps2_mouse_connect(false);
-    log("PS/2 mouse initialized!\n");
+    kprintf("PS/2 mouse initialized!\n");
 }

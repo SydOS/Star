@@ -1,6 +1,6 @@
 #include <main.h>
 #include <tools.h>
-#include <logging.h>
+#include <kprint.h>
 
 static uint32_t* page_directory = 0;
 static uint32_t page_dir_loc = 0;
@@ -22,13 +22,13 @@ void paging_map_virtual_to_phys(uint32_t virt, uint32_t phys)
 	itoa((uint32_t)&id, id_s, 16);
 	itoa((uint32_t)&phys, phys_s, 16);
 
-	log("Mapping 0x");
-	log(virt_s);
-	log(" (");
-	log(id_s);
-	log(") to 0x");
-	log(phys_s);
-	log("\n");
+	kprintf("Mapping 0x");
+	kprintf(virt_s);
+	kprintf(" (");
+	kprintf(id_s);
+	kprintf(") to 0x");
+	kprintf(phys_s);
+	kprintf("\n");
 }
 
 void paging_enable()
@@ -50,5 +50,5 @@ void paging_initialize() {
 	paging_map_virtual_to_phys(0, 0);
 	paging_map_virtual_to_phys(0x400000, 0x400000);
 	paging_enable();
-	log("Paging initialized!\n");
+	kprintf("Paging initialized!\n");
 }

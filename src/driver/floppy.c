@@ -1,7 +1,7 @@
 #include <main.h>
 #include <tools.h>
 #include <io.h>
-#include <logging.h>
+#include <kprint.h>
 #include <driver/floppy.h>
 #include <kernel/interrupts.h>
 
@@ -24,11 +24,11 @@ void floppy_detect() {
 
 	char *drive_type[6] = { "no floppy drive", "360kb 5.25in floppy drive", 
 	"1.2mb 5.25in floppy drive", "720kb 3.5in", "1.44mb 3.5in", "2.88mb 3.5in"};
-	log("Floppy drive A: ");
-	log(drive_type[a]);
+	kprintf("Floppy drive A: %s\nFloppy drive B: %s\n", drive_type[a], drive_type[b]);
+	/*log(drive_type[a]);
 	log("\nFloppy drive B: ");
 	log(drive_type[b]);
-	log("\n");
+	log("\n");*/
 }
 
 static void floppy_lba_to_chs(uint32_t lba, uint16_t* cyl, uint16_t* head, uint16_t* sector)
@@ -49,7 +49,7 @@ void floppy_write_command(uint8_t cmd)
 		}
 		sleep(20);
 	}
-	log("FLOPPY DRIVE DATA TIMEOUT\n");
+	kprintf("FLOPPY DRIVE DATA TIMEOUT\n");
 }
 
 uint8_t floppy_read_data()
@@ -62,7 +62,7 @@ uint8_t floppy_read_data()
 		}
 		sleep(20);
 	}
-	log("FLOPPY DRIVE DATA TIMEOUT\n");
+	kprintf("FLOPPY DRIVE DATA TIMEOUT\n");
 }
 
 bool floppy_wait_for_irq(uint16_t timeout) {
@@ -72,14 +72,14 @@ bool floppy_wait_for_irq(uint16_t timeout) {
 		timeout--;
 		sleep(20);
 	}
-	if(irq_triggered) { ret = true; } else { log("FLOPPY DRIVE IRQ TIMEOUT\n"); }
+	if(irq_triggered) { ret = true; } else { kprintf("FLOPPY DRIVE IRQ TIMEOUT\n"); }
 	irq_triggered = false;
 	return ret;
 }
 
 void floppy_irq(registers_t* regs) {
 	irq_triggered = true;
-	log("IRQ6 raised!\n");
+	kprintf("IRQ6 raised!\n");
 }
 
 static uint8_t floppy_getversion()
@@ -139,7 +139,7 @@ void floppy_reset() {
 	floppy_wait_for_irq(300);
 
 	// Clear any interrupts on drives.
-	log("Clearing interrupts...\n");
+	kprintf("Clearing interrupts...\n");
 	uint8_t* st0, cyl;
 	for(int i = 0; i < 4; i++)
 		floppy_sense_interrupt(&st0, &cyl);
@@ -154,9 +154,7 @@ bool floppy_seek(uint8_t drive, uint8_t cylinder)
 	for(uint8_t i = 0; i < 10; i++)
 	{
 		// Send seek command.
-		log("Seeking to track ");
-		log(utoa(cylinder, tmp, 10));
-		log("...\n");
+		kprintf("Seeking to track %u...\n", cylinder);
 		floppy_write_command(FLOPPY_SEEK);
 		floppy_write_command((0 << 2) | drive);
 		floppy_write_command(cylinder);
@@ -168,7 +166,7 @@ bool floppy_seek(uint8_t drive, uint8_t cylinder)
 		// Ensure command completed successfully.
 		if (st0 & 0xC0)
 		{
-			log("Error executing floppy seek command!\n");
+			kprintf("Error executing floppy seek command!\n");
 			continue;
 		}
 		
@@ -239,8 +237,8 @@ uint8_t floppy_read_sector(uint32_t sector_lba)
 	for(uint8_t i = 0; i < 54; i++)
 	{
 		data[i] = floppy_read_data();
-		log(utoa(data[i], tmp, 16));
-		log(" ");
+		//log(utoa(data[i], tmp, 16));
+		//log(" ");
 	}
 
 	// Turn off motor.
@@ -253,7 +251,7 @@ void floppy_init()
 	interrupts_irq_install_handler(6, floppy_irq);
 
 	// Reset floppy drive.
-	log("Resetting floppy drive controller...\n");
+	kprintf("Resetting floppy drive controller...\n");
 	floppy_reset();
 
 	// Get controller version.	
@@ -262,41 +260,37 @@ void floppy_init()
 	// If version is 0xFF, that means there isn't a floppy controller.
 	if (version == 0xFF)
 	{
-		log("No floppy controller present, aborting!\n");
+		kprintf("No floppy controller present, aborting!\n");
 		return;
 	}
 
-	// Print version for now.
-	char* temp1;
-	utoa(version, temp1, 16);
-	log("Floppy controller version is 0x");
-	log(temp1);
-	log("!\n");
+	// Print version.
+	kprintf("Floppy controller version is 0x%X!\n", version);
 
 	// Set and lock base config.
-	log("Configuring floppy drive controller...\n");
+	kprintf("Configuring floppy drive controller...\n");
 	implied_seeks = FLOPPY_VERSION_ENHANCED;
 	floppy_configure(implied_seeks, true, false, 0, 0);
-	log("Locking floppy drive controller configuration...\n");
+	kprintf("Locking floppy drive controller configuration...\n");
 	outb(FLOPPY_DATA_FIFO, FLOPPY_LOCK);
 
 	// Reset floppy drive.
-	log("Resetting floppy drive controller...\n");
+	kprintf("Resetting floppy drive controller...\n");
 	floppy_reset();
 
 	// Set transfer speed to 500 kb/s.
-	log("Setting transfer speed...\n");
+	kprintf("Setting transfer speed...\n");
 	outb(FLOPPY_CONFIGURATION_CONTROL_REGISTER, 0);
 
 	// Set drive info (step time = 4ms, load time = 16ms, unload time = 240ms).
-	log("Setting floppy drive info...\n");
+	kprintf("Setting floppy drive info...\n");
 	floppy_set_drive_data(0xC, 0x2, 0xF, false);
 
 	// Calibrate drive.
-	log("Calibrating floppy drive...\n");
+	kprintf("Calibrating floppy drive...\n");
 	floppy_recalibrate(0);
 
-	log("Turning on drive 0 motor...\n");
+	kprintf("Turning on drive 0 motor...\n");
 	floppy_set_motor(0, 1);
 
 	/*log("Seeking drive 0 to cylinder 0...\n");
@@ -325,6 +319,6 @@ void floppy_init()
 	log("Turning off drive 0 motor...\n");
 	floppy_set_motor(0, 0);*/
 
-	log("Getting sector 0...\n");
+	kprintf("Getting sector 0...\n");
 	floppy_read_sector(0);
 }

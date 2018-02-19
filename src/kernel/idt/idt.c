@@ -1,5 +1,5 @@
 #include <main.h>
-#include <logging.h>
+#include <kprint.h>
 #include <kernel/idt.h>
 #include <io.h>
 #include <string.h>
@@ -37,5 +37,5 @@ void idt_init()
 
     // Load the IDT into the processor.
     _idt_load((uint32_t)&idt_ptr);
-    log("IDT initialized!\n");
+    kprintf("IDT initialized!\n");
 }

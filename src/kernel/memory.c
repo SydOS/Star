@@ -1,6 +1,6 @@
 #include <main.h>
 #include <tools.h>
-#include <logging.h>
+#include <kprint.h>
 #include <multiboot.h>
 #include <string.h>
 #include <driver/vga.h>
@@ -18,39 +18,9 @@ uint32_t memory_used = 0;
 
 void memory_print_out()
 {
-	char temp1[32];
-	log("Memory used: ");
-	itoa((uint32_t)memory_used, temp1, 10);
-	log(temp1);
-	log(" bytes\n");
-
-	log("Memory free: ");
-	itoa((uint32_t)heap_end - heap_begin - memory_used, temp1, 10);
-	log(temp1);
-	log(" bytes\n");
-
-	log("Heap size: ");
-	itoa((uint32_t)heap_end - heap_begin, temp1, 10);
-	log(temp1);
-	log(" bytes\n");
-
-	log("Heap start: 0x");
-	itoa((uint32_t)heap_begin, temp1, 16);
-	log(temp1);
-	log("\n");
-
-	log("Heap end: 0x");
-	itoa((uint32_t)heap_end, temp1, 16);
-	log(temp1);
-	log("\n");
-
-	log("PHeap start: 0x");
-	itoa((uint32_t)pheap_begin, temp1, 16);
-	log(temp1);
-	log("\nPHeap end: 0x");
-	itoa((uint32_t)pheap_end, temp1, 16);
-	log(temp1);
-	log("\n");
+	kprintf("Memory used: %u bytes\nMemory free: %u bytes\n", memory_used, heap_end - heap_begin - memory_used);
+	kprintf("Heap size: %u bytes\nHeap start: 0x%X\nHeap end: 0x%X\n", heap_end - heap_begin, heap_begin, heap_end);
+	kprintf("PHeap start: 0x%X\nPHeap end: 0x%X\n", pheap_begin, pheap_end);
 }
 
 void memory_init(multiboot_info_t* mboot_info, uint32_t kernel_end) {
@@ -62,7 +32,7 @@ void memory_init(multiboot_info_t* mboot_info, uint32_t kernel_end) {
 	memset((char *)heap_begin, 0, heap_end - heap_begin);
 	pheap_desc = (uint8_t *)malloc(MAX_PAGE_ALIGNED_ALLOCS);
 
-	log("Physical memory map:\n");
+	kprintf("Physical memory map:\n");
 		uint64_t memory = 0;
 
 		uint32_t base = mboot_info->mmap_addr;
@@ -74,23 +44,14 @@ char* temp;
 			entry = (multiboot_memory_map_t*)base;
 
 			// Print out info.
-			log("region start: 0x");
-			log(utoa(entry->addr, temp, 16));
-			log(" length: 0x");
-			log(utoa(entry->len, temp, 16));
-			log(" type: 0x");
-			log(utoa(entry->type, temp, 10));
-			log("\n");
+			kprintf("region start: 0x%X length: 0x%X type: 0x%X\n", entry->addr, entry->len, entry->type);
 
 			if(entry->type == 1)
 				memory += entry->len;
 		}
 
 		memory = memory / 1024 / 1024;
-	
-			log("Detected RAM: ");
-	log(utoa(memory, temp, 10));
-	log("MB\n");
+		kprintf("Detected RAM: %uMB\n", memory);
 }
 
 char* malloc(size_t size)

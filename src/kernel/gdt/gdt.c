@@ -1,5 +1,5 @@
 #include <main.h>
-#include <logging.h>
+#include <kprint.h>
 #include <kernel/gdt.h>
 
 extern void _gdt_load(uint32_t ptr);
@@ -40,5 +40,5 @@ void gdt_init()
 
 	// Load the GDT into the processor.
    	_gdt_load((uint32_t)&gdt_ptr);
-	log("GDT initialized!\n");
+	kprintf("GDT initialized!\n");
 }

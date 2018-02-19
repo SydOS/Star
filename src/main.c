@@ -2,6 +2,7 @@
 #include <tools.h>
 #include <io.h>
 #include <string.h>
+#include <kprint.h>
 #include <multiboot.h>
 #include "kernel/gdt.h"
 #include "kernel/nmi.h"
@@ -16,8 +17,6 @@
 #include "driver/serial.h"
 #include "driver/speaker.h"
 #include "driver/ps2/ps2.h"
-
-#include "logging.h"
 
 /**
  * Kernel's ending address in RAM
@@ -68,7 +67,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	// Ensure multiboot magic value is good.
 	if (mboot_magic != MULTIBOOT_BOOTLOADER_MAGIC)
 	{
-		log("MULTIBOOT BOOTLOADER MAGIC NUMBER IS INVALID!\n");
+		kprintf("MULTIBOOT BOOTLOADER MAGIC NUMBER 0x%X IS INVALID!\n", mboot_magic);
 		// Kernel should die at this point.....
 		return;
 	}
@@ -76,7 +75,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	// Ensure a memory map is present.
 	if ((mboot_info->flags & MULTIBOOT_INFO_MEM_MAP) == 0)
 	{
-		log("NO MULTIBOOT MEMORY INFO FOUND!\n");
+		kprintf("NO MULTIBOOT MEMORY INFO FOUND!\n");
 		// Kernel should die at this point.....
 		return;
 	}
@@ -84,34 +83,17 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	// -------------------------------------------------------------------------
 	// MEMORY RELATED STUFF
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", &kernel_base, &kernel_end);
 
-	if(_check())
-	{
-		log("A20 is enabled here?\n");
-	}
 
-	/*vga_writes("Checking A20 line...\n");
-	int AX;
-	asm( "movl $0, %0"
-   		: "=a" (AX)
-    );
-    if (AX == 0) {
-    	vga_writes("Enabling A20 line...\n");
-		_enable_A20();
-    } else if (AX == 1) {
-    	vga_writes("A20 line already enabled.\n");
-    } else {
-    	vga_writes("A20 line detection returned invalid result!\n");
-    }*/
-
-	char kernbase[32], kernend[32];
+	/*char kernbase[32], kernend[32];
 	itoa((uint32_t)&kernel_base, kernbase, 16);
 	itoa((uint32_t)&kernel_end, kernend, 16);
 	log("Kernel start: 0x");
 	log(kernbase);
 	log(" | Kernel end: 0x");
 	log(kernend);
-	log("\n");
+	log("\n");*/
 
 	memory_init(mboot_info, (uint32_t)&kernel_end);
 	memory_print_out();
@@ -124,16 +106,16 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 
 	// -------------------------------------------------------------------------
 
-	log("Initializing GDT...\n");
+	kprintf("Initializing GDT...\n");
 	gdt_init();
 
-	log("Initializing IDT...\n");
+	kprintf("Initializing IDT...\n");
 	idt_init();
 
-	log("Initializing interrupts...\n");
+	kprintf("Initializing interrupts...\n");
 	interrupts_init();
 
-	log("Enabling NMI...\n");
+	kprintf("Enabling NMI...\n");
 	NMI_enable();
 
 	//vga_setcolor(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREEN);
@@ -143,30 +125,30 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
     // Enable interrupts.
 	asm volatile("sti");
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
-    log("INTERRUPTS ARE ENABLED\n");
+    kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	log("Setting up PIT...\n");
+	kprintf("Setting up PIT...\n");
     pit_init();
 
-    log("Initializing paging...\n");
+    kprintf("Initializing paging...\n");
     paging_initialize();
 
-	log("Initializing PS/2...\n");
+	kprintf("Initializing PS/2...\n");
 	ps2_init();
 
 	// Floppy test.
 	floppy_detect();
-	//log("Initialize floppy drives...\n");
+	//kprintf("Initialize floppy drives...\n");
 	//floppy_init();
 
     vga_enable_cursor();
 
-	log ("Current uptime: ");
-	char* temp;
+	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
+	/*char* temp;
 	utoa(pit_ticks(), temp, 10);
 	log(temp);
-	log(" milliseconds.\n");
+	log(" milliseconds.\n");*/
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
@@ -189,6 +171,8 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	parallel_sendbyte(0x378, 0x6C);
 	parallel_sendbyte(0x378, 0x30);
 	parallel_sendbyte(0x378, 0x48);*/
+
+	kprintf("Test: %X\n", 18446744073709551615);
 
 	for(;;) {
 		char* input[80];

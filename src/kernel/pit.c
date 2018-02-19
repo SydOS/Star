@@ -1,7 +1,7 @@
 #include <main.h>
 #include <io.h>
 #include <tools.h>
-#include <logging.h>
+#include <kprint.h>
 #include <kernel/pit.h>
 #include <kernel/interrupts.h>
 
@@ -64,5 +64,5 @@ void pit_init()
 
 	// Register the handler with IRQ 0.
     interrupts_irq_install_handler(0, pit_callback);
-	log("PIT initialized!\n");
+	kprintf("PIT initialized!\n");
 }
