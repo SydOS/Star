@@ -8,8 +8,7 @@
 static bool irq_triggered = false;
 static bool implied_seeks = false;
 
-// DMA transfers.
-
+// Buffer for DMA transfers.
 static uint8_t floppyDmaBuffer[FLOPPY_DMALENGTH]
 	__attribute__((aligned(0x8000)));
 
@@ -243,16 +242,11 @@ static bool floppy_recalibrate(uint8_t drive) {
 
 		// If current cylinder is zero, we are done.
 		if (!cyl)
-		{
-			// Turn off motor.
-			floppy_set_motor(drive, false);
 			return true;
-		}
 	}
 
 	// If we got here, calibration failed.
 	kprintf("Calibration of drive %u failed!\n", drive);
-	floppy_set_motor(drive, false);
 	return false;
 }
 
@@ -283,7 +277,7 @@ static void floppy_controller_reset(bool full) {
 	// Calibrate first drive.
 	kprintf("Calibrating floppy drive...\n");
 	floppy_recalibrate(0);
-	sleep(500);
+	sleep(1000);
 }
 
 // Configure default values.
@@ -311,6 +305,7 @@ bool floppy_seek(uint8_t drive, uint8_t track) {
 		return false;
 
 	// Attempt seek.
+	floppy_set_motor(drive, true);
 	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
 		// Send seek command.
 		kprintf("Seeking to track %u...\n", track);
@@ -330,6 +325,7 @@ bool floppy_seek(uint8_t drive, uint8_t track) {
 		
 		// If we have reached the requested track, return.
 		if (cyl == track) {
+			sleep(500);
 			return true;
 		}		
 	}
@@ -343,6 +339,7 @@ bool floppy_seek(uint8_t drive, uint8_t track) {
 int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 	if (drive >= 4)
 		return -1;
+	uint8_t st0, cyl = 0;
 
 	// Convert LBA to CHS.
 	uint16_t head = 0, track = 0, sector = 1;
@@ -353,6 +350,7 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 		return -1;
 
 	// Attempt to read sector.
+	floppy_set_motor(drive, true);
 	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
 		sleep(100);
 
@@ -373,10 +371,10 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 
 		// Wait for IRQ.
 		floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
+		floppy_sense_interrupt(&st0, &cyl);
 
 		// Get status registers.
-		uint8_t cyl = 0;
-		uint8_t st0 = floppy_read_data();
+		st0 = floppy_read_data();
 		uint8_t st1 = floppy_read_data();
 		uint8_t st2 = floppy_read_data();
 		uint8_t rTrack = floppy_read_data();
@@ -386,7 +384,6 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 
 		// Determine errors if any.
 		uint8_t error = floppy_parse_error(st0, st1, st2);
-		floppy_sense_interrupt(&st0, &cyl);
 
 		// If no error, we are done.
 		if (!error) {
@@ -439,7 +436,6 @@ void floppy_init()
 	kprintf("Resetting floppy drive controller...\n");
 	floppy_controller_reset(true);
 
-	floppy_set_motor(0, true);
 	kprintf("Getting sector 0...\n");
 	floppy_read_sector(0, 0);
 	floppy_set_motor(0, false);
