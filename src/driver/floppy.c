@@ -26,10 +26,6 @@ void floppy_detect() {
 	char *drive_type[6] = { "no floppy drive", "360kb 5.25in floppy drive", 
 	"1.2mb 5.25in floppy drive", "720kb 3.5in", "1.44mb 3.5in", "2.88mb 3.5in"};
 	kprintf("Floppy drive A: %s\nFloppy drive B: %s\n", drive_type[a], drive_type[b]);
-	/*log(drive_type[a]);
-	log("\nFloppy drive B: ");
-	log(drive_type[b]);
-	log("\n");*/
 }
 
 // Parse and print errors.
@@ -114,8 +110,8 @@ static void floppy_dma_init(bool write) {
 		uint32_t length;
 	} addr, count;
 
-	addr.length = (uint32_t)&floppyDmaBuffer;
-	count.length = (uint32_t)FLOPPY_DMALENGTH - 1;
+	addr.length = (unsigned)&floppyDmaBuffer;
+	count.length = (unsigned)FLOPPY_DMALENGTH - 1;
 
 	// Ensure address is under 24 bits, and count is under 16 bits.
 	if ((addr.length >> 24) || (count.length >> 16) || (((addr.length & 0xFFFF) + count.length) >> 16)) {
@@ -140,7 +136,7 @@ static void floppy_dma_init(bool write) {
 	outb(0x05, count.bytes[1]);
 
 	// Send mode and unmask DMA channel 2.
-	outb(0x0B, write ? 0x4A : 0x46);
+	outb(0x0B, write ? 0x5A : 0x56);
 	outb(0x0A, 0x02);
 }
 
@@ -168,12 +164,12 @@ static void floppy_write_command(uint8_t cmd) {
 static uint8_t floppy_read_data() {
 	for (uint16_t i = 0; i < FLOPPY_IRQ_WAIT_TIME; i++) {
 		// Wait until register is ready.
-		if (inb(FLOPPY_REG_MSR) & FLOPPY_MSR_RQM) {
+		if (inb(FLOPPY_REG_MSR) & FLOPPY_MSR_RQM)
 			return inb(FLOPPY_REG_FIFO);
-		}
 		sleep(10);
 	}
 	kprintf("FLOPPY DRIVE DATA TIMEOUT!\n");
+	return 0;
 }
 
 // Get any interrupts from last command.
@@ -354,9 +350,6 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
 		sleep(100);
 
-		// Initialize DMA.
-		floppy_dma_init(false);
-
 		// Send read command to disk.
 		kprintf("Attempting to read head %u, track %u, sector %u...\n", head, track, sector);
 		floppy_write_command(FLOPPY_CMD_READ_DATA | FLOPPY_CMD_EXT_SKIP | FLOPPY_CMD_EXT_MFM | FLOPPY_CMD_EXT_MT);
@@ -364,9 +357,9 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 		floppy_write_command(track);
 		floppy_write_command(head);
 		floppy_write_command(sector);
-		floppy_write_command(2);
+		floppy_write_command(FLOPPY_BYTES_SECTOR_512);
 		floppy_write_command(1);
-		floppy_write_command(0x1B);
+		floppy_write_command(FLOPPY_GAP3_3_5);
 		floppy_write_command(0xFF);
 
 		// Wait for IRQ.
@@ -387,22 +380,19 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 
 		// If no error, we are done.
 		if (!error) {
-			floppy_set_motor(drive, false);
 			for (uint16_t i = 0; i < 128; i++)
-				kprintf("%X ", (uint8_t)floppyDmaBuffer[i]);
+				kprintf("%X ", (uint8_t)(floppyDmaBuffer[i]));
 			kprintf("\n");
 			return 0;
 		}
 		else if (error > 1) {
 			kprintf("Not retrying...\n");
-			floppy_set_motor(drive, false);
 			return 2;
 		}
 	}
 
 	// Failed.
 	kprintf("Get sector failed!\n");
-	floppy_set_motor(drive, false);
 	return - 1;
 }
 
@@ -411,6 +401,9 @@ void floppy_init()
 {
 	// Install IRQ6 handler.
 	interrupts_irq_install_handler(6, floppy_irq_handler);
+
+	// Initialize DMA.
+	floppy_dma_init(false);
 
 	// Reset controller and get version.
 	floppy_controller_reset(false);

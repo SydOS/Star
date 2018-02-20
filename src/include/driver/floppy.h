@@ -119,6 +119,21 @@ enum {
     FLOPPY_ST3_WRITE_PROTECT    = 0x40  // Indicates the status of the WP pin.
 };
 
+// Floppy bytes/sector values.
+enum {
+    FLOPPY_BYTES_SECTOR_128     = 0x00,
+    FLOPPY_BYTES_SECTOR_256     = 0x01,
+    FLOPPY_BYTES_SECTOR_512     = 0x02,
+    FLOPPY_BYTES_SECTOR_1024    = 0x04
+};
+
+// Floppy sector gap sizes.
+enum {
+    FLOPPY_GAP3_STANDARD    = 0x2A,
+    FLOPPY_GAP3_5_25        = 0x20,
+    FLOPPY_GAP3_3_5         = 0x1B
+};
+
 #define FLOPPY_CMD_RETRY_COUNT  10
 #define FLOPPY_IRQ_WAIT_TIME    500
 #define FLOPPY_DMALENGTH 0x4800

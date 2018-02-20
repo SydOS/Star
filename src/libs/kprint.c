@@ -114,7 +114,7 @@ void kprint_hex(uint64_t num, bool capital, bool pad)
     {
         const uint8_t byte =(num >> (8 * i)) & 0xFF;
 
-        if (first & byte == 0)
+        if (first && byte == 0)
             continue;
 
         // Print hex byte.
