@@ -1,3 +1,6 @@
+#include <main.h>
+#include <multiboot.h>
+
 typedef struct {
 	uint8_t status;
 	uint32_t size;
