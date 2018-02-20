@@ -3,6 +3,7 @@
 #include <kprint.h>
 #include <multiboot.h>
 #include <string.h>
+#include <math.h>
 #include <driver/vga.h>
 #include <kernel/memory.h>
 
@@ -16,43 +17,95 @@ uint32_t pheap_end = 0;
 uint8_t *pheap_desc = 0;
 uint32_t memory_used = 0;
 
+extern uint32_t kernel_end;
+/**
+ * Kernel's starting address in RAM
+ */
+extern uint32_t kernel_base;
+
+// Used to store info about memory in the system.
+mem_info_t memInfo;
+
 void memory_print_out()
 {
 	kprintf("Memory used: %u bytes\nMemory free: %u bytes\n", memory_used, heap_end - heap_begin - memory_used);
-	kprintf("Heap size: %u bytes\nHeap start: 0x%X\nHeap end: 0x%X\n", heap_end - heap_begin, heap_begin, heap_end);
+	
 	kprintf("PHeap start: 0x%X\nPHeap end: 0x%X\n", pheap_begin, pheap_end);
 }
 
-void memory_init(multiboot_info_t* mboot_info, uint32_t kernel_end) {
-	last_alloc = kernel_end + 0x1000;
-	heap_begin = last_alloc;
-	pheap_end = 0x400000;
-	pheap_begin = pheap_end - (MAX_PAGE_ALIGNED_ALLOCS * 4096);
-	heap_end = pheap_begin;
-	memset((char *)heap_begin, 0, heap_end - heap_begin);
-	pheap_desc = (uint8_t *)malloc(MAX_PAGE_ALIGNED_ALLOCS);
+void memory_init(multiboot_info_t* mbootInfo) {
+	// Ensure a memory map is present.
+	if ((mbootInfo->flags & MULTIBOOT_INFO_MEM_MAP) == 0)
+	{
+		kprintf("NO MULTIBOOT MEMORY INFO FOUND!\n");
+		// Kernel should die at this point.....
+		while (true);
+	}
+
+	// Store away Multiboot info.
+	memInfo.mbootInfo = mbootInfo;
+	memInfo.mmap = (multiboot_memory_map_t*)mbootInfo->mmap_addr;
+	memInfo.mmapLength = mbootInfo->mmap_length;
+
+	// Store where the Multiboot info structure actually resides in memory.
+	memInfo.mbootStart = (uint32_t)mbootInfo;
+	memInfo.mbootEnd = (uint32_t)(mbootInfo + sizeof(multiboot_info_t));
+	memInfo.memLower = mbootInfo->mem_lower;
+	memInfo.memUpper = mbootInfo->mem_upper;
+
+	// Store where the kernel is. These come from the linker.
+	memInfo.kernelStart = &kernel_base;
+	memInfo.kernelEnd = &kernel_end;
+
+	// Get the highest free address before the first hole.
+	memInfo.highestFreeAddress = memInfo.memUpper * 1024; // memUpper is in KB, convert to bytes.
+
+	// Start the kernel heap on the first aligned page directly after where the kernel is.
+	memInfo.kernelHeapStart = (memInfo.kernelEnd + 0x1000) & 0xFFFFF000;
+	memInfo.kernelHeapPosition = memInfo.kernelHeapStart;
+
+	// Determine memory required and allocate for the bitset.
+	uint32_t bitsetLength = memInfo.highestFreeAddress / 0x1000;
+	uint32_t bitsetSize = DIVIDE_ROUND_UP(bitsetLength, 32) * sizeof(uint32_t);
+
+	// Print summary.
+	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
+	kprintf("Multiboot info start: 0x%X | Multiboot end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
+	kprintf("Heap start: 0x%X\n", memInfo.kernelHeapStart);
+
+	//last_alloc = kernel_end + 0x1000;
+	//heap_begin = last_alloc;
+	//pheap_end = 0x400000;
+	//pheap_begin = pheap_end - (MAX_PAGE_ALIGNED_ALLOCS * 4096);
+	//heap_end = pheap_begin;
+	//memset((char *)heap_begin, 0, heap_end - heap_begin);
+	//pheap_desc = (uint8_t *)malloc(MAX_PAGE_ALIGNED_ALLOCS);
 
 	kprintf("Physical memory map:\n");
 		uint64_t memory = 0;
 
-		uint32_t base = mboot_info->mmap_addr;
-		uint32_t end = base + mboot_info->mmap_length;
+		uint32_t base = mbootInfo->mmap_addr;
+		uint32_t end = base + mbootInfo->mmap_length;
 		multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
-char* temp;
+
 		for(; base < end; base += entry->size + sizeof(uint32_t))
 		{
 			entry = (multiboot_memory_map_t*)base;
 
 			// Print out info.
-			kprintf("region start: 0x%X length: 0x%X type: 0x%X\n", entry->addr, entry->len, entry->type);
+			kprintf("region start: 0x%llX length: 0x%llX type: 0x%X\n", entry->addr, entry->len, (uint64_t)entry->type);
 
-			if(entry->type == 1)
+			if(entry->type == 1 && ((uint32_t)entry->addr) > 0)
 				memory += entry->len;
 		}
 
 		memory = memory / 1024 / 1024;
 		kprintf("Detected RAM: %uMB\n", memory);
+		kprintf("Highest free address: 0x%X\n", memInfo.highestFreeAddress);
+
+		
 }
+
 
 char* malloc(size_t size)
 {

@@ -19,25 +19,6 @@
 #include "driver/ps2/ps2.h"
 
 /**
- * Kernel's ending address in RAM
- */
-extern uint32_t kernel_end;
-/**
- * Kernel's starting address in RAM
- */
-extern uint32_t kernel_base;
-
-/**
- * Function in enable_a20.asm to enable the A20 line.
- * This should be moved to a header file :(
- */
-//extern void _enable_A20();
-//extern void _enable_protected_mode();
-
-
-extern uint32_t _check();
-
-/**
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
@@ -72,39 +53,8 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 		return;
 	}
 
-	// Ensure a memory map is present.
-	if ((mboot_info->flags & MULTIBOOT_INFO_MEM_MAP) == 0)
-	{
-		kprintf("NO MULTIBOOT MEMORY INFO FOUND!\n");
-		// Kernel should die at this point.....
-		return;
-	}
-
-	// -------------------------------------------------------------------------
-	// MEMORY RELATED STUFF
-	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
-	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", &kernel_base, &kernel_end);
 
 
-	/*char kernbase[32], kernend[32];
-	itoa((uint32_t)&kernel_base, kernbase, 16);
-	itoa((uint32_t)&kernel_end, kernend, 16);
-	log("Kernel start: 0x");
-	log(kernbase);
-	log(" | Kernel end: 0x");
-	log(kernend);
-	log("\n");*/
-
-	memory_init(mboot_info, (uint32_t)&kernel_end);
-	memory_print_out();
-
-	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-
-	// Print CPUID info.
-	cpuid_print_capabilities();
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
-	// -------------------------------------------------------------------------
 
 	kprintf("Initializing GDT...\n");
 	gdt_init();
@@ -128,8 +78,31 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
     kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	kprintf("Setting up PIT...\n");
+
+	
+	// -------------------------------------------------------------------------
+	// MEMORY RELATED STUFF
+	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+	
+
+	memory_init(mboot_info);
+	//memory_print_out();
+
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+
+	// Print CPUID info.
+	//cpuid_print_capabilities();
+
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+		kprintf("Setting up PIT...\n");
     pit_init();
+
+		kprintf("Sleeping for 5 seconds...\n");
+	sleep(5000);
+	//while(true);
+
+	// -------------------------------------------------------------------------
 
     kprintf("Initializing paging...\n");
     paging_initialize();
@@ -145,10 +118,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
     vga_enable_cursor();
 
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
-	/*char* temp;
-	utoa(pit_ticks(), temp, 10);
-	log(temp);
-	log(" milliseconds.\n");*/
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	vga_writes("root@sydos ~: ");
@@ -171,8 +140,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	parallel_sendbyte(0x378, 0x6C);
 	parallel_sendbyte(0x378, 0x30);
 	parallel_sendbyte(0x378, 0x48);*/
-
-	kprintf("Test: %X\n", 18446744073709551615);
 
 	for(;;) {
 		char* input[80];

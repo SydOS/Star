@@ -98,7 +98,7 @@ void ps2_init()
 
     // Read the current configuration byte.
     uint8_t config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-    kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
+    //kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
 
     // Perform test of the PS/2 controller.
     uint8_t test_byte = ps2_send_cmd_response(PS2_CMD_TEST_CONTROLLER);
@@ -154,7 +154,7 @@ void ps2_init()
     ps2_send_cmd(PS2_CMD_WRITE_BYTE);
     ps2_send_data(config);
     config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-    kprintf("New PS/2 configuration byte: 0x%X\n", config);
+    //kprintf("New PS/2 configuration byte: 0x%X\n", config);
 
     // Reset and test keyboard.
     test_byte = ps2_send_data_response(PS2_DATA_RESET);
@@ -193,7 +193,7 @@ void ps2_init()
 
     // Read the current configuration byte.
     config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-    kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
+    //kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
 
     // Enable interrupts.
     config |= PS2_CONFIG_ENABLE_KEYBPORT_INTERRUPT | PS2_CONFIG_ENABLE_MOUSEPORT_INTERRUPT;
@@ -202,7 +202,7 @@ void ps2_init()
     ps2_send_cmd(PS2_CMD_WRITE_BYTE);
     ps2_send_data(config);
     config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
-    kprintf("New PS/2 configuration byte: 0x%X\n", config);
+    //kprintf("New PS/2 configuration byte: 0x%X\n", config);
 
     kprintf("PS/2 controller initialized!\n");
 }

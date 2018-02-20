@@ -20,19 +20,18 @@ int is_transmit_empty() {
 }
  
 void serial_write(char a) {
-   while (is_transmit_empty() == 0);
+  while (is_transmit_empty() == 0);
  
    outb(PORT,a);
+
+   // If newline, print '\r' too.
+   if (a == '\n')
+    outb(PORT,'\r');
 }
 
 void serial_writes(const char* data) {
     for (size_t i = 0; i < strlen(data); i++) {
-		if (data[i] == '\n') {
-			serial_write('\n');
-			serial_write('\r');
-		} else {
-			serial_write(data[i]);
-		}
+    serial_write(data[i]);
 	}
 }
 
