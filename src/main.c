@@ -112,8 +112,8 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 
 	// Floppy test.
 	floppy_detect();
-	//kprintf("Initialize floppy drives...\n");
-	//floppy_init();
+	kprintf("Initialize floppy drives...\n");
+	floppy_init();
 
     vga_enable_cursor();
 

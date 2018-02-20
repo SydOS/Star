@@ -5,11 +5,13 @@
 #include <driver/floppy.h>
 #include <kernel/interrupts.h>
 
-// https://forum.osdev.org/viewtopic.php?t=13538
-// www.osdever.net/documents/82077AA_FloppyControllerDatasheet.pdf
-
 static bool irq_triggered = false;
 static bool implied_seeks = false;
+
+// DMA transfers.
+
+static uint8_t floppyDmaBuffer[FLOPPY_DMALENGTH]
+	__attribute__((aligned(0x8000)));
 
 /**
  * Temporary function to detect floppy disks in drives
@@ -31,234 +33,395 @@ void floppy_detect() {
 	log("\n");*/
 }
 
-static void floppy_lba_to_chs(uint32_t lba, uint16_t* cyl, uint16_t* head, uint16_t* sector)
-{
-	*cyl = lba / (2 * FLPY_SECTORS_PER_TRACK);
-	*head = ((lba % (2 * FLPY_SECTORS_PER_TRACK)) / FLPY_SECTORS_PER_TRACK);
-	*sector = ((lba % (2 * FLPY_SECTORS_PER_TRACK)) % FLPY_SECTORS_PER_TRACK + 1);
-}
-
-void floppy_write_command(uint8_t cmd)
-{
-	for (uint16_t i = 0; i < 300; i++)
-	{
-		// Wait until register is ready.
-		if(inb(FLOPPY_MAIN_STATUS_REGISTER) & FLOPPY_RQM) {
-			outb(FLOPPY_DATA_FIFO, cmd);
-			return;
-		}
-		sleep(20);
+// Parse and print errors.
+static uint8_t floppy_parse_error(uint8_t st0, uint8_t st1, uint8_t st2) {
+	uint8_t error = 0;
+	if (st0 & FLOPPY_ST0_INTERRUPT_CODE) {
+		static const char *status[] = { 0, "command did not complete", "invalid command", "polling error" };
+		kprintf("An error occurred while getting the sector: %s.\n", status[st0 >> 6]);
+		error = 1;
 	}
-	kprintf("FLOPPY DRIVE DATA TIMEOUT\n");
-}
-
-uint8_t floppy_read_data()
-{
-	for (uint16_t i = 0; i < 300; i++)
-	{
-		// Wait until register is ready.
-		if(inb(FLOPPY_MAIN_STATUS_REGISTER) & FLOPPY_RQM) {
-			return inb(FLOPPY_DATA_FIFO);
-		}
-		sleep(20);
+	if (st0 & FLOPPY_ST0_FAIL) {
+		kprintf("Drive not ready.\n");
+		error = 1;
 	}
-	kprintf("FLOPPY DRIVE DATA TIMEOUT\n");
-}
-
-bool floppy_wait_for_irq(uint16_t timeout) {
-	uint8_t ret = false;
-	while (!irq_triggered) {
-		if(!timeout) break;
-		timeout--;
-		sleep(20);
+	if (st1 & FLOPPY_ST1_MISSING_ADDR_MARK || st2 & FLOPPY_ST2_MISSING_DATA_MARK) {
+		kprintf("Missing address mark.\n");
+		error = 1;
 	}
-	if(irq_triggered) { ret = true; } else { kprintf("FLOPPY DRIVE IRQ TIMEOUT\n"); }
-	irq_triggered = false;
-	return ret;
+	if (st1 & FLOPPY_ST1_NOT_WRITABLE) {
+		kprintf("Disk is write-protected.\n");
+		error = 2;
+	}
+	if (st1 & FLOPPY_ST1_NO_DATA) {
+		kprintf("Sector not found.\n");
+		error = 1;
+	}
+	if (st1 & FLOPPY_ST1_OVERRUN_UNDERRUN) {
+		kprintf("Buffer overrun/underrun.\n");
+		error = 1;
+	}
+	if (st1 & FLOPPY_ST1_DATA_ERROR) {
+		kprintf("CRC error.\n");
+		error = 1;
+	}
+	if (st1 & FLOPPY_ST1_END_OF_CYLINDER) {
+		kprintf("End of track.\n");
+		error = 1;
+	}
+	if (st2 & FLOPPY_ST2_BAD_CYLINDER) {
+		kprintf("Bad track.\n");
+		error = 1;
+	}
+	if (st2 & FLOPPY_ST2_WRONG_CYLINDER) {
+		kprintf("Wrong track.\n");
+		error = 1;
+	}
+	if (st2 & FLOPPY_ST2_DATA_ERROR_IN_FIELD) {
+		kprintf("CRC error in data.\n");
+		error = 1;
+	}
+	if (st2 & FLOPPY_ST2_CONTROL_MARK) {
+		kprintf("Deleted address mark.\n");
+		error = 1;
+	}
+
+	return error;
 }
 
-void floppy_irq(registers_t* regs) {
+// Handle firings IRQ6.
+static void floppy_irq_handler(registers_t* regs) {
 	irq_triggered = true;
 	kprintf("IRQ6 raised!\n");
 }
 
-static uint8_t floppy_getversion()
-{
-	// Get version of floppy controller.
-	floppy_write_command(FLOPPY_VERSION);
-	return floppy_read_data();
+// Wait for IRQ6 to be raised.
+static bool floppy_wait_for_irq(uint16_t timeout) {
+	uint8_t ret = false;
+	while (!irq_triggered) {
+		if(!timeout) break;
+		timeout--;
+		sleep(10);
+	}
+	if(irq_triggered) { ret = true; } else { kprintf("FLOPPY DRIVE IRQ TIMEOUT!\n"); }
+	irq_triggered = false;
+	return ret;
 }
 
-static void floppy_sense_interrupt(uint8_t* st0, uint8_t* cyl)
-{
-	floppy_write_command(FLOPPY_SENSE_INTERRUPT);
+// Init DMA. write = true to write, write = false to read.
+static void floppy_dma_init(bool write) {
+	union {
+		uint8_t bytes[4];
+		uint32_t length;
+	} addr, count;
+
+	addr.length = (uint32_t)&floppyDmaBuffer;
+	count.length = (uint32_t)FLOPPY_DMALENGTH - 1;
+
+	// Ensure address is under 24 bits, and count is under 16 bits.
+	if ((addr.length >> 24) || (count.length >> 16) || (((addr.length & 0xFFFF) + count.length) >> 16)) {
+		kprintf("INVALID FLOPPY DMA BUFFER SIZE/LOCATION!\n");
+		return;
+		// Kernel should die here.
+	}
+
+	// https://wiki.osdev.org/ISA_DMA#The_Registers.
+	// Mask DMA channel 2 and reset flip-flop.
+	outb(0x0A, 0x06);
+	outb(0x0C, 0xFF);
+
+	// Send address and page register.
+	outb(0x04, addr.bytes[0]);
+	outb(0x04, addr.bytes[1]);
+	outb(0x81, addr.bytes[2]);
+
+	// Reset flip-flop and send count.
+	outb(0x0C, 0xFF);
+	outb(0x05, count.bytes[0]);
+	outb(0x05, count.bytes[1]);
+
+	// Send mode and unmask DMA channel 2.
+	outb(0x0B, write ? 0x4A : 0x46);
+	outb(0x0A, 0x02);
+}
+
+// Convert LBA to CHS.
+static void floppy_lba_to_chs(uint32_t lba, uint16_t* cyl, uint16_t* head, uint16_t* sector) {
+	*cyl = lba / (2 * FLOPPY_SECTORS_PER_TRACK);
+	*head = ((lba % (2 * FLOPPY_SECTORS_PER_TRACK)) / FLOPPY_SECTORS_PER_TRACK);
+	*sector = ((lba % (2 * FLOPPY_SECTORS_PER_TRACK)) % FLOPPY_SECTORS_PER_TRACK + 1);
+}
+
+// Send command to floppy controller.
+static void floppy_write_command(uint8_t cmd) {
+	for (uint16_t i = 0; i < FLOPPY_IRQ_WAIT_TIME; i++) {
+		// Wait until register is ready.
+		if (inb(FLOPPY_REG_MSR) & FLOPPY_MSR_RQM) {
+			outb(FLOPPY_REG_FIFO, cmd);
+			return;
+		}
+		sleep(10);
+	}
+	kprintf("FLOPPY DRIVE DATA TIMEOUT!\n");
+}
+
+// Read data from FIFO register.
+static uint8_t floppy_read_data() {
+	for (uint16_t i = 0; i < FLOPPY_IRQ_WAIT_TIME; i++) {
+		// Wait until register is ready.
+		if (inb(FLOPPY_REG_MSR) & FLOPPY_MSR_RQM) {
+			return inb(FLOPPY_REG_FIFO);
+		}
+		sleep(10);
+	}
+	kprintf("FLOPPY DRIVE DATA TIMEOUT!\n");
+}
+
+// Get any interrupts from last command.
+static void floppy_sense_interrupt(uint8_t* st0, uint8_t* cyl) {
+	floppy_write_command(FLOPPY_CMD_SENSE_INTERRUPT);
 	*st0 = floppy_read_data();
 	*cyl = floppy_read_data();
 }
 
-static void floppy_set_drive_data(uint8_t step_rate, uint16_t load_time, uint8_t unload_time, bool dma)
-{
+// Sets drive data.
+static void floppy_set_drive_data(uint8_t step_rate, uint16_t load_time, uint8_t unload_time, bool dma) {
 	// Send specify command.
-	floppy_write_command(FLOPPY_SPECIFY);
-
-	// Send data.
+	floppy_write_command(FLOPPY_CMD_SPECIFY);
 	uint8_t data = ((step_rate & 0xF) << 4) | (unload_time & 0xF);
 	floppy_write_command(data);
 	data = (load_time << 1) | dma ? 0 : 1;
 	floppy_write_command(data);
 }
 
-static void floppy_recalibrate(uint8_t drive)
-{
-	// Recalibrate the drive.
-	floppy_write_command(FLOPPY_RECALIBRATE);
-	floppy_write_command(drive);
-	floppy_wait_for_irq(300);
+// Sets motor state.
+static void floppy_set_motor(uint8_t drive, bool on) {
+	// Check drive.
+	if (drive >= 4)
+		return;
+
+	// Get mask based on drive passed.
+	uint8_t motor = 0;
+	switch (drive) {
+		case 0:
+			motor = FLOPPY_DOR_MOT_DRIVE0;
+			break;
+
+		case 1:
+			motor = FLOPPY_DOR_MOT_DRIVE1;
+			break;
+
+		case 2:
+			motor = FLOPPY_DOR_MOT_DRIVE2;
+			break;
+
+		case 3:
+			motor = FLOPPY_DOR_MOT_DRIVE3;
+			break;
+	}
+
+	// Turn motor on or off and wait 500ms for motor to spin up.
+	outb(FLOPPY_REG_DOR, FLOPPY_DOR_RESET | FLOPPY_DOR_IRQ_DMA | (on ? (drive | motor) : 0));
+	sleep(500);
+}
+
+// Recalibrate drive to track 0.
+static bool floppy_recalibrate(uint8_t drive) {
+	uint8_t st0, cyl;
+	if (drive >= 4)
+		return false;
+
+	// Turn on motor and attempt to calibrate.
+	floppy_set_motor(drive, true);
+	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++)
+	{
+		// Send calibrate command.
+		floppy_write_command(FLOPPY_CMD_RECALIBRATE);
+		floppy_write_command(drive);
+		floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
+		floppy_sense_interrupt(&st0, &cyl);
+
+		// If current cylinder is zero, we are done.
+		if (!cyl)
+		{
+			// Turn off motor.
+			floppy_set_motor(drive, false);
+			return true;
+		}
+	}
+
+	// If we got here, calibration failed.
+	kprintf("Calibration of drive %u failed!\n", drive);
+	floppy_set_motor(drive, false);
+	return false;
+}
+
+// Reset floppy controller.
+static void floppy_controller_reset(bool full) {
+	// Disable and re-enable floppy controller.
+	outb(FLOPPY_REG_DOR, 0x00);
+	outb(FLOPPY_REG_DOR, FLOPPY_DOR_IRQ_DMA | FLOPPY_DOR_RESET);
+	floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
+
+	// Clear any interrupts on drives.
+	uint8_t st0, cyl;
+	for(int i = 0; i < 4; i++)
+		floppy_sense_interrupt(&st0, &cyl);
+
+	// Are we doing a full reset (parameters + calibration)?
+	if (!full)
+		return;
+
+	// Set transfer speed to 500 kb/s.
+	kprintf("Setting transfer speed...\n");
+	outb(FLOPPY_REG_CCR, 0x00);
+
+	// Set drive info (step time = 4ms, load time = 16ms, unload time = 240ms).
+	kprintf("Setting floppy drive info...\n");
+	floppy_set_drive_data(0xC, 0x2, 0xF, true);
+
+	// Calibrate first drive.
+	kprintf("Calibrating floppy drive...\n");
+	floppy_recalibrate(0);
+	sleep(500);
 }
 
 // Configure default values.
-// EIS - No Implied Seeks
-// EFIFO - FIFO Disabled
-// POLL - Polling Enabled
-// FIFOTHR - FIFO Threshold Set to 1 Byte
-// PRETRK - Pre-Compensation Set to Track 0
-void floppy_configure(bool eis, bool efifo, bool poll, uint8_t fifothr, uint8_t pretrk)
-{
+// EIS - No Implied Seeks.
+// EFIFO - FIFO Disabled.
+// POLL - Polling Enabled.
+// FIFOTHR - FIFO Threshold Set to 1 Byte.
+// PRETRK - Pre-Compensation Set to Track 0.
+static void floppy_configure(bool eis, bool efifo, bool poll, uint8_t fifothr, uint8_t pretrk) {
 	// Send configure command.
-	floppy_write_command(FLOPPY_CONFIGURE);
-	floppy_write_command(0x0);
-	char data = (!eis << 6) | (!efifo << 5) | (poll << 4) | fifothr;
+	floppy_write_command(FLOPPY_CMD_CONFIGURE);
+	floppy_write_command(0x00);
+	uint8_t data = (!eis << 6) | (!efifo << 5) | (poll << 4) | fifothr;
 	floppy_write_command(data);
 	floppy_write_command(pretrk);
+
+	// Lock configuration.
+	floppy_write_command(FLOPPY_CMD_LOCK);
 }
 
-void floppy_reset() {
-	// Disable and re-enable floppy controller.
-	outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, 0x00);
-	outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, FLOPPY_IRQ | FLOPPY_RESET);
-	floppy_wait_for_irq(300);
-
-	// Clear any interrupts on drives.
-	kprintf("Clearing interrupts...\n");
-	uint8_t* st0, cyl;
-	for(int i = 0; i < 4; i++)
-		floppy_sense_interrupt(&st0, &cyl);
-}
-
-bool floppy_seek(uint8_t drive, uint8_t cylinder)
-{
-	char* tmp;
+// Seek to specified track.
+bool floppy_seek(uint8_t drive, uint8_t track) {	
 	uint8_t st0, cyl = 0;
+	if (drive >= 4)
+		return false;
 
-	// Attempt seek up to 10 times.
-	for(uint8_t i = 0; i < 10; i++)
-	{
+	// Attempt seek.
+	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
 		// Send seek command.
-		kprintf("Seeking to track %u...\n", cylinder);
-		floppy_write_command(FLOPPY_SEEK);
-		floppy_write_command((0 << 2) | drive);
-		floppy_write_command(cylinder);
+		kprintf("Seeking to track %u...\n", track);
+		floppy_write_command(FLOPPY_CMD_SEEK);
+		floppy_write_command((0 << 2) | drive); // Head 0, drive.
+		floppy_write_command(track);
 
 		// Wait for response and check interrupt.
-		floppy_wait_for_irq(300);
+		floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
 		floppy_sense_interrupt(&st0, &cyl);
 
 		// Ensure command completed successfully.
-		if (st0 & 0xC0)
-		{
+		if (st0 & FLOPPY_ST0_INTERRUPT_CODE) {
 			kprintf("Error executing floppy seek command!\n");
 			continue;
 		}
 		
-		// If we have reached the request cylinder, return.
-		if (cyl == cylinder)
+		// If we have reached the requested track, return.
+		if (cyl == track) {
 			return true;
+		}		
 	}
 
 	// Seek failed if we get here.
+	kprintf("Seek failed for %u on drive %u!\n", track, drive);
 	return false;
 }
 
-void floppy_set_motor(uint8_t drive, uint8_t status) {
-	uint8_t motor = 0;
-	switch(drive)
-	{
-		case 0:
-			motor = FLOPPY_MOTA;
-			break;
-		case 1:
-			motor = FLOPPY_MOTB;
-			break;
-		case 2:
-			motor = FLOPPY_MOTC;
-			break;
-		case 3:
-			motor = FLOPPY_MOTD;
-			break;
-	}
+// Read the specified sector.
+int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
+	if (drive >= 4)
+		return -1;
 
-	if(status) {
-		outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, motor | FLOPPY_IRQ | FLOPPY_RESET);
-	} else {
-		outb(FLOPPY_DIGITAL_OUTPUT_REGISTER, FLOPPY_IRQ | FLOPPY_RESET);
-	}
-	sleep(500);
-}
-
-uint8_t floppy_read_sector(uint32_t sector_lba)
-{
 	// Convert LBA to CHS.
 	uint16_t head = 0, track = 0, sector = 1;
-	uint8_t st0, cyl = 0;
 	floppy_lba_to_chs(sector_lba, &head, &track, &sector);
 
-	// Turn on motor and seek to track.
-	floppy_set_motor(0, 1);
-	if (!floppy_seek(0, track))
-		return 0;
+	// Seek to track.	
+	if (!floppy_seek(drive, track))
+		return -1;
 
-	// Send read command to disk.
-	floppy_write_command(FLOPPY_READ_DATA | 0x40 | 0x80);
-	floppy_write_command(head << 2 | 0);
-	floppy_write_command(track);
-	floppy_write_command(head);
-	floppy_write_command(sector);
-	floppy_write_command(2);
-	floppy_write_command(1);
-	floppy_write_command(0x1B);
-	floppy_write_command(0xFF);
+	// Attempt to read sector.
+	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
+		sleep(100);
 
-	// Wait for IRQ.
-	floppy_wait_for_irq(1000);
+		// Initialize DMA.
+		floppy_dma_init(false);
 
-	// Read data.
-	uint8_t data[512];
-	char* tmp;
-	for(uint8_t i = 0; i < 54; i++)
-	{
-		data[i] = floppy_read_data();
-		//log(utoa(data[i], tmp, 16));
-		//log(" ");
+		// Send read command to disk.
+		kprintf("Attempting to read head %u, track %u, sector %u...\n", head, track, sector);
+		floppy_write_command(FLOPPY_CMD_READ_DATA | FLOPPY_CMD_EXT_SKIP | FLOPPY_CMD_EXT_MFM | FLOPPY_CMD_EXT_MT);
+		floppy_write_command(head << 2 | drive);
+		floppy_write_command(track);
+		floppy_write_command(head);
+		floppy_write_command(sector);
+		floppy_write_command(2);
+		floppy_write_command(1);
+		floppy_write_command(0x1B);
+		floppy_write_command(0xFF);
+
+		// Wait for IRQ.
+		floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
+
+		// Get status registers.
+		uint8_t cyl = 0;
+		uint8_t st0 = floppy_read_data();
+		uint8_t st1 = floppy_read_data();
+		uint8_t st2 = floppy_read_data();
+		uint8_t rTrack = floppy_read_data();
+		uint8_t rHead = floppy_read_data();
+		uint8_t rSector = floppy_read_data();
+		uint8_t bytesPerSector = floppy_read_data();
+
+		// Determine errors if any.
+		uint8_t error = floppy_parse_error(st0, st1, st2);
+		floppy_sense_interrupt(&st0, &cyl);
+
+		// If no error, we are done.
+		if (!error) {
+			floppy_set_motor(drive, false);
+			for (uint16_t i = 0; i < 128; i++)
+				kprintf("%X ", (uint8_t)floppyDmaBuffer[i]);
+			kprintf("\n");
+			return 0;
+		}
+		else if (error > 1) {
+			kprintf("Not retrying...\n");
+			floppy_set_motor(drive, false);
+			return 2;
+		}
 	}
 
-	// Turn off motor.
-	floppy_set_motor(0, 0);
+	// Failed.
+	kprintf("Get sector failed!\n");
+	floppy_set_motor(drive, false);
+	return - 1;
 }
 
+// Initializes floppy driver.
 void floppy_init()
 {
-	// Install IRQ.
-	interrupts_irq_install_handler(6, floppy_irq);
+	// Install IRQ6 handler.
+	interrupts_irq_install_handler(6, floppy_irq_handler);
 
-	// Reset floppy drive.
-	kprintf("Resetting floppy drive controller...\n");
-	floppy_reset();
-
-	// Get controller version.	
-	uint32_t version = floppy_getversion();
+	// Reset controller and get version.
+	floppy_controller_reset(false);
+	floppy_write_command(FLOPPY_CMD_VERSION);
+	uint8_t version = floppy_read_data();
 
 	// If version is 0xFF, that means there isn't a floppy controller.
-	if (version == 0xFF)
+	if (version == FLOPPY_VERSION_NONE)
 	{
 		kprintf("No floppy controller present, aborting!\n");
 		return;
@@ -269,56 +432,15 @@ void floppy_init()
 
 	// Set and lock base config.
 	kprintf("Configuring floppy drive controller...\n");
-	implied_seeks = FLOPPY_VERSION_ENHANCED;
+	implied_seeks = (version == FLOPPY_VERSION_ENHANCED);
 	floppy_configure(implied_seeks, true, false, 0, 0);
-	kprintf("Locking floppy drive controller configuration...\n");
-	outb(FLOPPY_DATA_FIFO, FLOPPY_LOCK);
 
-	// Reset floppy drive.
+	// Reset floppy controller.
 	kprintf("Resetting floppy drive controller...\n");
-	floppy_reset();
+	floppy_controller_reset(true);
 
-	// Set transfer speed to 500 kb/s.
-	kprintf("Setting transfer speed...\n");
-	outb(FLOPPY_CONFIGURATION_CONTROL_REGISTER, 0);
-
-	// Set drive info (step time = 4ms, load time = 16ms, unload time = 240ms).
-	kprintf("Setting floppy drive info...\n");
-	floppy_set_drive_data(0xC, 0x2, 0xF, false);
-
-	// Calibrate drive.
-	kprintf("Calibrating floppy drive...\n");
-	floppy_recalibrate(0);
-
-	kprintf("Turning on drive 0 motor...\n");
-	floppy_set_motor(0, 1);
-
-	/*log("Seeking drive 0 to cylinder 0...\n");
-	floppy_seek(0, 1);
-
-	sleep(1000);
-
-	log("Seeking drive 0 to cylinder 60...\n");
-	floppy_seek(0, 80);
-	log("Seeking drive 0 to cylinder 60...\n");
-	floppy_seek(0, 1);
-	log("Seeking drive 0 to cylinder 60...\n");
-	floppy_seek(0, 80);
-	log("Seeking drive 0 to cylinder 60...\n");
-	floppy_seek(0, 1);
-	sleep(100);
-
-	for (uint8_t i = 1; i <= 80; i++)
-	{
-		floppy_seek(0, i);
-		sleep(100);
-	}
-
-	sleep(5000);
-
-	log("Turning off drive 0 motor...\n");
-	floppy_set_motor(0, 0);*/
-
+	floppy_set_motor(0, true);
 	kprintf("Getting sector 0...\n");
-	floppy_read_sector(0);
+	floppy_read_sector(0, 0);
+	floppy_set_motor(0, false);
 }

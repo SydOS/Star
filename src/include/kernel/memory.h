@@ -17,6 +17,9 @@ struct mem_info {
 	uint32_t kernelHeapStart;
 	uint32_t kernelHeapPosition;
 
+	uint32_t isaDmaStart;
+	uint32_t isaDmaEnd;
+
 	uint32_t memLower;
 	uint32_t memUpper;
 	uint32_t highestFreeAddress;

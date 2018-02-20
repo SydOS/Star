@@ -1,68 +1,127 @@
 // https://wiki.osdev.org/Floppy_Disk_Controller
+// https://github.com/1byte2bytes/SydOS/blob/master/res/82077AA_FloppyControllerDatasheet.pdf
 
-extern void floppy_detect();
-
-enum FloppyRegisters
-{
-    FLOPPY_STATUS_REGISTER_A                = 0x3F0, // read-only
-    FLOPPY_STATUS_REGISTER_B                = 0x3F1, // read-only
-    FLOPPY_DIGITAL_OUTPUT_REGISTER          = 0x3F2,
-    FLOPPY_TAPE_DRIVE_REGISTER              = 0x3F3,
-    FLOPPY_MAIN_STATUS_REGISTER             = 0x3F4, // read-only
-    FLOPPY_DATARATE_SELECT_REGISTER         = 0x3F4, // write-only
-    FLOPPY_DATA_FIFO                        = 0x3F5,
-    FLOPPY_DIGITAL_INPUT_REGISTER           = 0x3F7, // read-only
-    FLOPPY_CONFIGURATION_CONTROL_REGISTER   = 0x3F7  // write-only
+// Floppy registers.
+enum {
+    FLOPPY_REG_SRA  = 0x3F0, // Status Register A, read-only.
+    FLOPPY_REG_SRB  = 0x3F1, // Status Register B, read-only.
+    FLOPPY_REG_DOR  = 0x3F2, // Digital Output Register, read-write.
+    FLOPPY_REG_TDR  = 0x3F3, // Tape Drive Register, read-write.
+    FLOPPY_REG_MSR  = 0x3F4, // Main Status Register, read-only.
+    FLOPPY_REG_DSR  = 0x3F4, // Data Rate Select Register, write-only.
+    FLOPPY_REG_FIFO = 0x3F5, // Data (FIFO), read-write.
+    FLOPPY_REG_DIR  = 0x3F7, // Digital Input Register, read-only.
+    FLOPPY_REG_CCR  = 0x3F7  // Configuration Control Register, write-only.
 };
 
-enum FloppyCommands
-{
-    FLOPPY_READ_TRACK =                 2,	    // generates IRQ6
-    FLOPPY_SPECIFY =                    3,      // * set drive parameters
-    FLOPPY_SENSE_DRIVE_STATUS =         4,
-    FLOPPY_WRITE_DATA =                 5,      // * write to the disk
-    FLOPPY_READ_DATA =                  6,      // * read from the disk
-    FLOPPY_RECALIBRATE =                7,      // * seek to cylinder 0
-    FLOPPY_SENSE_INTERRUPT =            8,      // * ack IRQ6, get status of last command
-    FLOPPY_WRITE_DELETED_DATA =         9,
-    FLOPPY_READ_ID =                    10,	    // generates IRQ6
-    FLOPPY_READ_DELETED_DATA =          12,
-    FLOPPY_FORMAT_TRACK =               13,     // *
-    FLOPPY_SEEK =                       15,     // * seek both heads to cylinder X
-    FLOPPY_VERSION =                    16,	    // * used during initialization, once
-    FLOPPY_SCAN_EQUAL =                 17,
-    FLOPPY_PERPENDICULAR_MODE =         18,	    // * used during initialization, once, maybe
-    FLOPPY_CONFIGURE =                  19,     // * set controller parameters
-    FLOPPY_LOCK =                       20,     // * protect controller params from a reset
-    FLOPPY_VERIFY =                     22,
-    FLOPPY_SCAN_LOW_OR_EQUAL =          25,
-    FLOPPY_SCAN_HIGH_OR_EQUAL =         29
+// Floppy commands.
+enum {
+    FLOPPY_CMD_READ_TRACK           = 0x02, // Read track.
+    FLOPPY_CMD_SPECIFY              = 0x03, // Set drive parameters.
+    FLOPPY_CMD_SENSE_DRIVE_STATUS   = 0x04, // Get drive information.
+    FLOPPY_CMD_WRITE_DATA           = 0x05, // Write sector.
+    FLOPPY_CMD_READ_DATA            = 0x06, // Read sector.
+    FLOPPY_CMD_RECALIBRATE          = 0x07, // Calibrate and seek to sector 0.
+    FLOPPY_CMD_SENSE_INTERRUPT      = 0x08, // Get status of last command.
+    FLOPPY_CMD_WRITE_DELETED_DATA   = 0x09, // Write sector with deleted flag.
+    FLOPPY_CMD_READ_ID              = 0x0A,	// Get current position of recording heads.
+    FLOPPY_CMD_READ_DELETED_DATA    = 0x0C, // Read sector with deleted flag.
+    FLOPPY_CMD_FORMAT_TRACK         = 0x0D, // Formats a track.
+    FLOPPY_CMD_DUMPREG              = 0x0E, // Diagnostics dump.
+    FLOPPY_CMD_SEEK                 = 0x0F, // Seek to track.
+    FLOPPY_CMD_VERSION              = 0x10,	// Get controller versison.
+    FLOPPY_CMD_SCAN_EQUAL           = 0x11, // Scan for data equal.
+    FLOPPY_CMD_PERPENDICULAR_MODE   = 0x12,	// Used before using commands that access a perpendicular disk drive.
+    FLOPPY_CMD_CONFIGURE            = 0x13, // Set controller parameters.
+    FLOPPY_CMD_LOCK                 = 0x14, // Locks in controller parameters so a reset does not affect them.
+    FLOPPY_CMD_VERIFY               = 0x16, // Verify sector.
+    FLOPPY_CMD_SCAN_LOW_OR_EQUAL    = 0x19, // Scan for data less or equal.
+    FLOPPY_CMD_SCAN_HIGH_OR_EQUAL   = 0x1D, // Scan for data greater or equal.
+    FLOPPY_CMD_RELATIVE_SEEK        = 0x8F  // Seek to relative sector.
 };
 
-// DOR bitflag definitions
-enum FloppyDORFlags
-{
-    FLOPPY_DSEL =       0x3,  // "Select" drive number for next access.
-    FLOPPY_RESET =      0x4,  // Clear = enter reset mode, Set = normal operation.
-    FLOPPY_IRQ =        0x8,  // Set to enable IRQs and DMA.
-    FLOPPY_MOTA =       0x10, // Set to turn drive 0's motor ON.
-    FLOPPY_MOTB =       0x20, // Set to turn drive 1's motor ON.
-    FLOPPY_MOTC =       0x40, // Set to turn drive 2's motor ON.
-    FLOPPY_MOTD =       0x80  // Set to turn drive 3's motor ON.
+// Floppy command options.
+enum {
+    FLOPPY_CMD_EXT_SKIP     = 0x20, // Skip flag. When set to 1, sectors containing a deleted data address
+                                    // mark will automatically be skipped during the execution of READ DATA.
+    FLOPPY_CMD_EXT_MFM      = 0x40, // MFM mode selector. A one selects the double density (MFM) mode.
+    FLOPPY_CMD_EXT_MT       = 0x80  // Multi-track selector. When set, this flag selects the multi-track operating mode.
 };
 
-// MSR bitflag definitions
-enum FloppyMSRFlags
-{
-    FLOPPY_ACTA =       0x01, // Drive 0 is seeking.
-    FLOPPY_ACTB =       0x02, // Drive 1 is seeking.
-    FLOPPY_ACTC =       0x04, // Drive 2 is seeking.
-    FLOPPY_ACTD =       0x08, // Drive 3 is seeking.
-    FLOPPY_CB =         0x10, // Command Busy: set when command byte received, cleared at end of Result phase.
-    FLOPPY_NDMA =       0x20, // Set in Execution phase of PIO mode read/write commands only.
-    FLOPPY_DIO =        0x40, // Set if FIFO IO port expects an IN opcode.
-    FLOPPY_RQM =        0x80, // Set if it's OK (or mandatory) to exchange bytes with the FIFO IO port.
+// Floppy DOR bits.
+enum {
+    FLOPPY_DOR_SEL_DRIVE0   = 0x00, // Select drive 0.
+    FLOPPY_DOR_SEL_DRIVE1   = 0x01, // Select drive 1.
+    FLOPPY_DOR_SEL_DRIVE2   = 0x02, // Select drive 2.
+    FLOPPY_DOR_SEL_DRIVE3   = 0x03, // Select drive 3.
+    FLOPPY_DOR_RESET        = 0x04, // Clear to enter reset mode, set to operate normally.
+    FLOPPY_DOR_IRQ_DMA      = 0x08, // Enable IRQs and DMA.
+    FLOPPY_DOR_MOT_DRIVE0   = 0x10, // Set to turn drive 0's motor on.
+    FLOPPY_DOR_MOT_DRIVE1   = 0x20, // Set to turn drive 1's motor on.
+    FLOPPY_DOR_MOT_DRIVE2   = 0x40, // Set to turn drive 2's motor on.
+    FLOPPY_DOR_MOT_DRIVE3   = 0x80  // Set to turn drive 3's motor on.
 };
 
-#define FLPY_SECTORS_PER_TRACK 18
+// Floppy MSR bits.
+enum {
+    FLOPPY_MSR_DRIVE0_BUSY  = 0x01, // Drive 0 is seeking.
+    FLOPPY_MSR_DRIVE1_BUSY  = 0x02, // Drive 1 is seeking.
+    FLOPPY_MSR_DRIVE2_BUSY  = 0x04, // Drive 2 is seeking.
+    FLOPPY_MSR_DRIVE3_BUSY  = 0x08, // Drive 3 is seeking.
+    FLOPPY_MSR_CMD_BUSY     = 0x10, // This bit is set to a one when a command is in progress. Cleared at end of result phase.
+    FLOPPY_MSR_NON_DMA      = 0x20, // This mode is selected in the SPECIFY command and will be set to a 1 during the execution phase of a command.
+    FLOPPY_MSR_DIO          = 0x40, // Indicates the direction of a data transfer once RQM is set. A 1 indicates a read and a 0 indicates a write is required.
+    FLOPPY_MSR_RQM          = 0x80, // Indicates that the host can transfer data if set to a 1. No access is permitted if set to a 0.
+};
+
+// Floppy ST0 masks.
+enum {
+    FLOPPY_ST0_SEL_DRIVE0       = 0x00, // Drive 0 is selected.
+    FLOPPY_ST0_SEL_DRIVE1       = 0x01, // Drive 1 is selected.
+    FLOPPY_ST0_SEL_DRIVE2       = 0x02, // Drive 2 is selected.
+    FLOPPY_ST0_SEL_DRIVE3       = 0x03, // Drive 3 is selected.
+    FLOPPY_ST0_ACTIVE_HEAD      = 0x04, // The current head address.
+    FLOPPY_ST0_FAIL             = 0x08, // Drive not ready.
+    FLOPPY_ST0_SEEK_END         = 0x10, // The 82077AA completed a SEEK or RECALIBRATE command, or a READ or WRITE with implied seek command.
+    FLOPPY_ST0_INTERRUPT_CODE   = 0xC0  // Command failed.
+};
+
+// Floppy ST1 masks.
+enum {
+    FLOPPY_ST1_MISSING_ADDR_MARK    = 0x01, // No address mark found.
+    FLOPPY_ST1_NOT_WRITABLE         = 0x02, // Disk is write-protected.
+    FLOPPY_ST1_NO_DATA              = 0x04, // Sector not found.
+    FLOPPY_ST1_OVERRUN_UNDERRUN     = 0x10, // Becomes set if the 82077AA does not receive CPU or DMA Underrun service
+                                            // within the required time interval, resulting in data overrun or underrun.
+    FLOPPY_ST1_DATA_ERROR           = 0x20, // The 82077AA detected a CRC error in either the ID field or the data field of a sector.
+    FLOPPY_ST1_END_OF_CYLINDER      = 0x80  // The 82077AA tried to access a sector beyond the final sector of the track.
+};
+
+// Floppy ST2 masks.
+enum {
+    FLOPPY_ST2_MISSING_DATA_MARK    = 0x01, // The 82077AA cannot detect a data address mark or a deleted data address mark.
+    FLOPPY_ST2_BAD_CYLINDER         = 0x02, // The track address from the sector ID field is different from the track address
+                                            // maintained inside the 82077AA and is equal to FF hex which indicates a bad track
+                                            // with a hard error according to the IBM soft-sectored format.
+    FLOPPY_ST2_WRONG_CYLINDER       = 0x10, // The track address from the sector ID field is different from the track address maintained inside the 82077AA.
+    FLOPPY_ST2_DATA_ERROR_IN_FIELD  = 0x20, // The 82077AA detected a CRC error in the data field.
+    FLOPPY_ST2_CONTROL_MARK         = 0x40  // Data address mark found.
+};
+
+// Floppy ST3 masks.
+enum {
+    FLOPPY_ST3_SEL_DRIVE0       = 0x00, // Indicates the status of the DS1, DS0 pins.
+    FLOPPY_ST3_SEL_DRIVE1       = 0x01,
+    FLOPPY_ST3_SEL_DRIVE2       = 0x02,
+    FLOPPY_ST3_SEL_DRIVE3       = 0x03,
+    FLOPPY_ST3_HEAD_ADDRESS     = 0x04, // Indicates the status of the HDSEL pin.
+    FLOPPY_ST3_TRACK0           = 0x10, // Indicates the status of the TRK0 pin.
+    FLOPPY_ST3_WRITE_PROTECT    = 0x40  // Indicates the status of the WP pin.
+};
+
+#define FLOPPY_CMD_RETRY_COUNT  10
+#define FLOPPY_IRQ_WAIT_TIME    500
+#define FLOPPY_DMALENGTH 0x4800
+#define FLOPPY_SECTORS_PER_TRACK 18
+#define FLOPPY_VERSION_NONE     0xFF
 #define FLOPPY_VERSION_ENHANCED 0x90

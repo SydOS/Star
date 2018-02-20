@@ -60,17 +60,27 @@ void memory_init(multiboot_info_t* mbootInfo) {
 	// Get the highest free address before the first hole.
 	memInfo.highestFreeAddress = memInfo.memUpper * 1024; // memUpper is in KB, convert to bytes.
 
-	// Start the kernel heap on the first aligned page directly after where the kernel is.
-	memInfo.kernelHeapStart = (memInfo.kernelEnd + 0x1000) & 0xFFFFF000;
+	// Calculate ISA DMA space directly after where the kernel is.
+	memInfo.isaDmaStart = (memInfo.kernelEnd + 0x1000) & 0xFFFFF000;
+	memInfo.isaDmaEnd = memInfo.isaDmaStart + 0x200000; // 2MB of address space.
+
+	// Determine memory required and allocate for the ISA DMA bitmap.
+	uint32_t isaDmaBitmapLength = memInfo.isaDmaEnd / 0x1000;
+	uint32_t isaDmaBitmapSize = DIVIDE_ROUND_UP(isaDmaBitmapLength, 32) * sizeof(uint32_t);
+	
+
+	// Start the kernel heap on the first aligned page directly after where the ISA DMA space is.
+	memInfo.kernelHeapStart = (memInfo.isaDmaEnd + 0x1000) & 0xFFFFF000;
 	memInfo.kernelHeapPosition = memInfo.kernelHeapStart;
 
-	// Determine memory required and allocate for the bitset.
-	uint32_t bitsetLength = memInfo.highestFreeAddress / 0x1000;
-	uint32_t bitsetSize = DIVIDE_ROUND_UP(bitsetLength, 32) * sizeof(uint32_t);
+
+
+
 
 	// Print summary.
 	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
-	kprintf("Multiboot info start: 0x%X | Multiboot end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
+	kprintf("Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
+	kprintf("ISA DMA start: 0x%X | ISA DMA end: 0x%X\n", memInfo.isaDmaStart, memInfo.isaDmaEnd);
 	kprintf("Heap start: 0x%X\n", memInfo.kernelHeapStart);
 
 	//last_alloc = kernel_end + 0x1000;
