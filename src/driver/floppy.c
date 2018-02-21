@@ -40,10 +40,10 @@ static uint8_t floppy_parse_error(uint8_t st0, uint8_t st1, uint8_t st2) {
 		kprintf("Drive not ready.\n");
 		error = 1;
 	}
-	if (st1 & FLOPPY_ST1_MISSING_ADDR_MARK || st2 & FLOPPY_ST2_MISSING_DATA_MARK) {
-		kprintf("Missing address mark.\n");
-		error = 1;
-	}
+	//if (st1 & FLOPPY_ST1_MISSING_ADDR_MARK || st2 & FLOPPY_ST2_MISSING_DATA_MARK) {
+	//	kprintf("Missing address mark.\n");
+	//	error = 1;
+	//}
 	if (st1 & FLOPPY_ST1_NOT_WRITABLE) {
 		kprintf("Disk is write-protected.\n");
 		error = 2;
@@ -332,14 +332,14 @@ bool floppy_seek(uint8_t drive, uint8_t track) {
 }
 
 // Read the specified sector.
-int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
+int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize) {
 	if (drive >= 4)
 		return -1;
 	uint8_t st0, cyl = 0;
 
 	// Convert LBA to CHS.
 	uint16_t head = 0, track = 0, sector = 1;
-	floppy_lba_to_chs(sector_lba, &head, &track, &sector);
+	floppy_lba_to_chs(sectorLba, &head, &track, &sector);
 
 	// Seek to track.	
 	if (!floppy_seek(drive, track))
@@ -380,9 +380,8 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 
 		// If no error, we are done.
 		if (!error) {
-			for (uint16_t i = 0; i < 128; i++)
-				kprintf("%X ", (uint8_t)(floppyDmaBuffer[i]));
-			kprintf("\n");
+			// Copy data to buffer.
+			memcpy(floppyDmaBuffer, buffer, bufferSize);
 			return 0;
 		}
 		else if (error > 1) {
@@ -429,7 +428,19 @@ void floppy_init()
 	kprintf("Resetting floppy drive controller...\n");
 	floppy_controller_reset(true);
 
+	uint8_t data[12000];
 	kprintf("Getting sector 0...\n");
-	floppy_read_sector(0, 0);
+	floppy_read_sector(0, 0, data, 12000);
 	floppy_set_motor(0, false);
+
+	for (int i = 0; i < 60; i++)
+		kprintf("%X ", data[i]);
+	kprintf("\n");
+
+	char volumeName[12];
+	memcpy(data+43, volumeName, sizeof(volumeName));
+	volumeName[11] = '\0';
+
+	// Print volume name.
+	kprintf("FAT12 volume string: %s\n", volumeName);
 }

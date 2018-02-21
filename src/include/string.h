@@ -2,7 +2,7 @@
 #define STRING_H
 
 extern int32_t memcmp(const void *str1, const void *str2, size_t n);
-extern void* memcpy(void *str1, const void *str2, size_t n);
+extern void memcpy(uint8_t *src, uint8_t *dest, size_t n);
 extern void* memmove(void *str1, const void *str2, size_t n);
 extern void* memset(void *str, int32_t c, size_t n);
 extern char* strcat(char *dest, const char *src);

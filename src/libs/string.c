@@ -18,16 +18,15 @@ int32_t memcmp(const void *str1, const void *str2, size_t n)
 	return 0;
 }
 
-// Copies n bytes from memory area str1 to memory area str2.
-void* memcpy(void *str1, const void *str2, size_t n)
+// Copies n bytes from memory area src to memory area dest.
+void memcpy(uint8_t *src, uint8_t *dest, size_t n)
 {
-	uint8_t *s1 = (uint8_t*)str1;
-	const uint8_t *s2 = (const uint8_t*)str2;
-
 	// Copy bytes.
 	for (size_t i = 0; i < n; i++)
-		s1[i] = s2[i];
-	return str1;
+	{
+		dest[i] = src[i];
+		//kprintf("Byte %i\n", i);
+	}
 }
 
 // Copies n bytes from memory area str1 to memory area str2,
