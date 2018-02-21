@@ -32,3 +32,34 @@ uint64_t cpu_msr_read(uint32_t msr) {
 void cpu_msr_write(uint32_t msr, uint64_t value) {
     asm volatile ("wrmsr" : : "a"((uint32_t)(value & 0xFFFFFFFF)), "d"((uint32_t)(value >> 32)), "c"(msr));
 }
+// -----------------------------------------------------------------------------
+
+// Outputs 2 bytes to the specified port.
+void outw(uint16_t port, uint16_t data)
+{
+    asm volatile("outw %0, %1" : : "a"(data), "Nd"(port));
+}
+
+// Gets 2 bytes from the specified port.
+uint16_t inw(uint16_t port)
+{
+    uint8_t data;
+    asm volatile("inw %1, %0" : "=a"(data) : "Nd"(port));
+    return data;
+}
+
+// -----------------------------------------------------------------------------
+
+// Outputs 4 bytes to the specified port.
+void outl(uint16_t port, uint32_t data)
+{
+    asm volatile("outl %0, %1" : : "a"(data), "Nd"(port));
+}
+
+// Gets 4 bytes from the specified port.
+uint32_t inl(uint16_t port)
+{
+    uint8_t data;
+    asm volatile("inl %1, %0" : "=a"(data) : "Nd"(port));
+    return data;
+}
