@@ -1,4 +1,6 @@
 [bits 32]
+section .text
+
 ; Sets up the new GDT into the processor while flushing out the old one.
 global _gdt_load
 _gdt_load:
@@ -11,6 +13,7 @@ _gdt_load:
 	mov fs, ax
 	mov gs, ax
 	mov ss, ax
+	
 	jmp 0x08:.flush2
 .flush2:
 	ret

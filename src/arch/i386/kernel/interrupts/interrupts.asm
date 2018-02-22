@@ -1,4 +1,5 @@
 [bits 32]
+section .text
 
 ; Exception ISRs
 global _isr0
@@ -106,30 +107,35 @@ _isr9:
 ; 10: Bad TSS Exception (With Error Code!)
 _isr10:
     cli
+    push byte 0
     push byte 10
     jmp isr_common_stub
 
 ; 11: Segment Not Present Exception (With Error Code!)
 _isr11:
     cli
+    push byte 0
     push byte 11
     jmp isr_common_stub
 
 ; 12: Stack Fault Exception (With Error Code!)
 _isr12:
     cli
+    push byte 0
     push byte 12
     jmp isr_common_stub
 
 ; 13: General Protection Fault Exception (With Error Code!)
 _isr13:
     cli
+    push byte 0
     push byte 13
     jmp isr_common_stub
 
 ; 14: Page Fault Exception (With Error Code!)
 _isr14:
     cli
+    push byte 0
     push byte 14
     jmp isr_common_stub
 

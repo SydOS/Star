@@ -4,10 +4,10 @@
 #include <string.h>
 #include <kprint.h>
 #include <multiboot.h>
-#include "kernel/gdt.h"
+#include <arch/i386/kernel/gdt.h>
+#include <arch/i386/kernel/idt.h>
+#include <arch/i386/kernel/interrupts.h>
 #include "kernel/nmi.h"
-#include "kernel/idt.h"
-#include "kernel/interrupts.h"
 #include "kernel/pit.h"
 #include "kernel/memory.h"
 #include "kernel/paging.h"

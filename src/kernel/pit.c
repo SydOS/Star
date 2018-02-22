@@ -3,7 +3,7 @@
 #include <tools.h>
 #include <kprint.h>
 #include <kernel/pit.h>
-#include <kernel/interrupts.h>
+#include <arch/i386/kernel/interrupts.h>
 
 // https://wiki.osdev.org/Programmable_Interval_Timer
 

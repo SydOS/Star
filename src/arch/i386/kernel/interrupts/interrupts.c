@@ -1,8 +1,7 @@
 #include <main.h>
 #include <kprint.h>
-#include <io.h>
-#include <kernel/idt.h>
-#include <kernel/interrupts.h>
+#include <arch/i386/kernel/idt.h>
+#include <arch/i386/kernel/interrupts.h>
 #include <kernel/pic.h>
 
 // Functions defined by Intel for service extensions.
@@ -58,15 +57,13 @@ extern void _irq14();
 extern void _irq15();
 
 // Array of IRQ handler pointers.
-void* irq_handlers[16] =
-{
+void* irqHandlers[16] = {
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0
 };
 
 // Exception messages array.
-char* exception_messages[] =
-{
+char* exception_messages[] = {
     "Division By Zero",
     "Debug",
     "Non Maskable Interrupt",
@@ -105,52 +102,45 @@ char* exception_messages[] =
 };
 
 // Installs an IRQ handler.
-void interrupts_irq_install_handler(uint8_t irq, void (*handler)(registers_t *regs))
-{
+void interrupts_irq_install_handler(uint8_t irq, void (*handler)(registers_t *regs)) {
     // Add handler for IRQ to array.
-    irq_handlers[irq] = handler;
+    irqHandlers[irq] = handler;
     kprintf("Interrupt for IRQ%u installed!\n", irq);
 }
 
 // Removes an IRQ handler.
-void interrupts_irq_remove_handler(uint8_t irq)
-{
+void interrupts_irq_remove_handler(uint8_t irq) {
     // Null out handler for IRQ in array.
-    irq_handlers[irq] = 0;
+    irqHandlers[irq] = 0;
 }
 
 // Handler for exception ISRs.
-void interrupts_fault_handler(registers_t *regs)
-{
-    if(regs->int_no < 32)
-    {
+void interrupts_fault_handler(registers_t *regs) {
+    if(regs->intNum < 32) {
         // Log exception and stop. Maybe have panic thingy.
-        kprintf("%s\nHalted.", exception_messages[regs->int_no]);
-        for (;;);
+        kprintf("%s\nHalted.", exception_messages[regs->intNum]);
+        while (true);
     }
 }
 
 // Handler for IRQ ISRs.
-void interrupts_irq_handler(registers_t *regs)
-{
+void interrupts_irq_handler(registers_t *regs) {
     // Blank handler pointer.
     void (*handler)(struct regs *r);
 
     // Invoke any handler registered.
-    handler = irq_handlers[regs->int_no - 32];
+    handler = irqHandlers[regs->intNum - 32];
     if (handler)
         handler(regs);
 
     // Send EOI to PIC.
-    pic_eoi(regs->int_no);
+    pic_eoi(regs->intNum);
 }
 
 // Initializes interrupts.
-void interrupts_init()
-{
+void interrupts_init() {
     // Enable PIC.
     pic_init();
-    //apic_init();
 
     // Add each of the 32 exception ISRs to the IDT.
     idt_set_gate(0, (uint32_t)_isr0, 0x08, 0x8E);

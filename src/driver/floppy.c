@@ -3,7 +3,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <driver/floppy.h>
-#include <kernel/interrupts.h>
+#include <arch/i386/kernel/interrupts.h>
 
 static bool irq_triggered = false;
 static bool implied_seeks = false;
@@ -487,8 +487,9 @@ void floppy_init()
 	// Reset floppy controller.
 	kprintf("Resetting floppy drive controller...\n");
 	floppy_controller_reset(true);
+	floppy_set_motor(0, false);
 
-	uint8_t data[16000];
+	/*uint8_t data[16000];
 	kprintf("Getting sector 0...\n");
 	floppy_read_track(0, 0, data, 16000);
 	floppy_set_motor(0, false);
@@ -502,5 +503,5 @@ void floppy_init()
 	volumeName[11] = '\0';
 
 	// Print volume name.
-	kprintf("FAT12 volume string: %s\n", volumeName);
+	kprintf("FAT12 volume string: %s\n", volumeName);*/
 }
