@@ -1,4 +1,4 @@
-CFLAGS?=-std=gnu99 -O3 -ffreestanding -fno-omit-frame-pointer -ggdb -gdwarf-2 -Wall -Wextra -I./src/include
+CFLAGS?=-std=gnu99 -ffreestanding -ggdb -gdwarf-2 -Wall -Wextra -I./src/include
 ARCH?=i686
 TIME?=$(shell date +%s)
 
@@ -26,7 +26,7 @@ all:
 
 build-kernel: $(ASM_OBJECTS) $(C_OBJECTS)
 	# Link objects together into binary.
-	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -O2 -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc
+	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc
 
 	# Strip out debug info into separate files.
 	$(ARCH)-elf-objcopy --only-keep-debug Star-$(ARCH).kernel Star-$(ARCH).sym
@@ -40,9 +40,9 @@ build-kernel: $(ASM_OBJECTS) $(C_OBJECTS)
 $(ASM_OBJECTS):
 	mkdir -p $(dir $@)
 ifeq ($(ARCH), x86_64)
-	nasm -felf64 $(subst build, src, $(subst _asm.o,.asm,$@)) -o $@
+	nasm -felf64 -F dwarf $(subst build, src, $(subst _asm.o,.asm,$@)) -o $@
 else
-	nasm -felf32 $(subst build, src, $(subst _asm.o,.asm,$@)) -o $@
+	nasm -felf32 -F dwarf $(subst build, src, $(subst _asm.o,.asm,$@)) -o $@
 endif
 
 # Compile C source files.
