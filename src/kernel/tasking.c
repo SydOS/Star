@@ -1,6 +1,8 @@
 #include <main.h>
 #include <kprint.h>
+#include <kernel/pit.h>
 #include <kernel/memory.h>
+#include <kernel/main.h>
 
 typedef struct _process {
 	struct _process* prev;
@@ -34,17 +36,23 @@ bool taskingEnabled = false;
 
 // -----------------------------------------------------------------------------
 
+void schedule_noirq() {
+	if(!taskingEnabled) return;
+	asm volatile("int $0x2e");
+	return;
+}
+
 void _kill() {
 	// Kill a process
-	if(c->pid == 1) { set_task(0); kprintf("Idle can't be killed!"); }
+	if(c->pid == 1) { pit_set_task(0); kprintf("Idle can't be killed!"); }
 	kprintf("Killing process %s (%d)\n", c->name, c->pid);
-	set_task(0);
+	pit_set_task(0);
 	free((void *)c->stacktop);
 	free(c);
 	pfree(c->cr3);
 	c->prev->next = c->next;
 	c->next->prev = c->prev;
-	set_task(1);
+	pit_set_task(1);
 	schedule_noirq();
 }
 
@@ -70,9 +78,9 @@ void __notified(int sig) {
 // -----------------------------------------------------------------------------
 
 void kernel_main_thread() {
-	//tasking_enable();
-	//taskingEnabled = true;
-	//late_init();
+	pit_enable_tasking();
+	taskingEnabled = true;
+	kernel_late();
 }
 
 PROCESS* tasking_create_process(char* name, uint32_t addr) {
@@ -108,9 +116,58 @@ PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	return p;
 }
 
+void tasking_tick() {
+	//asm volatile("add $0xc, %esp");
+	asm volatile("push %eax");
+	asm volatile("push %ebx");
+	asm volatile("push %ecx");
+	asm volatile("push %edx");
+	asm volatile("push %esi");
+	asm volatile("push %edi");
+	asm volatile("push %ebp");
+	asm volatile("push %ds");
+	asm volatile("push %es");
+	asm volatile("push %fs");
+	asm volatile("push %gs");
+	asm volatile("mov %%esp, %%eax":"=a"(c->esp));
+	c = c->next;
+	asm volatile("mov %%eax, %%cr3": :"a"(c->cr3));
+	asm volatile("mov %%eax, %%esp": :"a"(c->esp));
+	asm volatile("pop %gs");
+	asm volatile("pop %fs");
+	asm volatile("pop %es");
+	asm volatile("pop %ds");
+	asm volatile("pop %ebp");
+	asm volatile("pop %edi");
+	asm volatile("pop %esi");
+	asm volatile("out %%al, %%dx": :"d"(0x20), "a"(0x20)); // send EoI to master PIC
+	asm volatile("pop %edx");
+	asm volatile("pop %ecx");
+	asm volatile("pop %ebx");
+	asm volatile("pop %eax");
+	asm volatile("iret");
+}
+
+void tasking_exec()
+{
+	asm volatile("mov %%eax, %%esp": :"a"(c->esp));
+	asm volatile("pop %gs");
+	asm volatile("pop %fs");
+	asm volatile("pop %es");
+	asm volatile("pop %ds");
+	asm volatile("pop %ebp");
+	asm volatile("pop %edi");
+	asm volatile("pop %esi");
+	asm volatile("pop %edx");
+	asm volatile("pop %ecx");
+	asm volatile("pop %ebx");
+	asm volatile("pop %eax");
+	asm volatile("iret");
+}
+
 void tasking_init() {
 	c = tasking_create_process("kernel", (uint32_t)kernel_main_thread);
 	c->next = c;
 	c->prev = c;
-	//tasking_exec();
+	tasking_exec();
 }

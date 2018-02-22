@@ -11,6 +11,7 @@
 #include "kernel/pit.h"
 #include "kernel/memory.h"
 #include "kernel/paging.h"
+#include "kernel/tasking.h"
 #include <arch/i386/kernel/cpuid.h>
 #include "driver/vga.h"
 #include "driver/floppy.h"
@@ -96,6 +97,11 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 		kprintf("Sleeping for 5 seconds...\n");
 	sleep(5000);
 
+		kprintf("Starting tasking...\n");
+	tasking_init();
+}
+
+void kernel_late() {
 	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
 	// Print CPUID info.
