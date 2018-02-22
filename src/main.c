@@ -4,14 +4,14 @@
 #include <string.h>
 #include <kprint.h>
 #include <multiboot.h>
-#include "kernel/gdt.h"
+#include <arch/i386/kernel/gdt.h>
+#include <arch/i386/kernel/idt.h>
+#include <arch/i386/kernel/interrupts.h>
 #include "kernel/nmi.h"
-#include "kernel/idt.h"
-#include "kernel/interrupts.h"
 #include "kernel/pit.h"
 #include "kernel/memory.h"
 #include "kernel/paging.h"
-#include "kernel/cpuid.h"
+#include <arch/i386/kernel/cpuid.h>
 #include "driver/vga.h"
 #include "driver/floppy.h"
 #include "driver/serial.h"
@@ -88,20 +88,20 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	memory_init(mboot_info);
 	//memory_print_out();
 
-	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
-	// Print CPUID info.
-	//cpuid_print_capabilities();
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 		kprintf("Setting up PIT...\n");
     pit_init();
 
 		kprintf("Sleeping for 5 seconds...\n");
 	sleep(5000);
-	//while(true);
 
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+
+	// Print CPUID info.
+	cpuid_print_capabilities();
+
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	// -------------------------------------------------------------------------
 
     kprintf("Initializing paging...\n");

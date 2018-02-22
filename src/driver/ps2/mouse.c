@@ -3,7 +3,7 @@
 #include <tools.h>
 #include <driver/ps2/mouse.h>
 #include <driver/ps2/ps2.h>
-#include <kernel/interrupts.h>
+#include <arch/i386/kernel/interrupts.h>
 
 // https://wiki.osdev.org/Mouse
 // https://wiki.osdev.org/PS/2_Mouse

@@ -1,5 +1,6 @@
 // https://wiki.osdev.org/Floppy_Disk_Controller
 // https://github.com/1byte2bytes/SydOS/blob/master/res/82077AA_FloppyControllerDatasheet.pdf
+// https://forum.osdev.org/viewtopic.php?t=13538
 
 // Floppy registers.
 enum {
