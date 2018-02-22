@@ -1,7 +1,7 @@
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
-#include <kernel/cpuid.h>
+#include <arch/i386/kernel/cpuid.h>
 
 extern uint32_t _cpuid_detect();
 extern uint32_t _cpuid_gethighestfunction();
@@ -16,15 +16,20 @@ extern uint32_t _cpuid_gethighestextendedfunction();
 extern uint32_t _cpuid_geteeprocessorfeatures_edx();
 extern uint32_t _cpuid_geteeprocessorfeatures_ecx();
 
-void cpuid_print_capabilities() {
-    char temp1[32];
+// Query CPUID.
+void cpuid_query(uint32_t function, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx) {
+    asm volatile ("cpuid" : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx) :
+                            "a"(function), "b"(0), "c"(0), "d"(0));
+}
 
+void cpuid_print_capabilities() {
     // Determine if CPUID is even supported.
     // A return value of 0 indicates CPUID is supported.
     if(_cpuid_detect() != 0) {
         // Get highest CPUID function supported
-        uint32_t highest_cpuidfunc = _cpuid_gethighestfunction();
-
+        uint32_t highest_cpuidfunc = 0;
+        uint32_t unused;
+        cpuid_query(0, &highest_cpuidfunc, &unused, &unused, &unused);
         // Print vendor ID if supported (should be).
 	    
 	    uint32_t cpuvendor[4];

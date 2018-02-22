@@ -2,7 +2,7 @@
 #include <kprint.h>
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/interrupts.h>
-#include <kernel/pic.h>
+#include <arch/i386/kernel/pic.h>
 
 // Functions defined by Intel for service extensions.
 extern void _isr0();
@@ -139,6 +139,10 @@ void interrupts_irq_handler(registers_t *regs) {
 
 // Initializes interrupts.
 void interrupts_init() {
+    // Check if an APIC is present.
+    if (lapic_supported())
+        kprintf("APIC supported!\n");
+
     // Enable PIC.
     pic_init();
 

@@ -14,3 +14,14 @@ uint8_t inb(uint16_t port)
     asm volatile("inb %1, %0" : "=a"(data) : "Nd"(port));
     return data;
 }
+
+void io_wait() {
+    asm volatile ("jmp 1f\n\t"
+                  "1:jmp 2f\n\t"
+                  "2:");
+}
+
+// Read MSR.
+void cpu_msr_read(uint32_t msr, uint32_t *low, uint32_t *high) {
+    asm volatile ("rdmsr" : "=a"(*low), "=d"(high) : "c"(msr));
+}
