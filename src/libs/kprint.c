@@ -123,14 +123,18 @@ void kprint_hex(uint64_t num, bool capital, bool pad)
     }
 }
 
-// https://en.wikipedia.org/wiki/Printf_format_string
-// Printf implementation.
-void kprintf(const char* format, ...)
-{
+void kprintf(const char* format, ...) {
     // Get args.
     va_list args;
     va_start(args, format);
 
+    // Call va_list kprintf.
+    kprintf_va(format, args);
+}
+
+// https://en.wikipedia.org/wiki/Printf_format_string
+// Printf implementation.
+void kprintf_va(const char* format, va_list args) {
     // Disable cursor for increased performance.
     vga_disable_cursor();
 

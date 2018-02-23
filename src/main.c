@@ -19,6 +19,24 @@
 #include "driver/speaker.h"
 #include "driver/ps2/ps2.h"
 
+// Displays a kernel panic message and halts the system.
+void panic(const char *format, ...) {
+	// Disable interrupts.
+	asm volatile("cli");
+
+    // Get args.
+    va_list args;
+	va_start(args, format);
+
+	// Show panic.
+	kprintf("\nPANIC:\n");
+	kprintf_va(format, args);
+	kprintf("\n\nHalted.");
+
+	// Halt forever.
+	while (true);
+}
+
 /**
  * The main function for the kernel, called from boot.asm
  */
@@ -54,7 +72,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 		return;
 	}
 
-
 	kprintf("Initializing GDT...\n");
 	gdt_init();
 
@@ -80,7 +97,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	
 	// Initialize physical memory manager.
 	pmm_init(mboot_info);
-
 
 	kprintf("Setting up PIT...\n");
     pit_init();

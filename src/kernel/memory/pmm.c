@@ -37,10 +37,8 @@ page_t pmm_pop_page() {
     page_t page = *pageStack;
 
     // Verify there are pages.
-    if (pagesAvailable == 0) {
-        kprintf("No more pages!\n"); // Die here.
-        return 0;
-    }
+    if (pagesAvailable == 0)
+        panic("No more pages!\n");
 
     // Decrement stack and return page.
     pageStack--;
@@ -68,10 +66,7 @@ static void pmm_build_stack() {
 		}
 	kprintf("Test %s!\n", pass ? "passed" : "failed");
     if (!pass)
-    {
-        // Probably should die.
-        while(true);
-    }
+        panic("Memory test of page stack area failed.\n");
 
     // Build stack of free pages.
 	for (multiboot_memory_map_t *entry = memInfo.mmap; (uint32_t)entry < (uint32_t)memInfo.mmap + memInfo.mmapLength;
@@ -106,11 +101,7 @@ static void pmm_build_stack() {
 void pmm_init(multiboot_info_t* mbootInfo) {
 	// Ensure a memory map is present.
 	if ((mbootInfo->flags & MULTIBOOT_INFO_MEM_MAP) == 0)
-	{
-		kprintf("NO MULTIBOOT MEMORY MAP FOUND!\n");
-		// Kernel should die at this point.....
-		while (true);
-	}
+		panic("NO MULTIBOOT MEMORY MAP FOUND!\n");
 
 	// Store away Multiboot info.
 	memInfo.mbootInfo = mbootInfo;
@@ -185,8 +176,5 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 
     kprintf("Stack test %s!\n", pass ? "passed" : "failed");
     if (!pass)
-    {
-        // Probably should die.
-        while(true);
-    }
+        panic("Test of memory page failed.\n");
 }

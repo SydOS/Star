@@ -117,11 +117,9 @@ void interrupts_irq_remove_handler(uint8_t irq) {
 
 // Handler for exception ISRs.
 void interrupts_fault_handler(registers_t *regs) {
-    if(regs->intNum < 32) {
-        // Log exception and stop. Maybe have panic thingy.
-        kprintf("%s\nHalted.", exception_messages[regs->intNum]);
-        while (true);
-    }
+    if(regs->intNum < 32)
+        panic("Exception: %s\n", exception_messages[regs->intNum]); // TODO: only panic with actual aborts,
+                                                                    // as faults are command and shouldn't panic.
 }
 
 // Handler for IRQ ISRs.
