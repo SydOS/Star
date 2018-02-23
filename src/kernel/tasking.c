@@ -83,6 +83,19 @@ void kernel_main_thread() {
 	kernel_late();
 }
 
+void hmmm_thread() {
+	while (1) {  }
+}
+
+/* This adds a process while no others are running! */
+void __addProcess(PROCESS* p)
+{
+	p->next = c->next;
+	p->next->prev = p;
+	p->prev = c;
+	c->next = p;
+}
+
 PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	// Set up our new process
 	PROCESS* p = (PROCESS *)malloc(sizeof(PROCESS));
@@ -169,5 +182,6 @@ void tasking_init() {
 	c = tasking_create_process("kernel", (uint32_t)kernel_main_thread);
 	c->next = c;
 	c->prev = c;
+	__addProcess(tasking_create_process("hmmm", (uint32_t)hmmm_thread));
 	tasking_exec();
 }
