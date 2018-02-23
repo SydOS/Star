@@ -160,6 +160,24 @@ void vga_setcolor(enum vga_color fg, enum vga_color bg) {
 	terminal_color = vga_entry_color(fg, bg);
 }
 
+// -----------------------------------------------------------------------------
+// Cursor stuff
+// -----------------------------------------------------------------------------
+
+void vga_update_cursor(int x, int y)
+{
+	uint16_t pos = y * VGA_WIDTH + x;
+ 
+	outb(0x3D4, 0x0F);
+	outb(0x3D5, (uint8_t) (pos & 0xFF));
+	outb(0x3D4, 0x0E);
+	outb(0x3D5, (uint8_t) ((pos >> 8) & 0xFF));
+}
+
+void vga_trigger_cursor_update() {
+	vga_update_cursor(terminal_column, terminal_row);
+}
+
 void vga_enable_cursor() {
 	outb(0x3D4, 0x0A);
 	outb(0x3D5, (inb(0x3D5) & 0xC0) | 0);
@@ -177,20 +195,6 @@ void vga_disable_cursor() {
 	outb(0x3D5, 0x20);
 
 	cursor_enabled = false;
-}
-
-void vga_update_cursor(int x, int y)
-{
-	uint16_t pos = y * VGA_WIDTH + x;
- 
-	outb(0x3D4, 0x0F);
-	outb(0x3D5, (uint8_t) (pos & 0xFF));
-	outb(0x3D4, 0x0E);
-	outb(0x3D5, (uint8_t) ((pos >> 8) & 0xFF));
-}
-
-void vga_trigger_cursor_update() {
-	vga_update_cursor(terminal_column, terminal_row);
 }
 
 int* vga_cursor_pos(int* p) {
