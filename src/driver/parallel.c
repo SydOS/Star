@@ -22,7 +22,7 @@ void parallel_reset(uint16_t port)
 void parallel_sendbyte(uint16_t port, unsigned char data)
 {
 	// Wait for device to be receptive.
-	while (!inb(PARALLEL_STATUS_PORT(port)) & PARALLEL_STATUS_BUSY)
+	while (!inb(PARALLEL_STATUS_PORT(port)) && PARALLEL_STATUS_BUSY)
 		sleep(10);
 
 	// Write byte to data port.
@@ -34,6 +34,6 @@ void parallel_sendbyte(uint16_t port, unsigned char data)
 	outb(PARALLEL_CONTROL_PORT(port), PARALLEL_CONTROL_AUTOLF | PARALLEL_CONTROL_INIT | PARALLEL_CONTROL_SELECT);
 
 	// Wait for end device to finish processing.
-	while (!inb(PARALLEL_STATUS_PORT(port)) & PARALLEL_STATUS_BUSY)
+	while (!inb(PARALLEL_STATUS_PORT(port)) && PARALLEL_STATUS_BUSY)
 		sleep(10);
 }
