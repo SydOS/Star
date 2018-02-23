@@ -120,7 +120,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-	vga_writes("root@sydos ~: ");
+	kprintf("root@sydos ~: ");
 	serial_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
@@ -148,7 +148,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 
 		if (c == '\r' || c == '\n') {
 			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-			vga_writes("\nroot@sydos ~: ");
+			kprintf("\nroot@sydos ~: ");
 			serial_writes("\nroot@sydos ~: ");
 			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 		} else {
@@ -156,6 +156,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 			i++;
 			vga_putchar(c);
 			serial_write(c);
+			vga_trigger_cursor_update();
 		}
 	}
 }

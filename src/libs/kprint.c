@@ -131,6 +131,9 @@ void kprintf(const char* format, ...)
     va_list args;
     va_start(args, format);
 
+    // Disable cursor for increased performance.
+    vga_disable_cursor();
+
     // Iterate through format string.
     char c;
     while (*format)
@@ -256,4 +259,7 @@ void kprintf(const char* format, ...)
             kputchar(c);
         }
     }
+
+    // Re-enable the console driver
+    vga_enable_cursor();
 }

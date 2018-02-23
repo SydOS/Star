@@ -130,10 +130,6 @@ void vga_putchar(char c) {
 			vga_scroll();
 		}
 	}
-
-	if (cursor_enabled == true) {
-		vga_update_cursor(terminal_column, terminal_row);
-	}
 }
 
 /**
@@ -144,10 +140,6 @@ void vga_putchar(char c) {
 void vga_write(const char* data, size_t size) {
 	for (size_t i = 0; i < size; i++) {
 		vga_putchar(data[i]);
-	}
-
-	if (cursor_enabled == true) {
-		vga_update_cursor(terminal_column, terminal_row);
 	}
 }
 
@@ -176,6 +168,8 @@ void vga_enable_cursor() {
 	outb(0x3D5, (inb(0x3E0) & 0xE0) | 15);
 
 	cursor_enabled = true;
+
+	vga_update_cursor(terminal_column, terminal_row);
 }
 
 void vga_disable_cursor() {
@@ -193,6 +187,10 @@ void vga_update_cursor(int x, int y)
 	outb(0x3D5, (uint8_t) (pos & 0xFF));
 	outb(0x3D4, 0x0E);
 	outb(0x3D5, (uint8_t) ((pos >> 8) & 0xFF));
+}
+
+void vga_trigger_cursor_update() {
+	vga_update_cursor(terminal_column, terminal_row);
 }
 
 int* vga_cursor_pos(int* p) {
