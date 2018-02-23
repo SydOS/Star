@@ -1,6 +1,7 @@
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
+#include <kernel/pmm.h>
 
 static uint32_t* page_directory = 0;
 static uint32_t page_dir_loc = 0;
@@ -37,6 +38,12 @@ void paging_enable()
 	asm volatile("mov %cr0, %eax");
 	asm volatile("orl $0x80000000, %eax");
 	asm volatile("mov %eax, %cr0");
+}
+
+void paging_init() {
+	// Initialize page directory.
+
+	kprintf("Paging initialized!\n");
 }
 
 void paging_initialize() {

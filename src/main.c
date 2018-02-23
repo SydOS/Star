@@ -96,7 +96,11 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 	
 	// Initialize physical memory manager.
+	kprintf("Initializing Physical memory manager...\n");
 	pmm_init(mboot_info);
+
+	kprintf("Initializing paging...\n");
+    paging_init();
 
 	kprintf("Setting up PIT...\n");
     pit_init();
@@ -112,8 +116,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	// -------------------------------------------------------------------------
 
-    kprintf("Initializing paging...\n");
-    //paging_initialize();
+
 
 	kprintf("Initializing PS/2...\n");
 	ps2_init();

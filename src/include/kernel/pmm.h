@@ -2,10 +2,12 @@
 #define PAGE_H
 
 #include <main.h>
+#include <multiboot.h>
 
 // Page sizes.
 #define PAGE_DIRECTORY_SIZE 4096
 #define PAGE_TABLE_SIZE     4096
+#define PAGE_STACK_SIZE		(4096*1024)
 #define PAGE_SIZE_4K        4096
 
 // Type for pages.
@@ -21,11 +23,8 @@ struct mem_info {
 	uint32_t mbootStart;
 	uint32_t mbootEnd;
 
-    uint32_t pageDirStart;
-    uint32_t pageDirEnd;
-
-    uint32_t pageTableStart;
-    uint32_t pageTableEnd;
+    uint32_t pageDirectoryStart;
+    uint32_t pageDirectoryEnd;
 
     uint32_t pageStackStart;
     uint32_t pageStackEnd;

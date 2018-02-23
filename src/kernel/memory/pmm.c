@@ -85,7 +85,7 @@ static void pmm_build_stack() {
 			// If the address is in conventional memory (low memory), or is reserved by
 			// the kernel, Multiboot header, or the page stacks, don't mark it free.
 			if (addr <= 0x100000 || (addr >= memInfo.kernelStart && addr <= memInfo.kernelEnd) || 
-                (addr >= memInfo.pageDirStart && addr <= memInfo.pageDirEnd) || (addr >= memInfo.pageTableStart && addr <= memInfo.pageTableEnd) ||
+                (addr >= memInfo.pageDirectoryStart && addr <= memInfo.pageDirectoryEnd) ||
                 (addr >= memInfo.pageStackStart && addr <= memInfo.pageStackEnd))
 				continue;
 
@@ -116,22 +116,19 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 	memInfo.kernelStart = (uint32_t)&kernel_base;
 	memInfo.kernelEnd = (uint32_t)&kernel_end;
 
-    // Calculate page directory and page table locations on the first
-    // 4KB aligned addresses after the kernel.
-    memInfo.pageDirStart = ALIGN_4K(memInfo.kernelEnd);
-    memInfo.pageDirEnd = memInfo.pageDirStart + PAGE_DIRECTORY_SIZE;
-    memInfo.pageTableStart = memInfo.pageDirEnd;
-    memInfo.pageTableEnd = memInfo.pageTableStart + PAGE_TABLE_SIZE;
+    // Calculate page directory location on the first
+    // 4KB aligned address after the kernel.
+    memInfo.pageDirectoryStart = ALIGN_4K(memInfo.kernelEnd);
+    memInfo.pageDirectoryEnd = memInfo.pageDirectoryStart + PAGE_DIRECTORY_SIZE;
 
-    // Calculate page stack location, located after the page directory and table.
-    memInfo.pageStackStart = memInfo.pageTableEnd;
-    memInfo.pageStackEnd = memInfo.pageStackStart + PAGE_TABLE_SIZE * 1024;
+    // Calculate page stack location, located after the page directory.
+    memInfo.pageStackStart = memInfo.pageDirectoryEnd;
+    memInfo.pageStackEnd = memInfo.pageStackStart + PAGE_STACK_SIZE;
 
 	// Print summary.
 	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
 	kprintf("Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
-	kprintf("Page directory start: 0x%X | Page directory end: 0x%X\n", memInfo.pageDirStart, memInfo.pageDirEnd);
-    kprintf("Page table start: 0x%X | Page table end: 0x%X\n", memInfo.pageTableStart, memInfo.pageTableEnd);
+	kprintf("Page directory start: 0x%X | Page directory end: 0x%X\n", memInfo.pageDirectoryStart, memInfo.pageDirectoryEnd);
     kprintf("Page stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageStackStart, memInfo.pageStackEnd);
 
 	kprintf("Physical memory map:\n");
@@ -177,4 +174,6 @@ void pmm_init(multiboot_info_t* mbootInfo) {
     kprintf("Stack test %s!\n", pass ? "passed" : "failed");
     if (!pass)
         panic("Test of memory page failed.\n");
+    
+    kprintf("Physical memory manager initialized!\n");
 }
