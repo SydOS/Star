@@ -54,8 +54,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	}
 
 
-
-
 	kprintf("Initializing GDT...\n");
 	gdt_init();
 
@@ -67,17 +65,12 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 
 	kprintf("Enabling NMI...\n");
 	NMI_enable();
-
-	//vga_setcolor(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREEN);
-	//log("Kernel has entered protected mode.\n");
-	//vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
     // Enable interrupts.
 	asm volatile("sti");
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
     kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
 
 	
 	// -------------------------------------------------------------------------
@@ -87,7 +80,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 
 	memory_init(mboot_info);
 	//memory_print_out();
-
 
 
 		kprintf("Setting up PIT...\n");
@@ -127,19 +119,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
     // Ring serial and VGA terminals.
 	serial_write('\a');
 	vga_putchar('\a');
-
-	/*char* bee_movie = "According to all known laws\r\nof aviation,\r\nthere is no way a bee\r\nshould be able to fly.\r\nIts wings are too small to get\r\nits fat little body off the ground.\r\nThe bee, of course, flies anyway\r\nbecause bees don't care\r\nwhat humans think is impossible.\r\nYellow, black. Yellow, black.\r\nYellow, black. Yellow, black.\r\nOoh, black and yellow!\r\nLet's shake it up a little.\r\nBarry! Breakfast is ready!";
-	for (size_t i = 0; i < strlen(bee_movie); i++)
-	{
-		parallel_sendbyte(0x378, bee_movie[i]);
-	}
-
-	// Send eject page PCL command.
-	parallel_sendbyte(0x378, 0x1B);
-	parallel_sendbyte(0x378, 0x26);
-	parallel_sendbyte(0x378, 0x6C);
-	parallel_sendbyte(0x378, 0x30);
-	parallel_sendbyte(0x378, 0x48);*/
 
 	for(;;) {
 		char* input[80];
