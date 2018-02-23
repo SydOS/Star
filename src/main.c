@@ -85,8 +85,8 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 		kprintf("Setting up PIT...\n");
     pit_init();
 
-		kprintf("Sleeping for 5 seconds...\n");
-	sleep(5000);
+		kprintf("Sleeping for 2 seconds...\n");
+	sleep(2000);
 
 	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
