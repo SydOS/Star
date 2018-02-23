@@ -121,8 +121,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	vga_putchar('\a');
 
 	for(;;) {
-		char* input[80];
-		int i = 0;
 		char c = serial_read();
 
 		if (c == '\r' || c == '\n') {
@@ -131,8 +129,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 			serial_writes("\nroot@sydos ~: ");
 			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 		} else {
-			input[i] = &c;
-			i++;
 			vga_putchar(c);
 			serial_write(c);
 			vga_trigger_cursor_update();
