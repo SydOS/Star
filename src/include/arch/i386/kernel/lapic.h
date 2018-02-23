@@ -1,0 +1,1 @@
+extern bool lapic_supported();

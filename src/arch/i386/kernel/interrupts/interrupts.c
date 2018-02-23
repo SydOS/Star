@@ -3,6 +3,7 @@
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/interrupts.h>
 #include <arch/i386/kernel/pic.h>
+#include <arch/i386/kernel/lapic.h>
 
 // Functions defined by Intel for service extensions.
 extern void _isr0();
