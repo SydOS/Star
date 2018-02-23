@@ -9,6 +9,7 @@
 #include <arch/i386/kernel/interrupts.h>
 #include "kernel/nmi.h"
 #include "kernel/pit.h"
+#include <kernel/pmm.h>
 #include "kernel/memory.h"
 #include "kernel/paging.h"
 #include <arch/i386/kernel/cpuid.h>
@@ -77,15 +78,14 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	// MEMORY RELATED STUFF
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 	
+	// Initialize physical memory manager.
+	pmm_init(mboot_info);
 
-	memory_init(mboot_info);
-	//memory_print_out();
 
-
-		kprintf("Setting up PIT...\n");
+	kprintf("Setting up PIT...\n");
     pit_init();
 
-		kprintf("Sleeping for 2 seconds...\n");
+	kprintf("Sleeping for 2 seconds...\n");
 	sleep(2000);
 
 	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
@@ -97,7 +97,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	// -------------------------------------------------------------------------
 
     kprintf("Initializing paging...\n");
-    paging_initialize();
+    //paging_initialize();
 
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
