@@ -99,6 +99,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	kprintf("Initializing Physical memory manager...\n");
 	pmm_init(mboot_info);
 
+	// Initialize paging.
 	kprintf("Initializing paging...\n");
     paging_init();
 

@@ -5,8 +5,6 @@
 #include <multiboot.h>
 
 // Page sizes.
-#define PAGE_DIRECTORY_SIZE 4096
-#define PAGE_TABLE_SIZE     4096
 #define PAGE_STACK_SIZE		(4096*1024)
 #define PAGE_SIZE_4K        4096
 
@@ -23,9 +21,7 @@ struct mem_info {
 	uint32_t mbootStart;
 	uint32_t mbootEnd;
 
-    uint32_t pageDirectoryStart;
-    uint32_t pageDirectoryEnd;
-
+	// Page stack.
     uint32_t pageStackStart;
     uint32_t pageStackEnd;
 };
@@ -33,7 +29,8 @@ typedef struct mem_info mem_info_t;
 
 // Macros for checking and aligning.
 #define ALIGN_4K(size)          (((uint32_t)(size) + 0x1000) & 0xFFFFF000)
-#define MASK_PAGE_4K(size)      ((uint32_t)(size) & ~0xFFFFF000)
+#define MASK_PAGE_4K(size)      ((uint32_t)(size) & 0xFFFFF000)
+#define MASK_PAGEFLAGS_4K(size)      ((uint32_t)(size) & ~0xFFFFF000)
 
 extern mem_info_t memInfo;
 extern void pmm_push_page(page_t page);

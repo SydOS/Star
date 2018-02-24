@@ -83,13 +83,13 @@ static void pmm_build_stack() {
 			uint32_t addr = pageBase + (i * PAGE_SIZE_4K);
 
 			// If the address is in conventional memory (low memory), or is reserved by
-			// the kernel, Multiboot header, or the page stacks, don't mark it free.
+			// the kernel, Multiboot header, or the page stack, don't mark it free.
 			if (addr <= 0x100000 || (addr >= memInfo.kernelStart && addr <= memInfo.kernelEnd) || 
-                (addr >= memInfo.pageDirectoryStart && addr <= memInfo.pageDirectoryEnd) ||
-                (addr >= memInfo.pageStackStart && addr <= memInfo.pageStackEnd))
+                (addr >= memInfo.pageStackStart && addr <= memInfo.pageStackEnd) || addr >= entry->addr + entry->len)
 				continue;
 
             // Add page to stack.
+            // kprintf("Adding page 0x%X...\n", addr);
             pmm_push_page(addr);
 		}       
 	}
@@ -116,19 +116,13 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 	memInfo.kernelStart = (uint32_t)&kernel_base;
 	memInfo.kernelEnd = (uint32_t)&kernel_end;
 
-    // Calculate page directory location on the first
-    // 4KB aligned address after the kernel.
-    memInfo.pageDirectoryStart = ALIGN_4K(memInfo.kernelEnd);
-    memInfo.pageDirectoryEnd = memInfo.pageDirectoryStart + PAGE_DIRECTORY_SIZE;
-
-    // Calculate page stack location, located after the page directory.
-    memInfo.pageStackStart = memInfo.pageDirectoryEnd;
+    // Calculate page stack location after the kernel.
+    memInfo.pageStackStart = ALIGN_4K(memInfo.kernelEnd);
     memInfo.pageStackEnd = memInfo.pageStackStart + PAGE_STACK_SIZE;
 
 	// Print summary.
 	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
 	kprintf("Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
-	kprintf("Page directory start: 0x%X | Page directory end: 0x%X\n", memInfo.pageDirectoryStart, memInfo.pageDirectoryEnd);
     kprintf("Page stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageStackStart, memInfo.pageStackEnd);
 
 	kprintf("Physical memory map:\n");
@@ -156,20 +150,24 @@ void pmm_init(multiboot_info_t* mbootInfo) {
     pmm_build_stack();
 
     // Test out stack.
-    page_t *page = (page_t*)pmm_pop_page();
+    kprintf("Testing physical stack...\n");
+    page_t page = pmm_pop_page();
+    page_t *pagePtr = (page_t*)page;
+    kprintf("Popped page 0x%X!\n", page);
+
     page_t i = 0;
-    for (i = 0; i < PAGE_SIZE_4K; i++)
-        page[i] = i;
+    for (i = 0; i < 1024; i++) // 1024 = 4096 / 4 bytes, pointer/array moves in 4 byte increments.
+        pagePtr[i] = i;
 
     bool pass = true;
-    for (i = 0; i < PAGE_SIZE_4K; i++)
-        if (page[i] != i) {
+    for (i = 0; i < 1024; i++)
+        if (pagePtr[i] != i) {
             pass = false;
             break;
         }
 
     // Push page back to stack.
-    pmm_push_page((page_t)&page);
+    pmm_push_page(page);
 
     kprintf("Stack test %s!\n", pass ? "passed" : "failed");
     if (!pass)

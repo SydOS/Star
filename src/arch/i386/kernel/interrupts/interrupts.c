@@ -117,8 +117,17 @@ void interrupts_irq_remove_handler(uint8_t irq) {
 
 // Handler for exception ISRs.
 void interrupts_fault_handler(registers_t *regs) {
-    if(regs->intNum < 32)
+    if(regs->intNum < 32) {
+        if (regs->intNum == 0xE)
+        {
+
+        
+        uint32_t fault_addr;
+        asm volatile ("mov %%cr2, %0" : "=r" (fault_addr));
+        kprintf("Page Fault at 0x%X!\n", fault_addr);
+        }
         panic("Exception: %s\n", exception_messages[regs->intNum]); // TODO: only panic with actual aborts,
+    }
                                                                     // as faults are command and shouldn't panic.
 }
 
