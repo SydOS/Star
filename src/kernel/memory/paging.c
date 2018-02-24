@@ -1,12 +1,14 @@
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
+#include <arch/i386/kernel/interrupts.h>
 #include <kernel/paging.h>
 #include <kernel/pmm.h>
 
 // http://www.rohitab.com/discuss/topic/31139-tutorial-paging-memory-mapping-with-a-recursive-page-directory/
 
-static page_t *kernPageTable;
+page_t kernelPageDirAddr;
+page_t *kernelPageDirPtr;
 
 static uint32_t* page_directory = 0;
 static uint32_t page_dir_loc = 0;
@@ -59,10 +61,19 @@ page_t paging_create_page_directory(uint16_t flags) {
 	return pageDir;
 }
 
+static void paging_pagefault_handler(registers_t *regs) {
+	
+
+	page_t addr;
+	asm volatile ("mov %%cr2, %0" : "=r"(addr));
+
+	panic("Page fault at 0x%X!\n", addr);
+}
+
 void paging_init() {
 	// Create table for kernel.
-	page_t kernelPageDirAddr = paging_create_page_directory(PAGING_PAGE_READWRITE);
-	page_t *kernelPageDirPtr = (page_t*)kernelPageDirAddr;
+	kernelPageDirAddr = paging_create_page_directory(PAGING_PAGE_READWRITE);
+	kernelPageDirPtr = (page_t*)kernelPageDirAddr;
 
 	for (page_t i = 0; i < PAGE_DIRECTORY_SIZE; i++)
 		kernelPageDirPtr[i] = 0;
@@ -74,6 +85,9 @@ void paging_init() {
 	// Map ourself (page directory).
 	paging_map_virtual_to_phys(kernelPageDirPtr, kernelPageDirAddr, kernelPageDirAddr);
 
+	// Wire up handler for page faults.
+	interrupts_isr_install_handler(ISR_EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
+
 	// Enable paging.
 	asm volatile("mov %%eax, %%cr3": :"a"(kernelPageDirAddr));	
 	asm volatile("mov %cr0, %eax");
@@ -81,7 +95,7 @@ void paging_init() {
 	asm volatile("mov %eax, %cr0");
 
 	//kprintf("Attempting to write to (probably) non-existing page...\n");
-	//page_t *test = (page_t*)pmm_pop_page();
+	//page_t *test = (page_t*)0xFFFFFF;
 	//*test = 0xFF;
 
 	kprintf("Paging initialized!\n");
