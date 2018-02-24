@@ -59,7 +59,7 @@ static void pmm_build_stack() {
 		pageStack[i] = i;
 
     bool pass = true;
-	for (page_t i = 0; i < memInfo.pageStackEnd - memInfo.pageStackStart; i++)
+	for (page_t i = 0; i < (memInfo.pageStackEnd - memInfo.pageStackStart) / sizeof(page_t); i++)
 		if (pageStack[i] != i) {
 			pass = false;
 			break;
@@ -143,9 +143,6 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 			memory += entry->len;
 	}
 
-	memory = memory / 1024 / 1024;
-	kprintf("Detected RAM: %uMB\n", memory);
-
     // Build stack.
     pmm_build_stack();
 
@@ -156,11 +153,11 @@ void pmm_init(multiboot_info_t* mbootInfo) {
     kprintf("Popped page 0x%X!\n", page);
 
     page_t i = 0;
-    for (i = 0; i < 1024; i++) // 1024 = 4096 / 4 bytes, pointer/array moves in 4 byte increments.
+    for (i = 0; i < PAGE_SIZE_4K / sizeof(page_t); i++) // 1024 = 4096 / 4 bytes, pointer/array moves in 4 byte increments.
         pagePtr[i] = i;
 
     bool pass = true;
-    for (i = 0; i < 1024; i++)
+    for (i = 0; i < PAGE_SIZE_4K / sizeof(page_t); i++)
         if (pagePtr[i] != i) {
             pass = false;
             break;
@@ -173,5 +170,8 @@ void pmm_init(multiboot_info_t* mbootInfo) {
     if (!pass)
         panic("Test of memory page failed.\n");
     
+	memory = memory / 1024 / 1024;
+	kprintf("Detected usable RAM: %uMB\n", memory);
+
     kprintf("Physical memory manager initialized!\n");
 }
