@@ -54,7 +54,7 @@ static void pmm_build_stack() {
     memset(pageStack, 0, memInfo.pageStackEnd - memInfo.pageStackStart);
 
     // Perform memory test on stack areas.
-	kprintf("Testing 4M of memory at 0x%X...\n", memInfo.pageStackStart);
+	kprintf("Testing %uKB of memory at 0x%X...\n", (memInfo.pageStackEnd - memInfo.pageStackStart) / 1024, memInfo.pageStackStart);
 	for (page_t i = 0; i < memInfo.pageStackEnd - memInfo.pageStackStart; i++)
 		pageStack[i] = i;
 
@@ -116,15 +116,6 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 	memInfo.kernelStart = (uint32_t)&kernel_base;
 	memInfo.kernelEnd = (uint32_t)&kernel_end;
 
-    // Calculate page stack location after the kernel.
-    memInfo.pageStackStart = ALIGN_4K(memInfo.kernelEnd);
-    memInfo.pageStackEnd = memInfo.pageStackStart + PAGE_STACK_SIZE;
-
-	// Print summary.
-	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
-	kprintf("Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
-    kprintf("Page stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageStackStart, memInfo.pageStackEnd);
-
 	kprintf("Physical memory map:\n");
 	uint64_t memory = 0;
 
@@ -142,6 +133,15 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 		if(entry->type == 1 && ((uint32_t)entry->addr) > 0)
 			memory += entry->len;
 	}
+
+    // Calculate page stack location after the kernel.
+    memInfo.pageStackStart = ALIGN_4K(memInfo.kernelEnd);
+    memInfo.pageStackEnd = memInfo.pageStackStart + memory / 1024; // Size of stack is the same as memory in KB.
+
+	// Print summary.
+	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
+	kprintf("Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
+    kprintf("Page stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageStackStart, memInfo.pageStackEnd);
 
     // Build stack.
     pmm_build_stack();
