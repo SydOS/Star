@@ -107,35 +107,30 @@ _isr9:
 ; 10: Bad TSS Exception (With Error Code!)
 _isr10:
     cli
-    push byte 0
     push byte 10
     jmp isr_common_stub
 
 ; 11: Segment Not Present Exception (With Error Code!)
 _isr11:
     cli
-    push byte 0
     push byte 11
     jmp isr_common_stub
 
 ; 12: Stack Fault Exception (With Error Code!)
 _isr12:
     cli
-    push byte 0
     push byte 12
     jmp isr_common_stub
 
 ; 13: General Protection Fault Exception (With Error Code!)
 _isr13:
     cli
-    push byte 0
     push byte 13
     jmp isr_common_stub
 
 ; 14: Page Fault Exception (With Error Code!)
 _isr14:
     cli
-    push byte 0
     push byte 14
     jmp isr_common_stub
 
@@ -258,35 +253,6 @@ _isr31:
     push byte 31
     jmp isr_common_stub
 
-; ISR common stub. This calls the fault handler defined in interrupts.c.
-extern interrupts_fault_handler
-isr_common_stub:
-    pusha
-    push ds
-    push es
-    push fs
-    push gs
-
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov eax, esp
-
-    push eax
-    mov eax, interrupts_fault_handler
-    call eax
-    pop eax
-
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    popa
-    add esp, 8
-    iret
-
 ; IRQ ISRs
 global _irq0
 global _irq1
@@ -310,116 +276,116 @@ _irq0:
     cli
     push byte 0
     push byte 32
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 33: IRQ1
 _irq1:
     cli
     push byte 0
     push byte 33
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 34: IRQ2
 _irq2:
     cli
     push byte 0
     push byte 34
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 35: IRQ3
 _irq3:
     cli
     push byte 0
     push byte 35
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 36: IRQ4
 _irq4:
     cli
     push byte 0
     push byte 36
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 37: IRQ5
 _irq5:
     cli
     push byte 0
     push byte 37
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 38: IRQ6
 _irq6:
     cli
     push byte 0
     push byte 38
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 39: IRQ7
 _irq7:
     cli
     push byte 0
     push byte 39
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 40: IRQ8
 _irq8:
     cli
     push byte 0
     push byte 40
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 41: IRQ9
 _irq9:
     cli
     push byte 0
     push byte 41
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 42: IRQ10
 _irq10:
     cli
     push byte 0
     push byte 42
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 43: IRQ11
 _irq11:
     cli
     push byte 0
     push byte 43
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 44: IRQ12
 _irq12:
     cli
     push byte 0
     push byte 44
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 45: IRQ13
 _irq13:
     cli
     push byte 0
     push byte 45
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 46: IRQ14
 _irq14:
     cli
     push byte 0
     push byte 46
-    jmp irq_common_stub
+    jmp isr_common_stub
 
 ; 47: IRQ15
 _irq15:
     cli
     push byte 0
     push byte 47
-    jmp irq_common_stub
+    jmp isr_common_stub
 
-; IRQ common stub. This calls the handler defined in interrupts.c.
-extern interrupts_irq_handler
-irq_common_stub:
+; ISR common stub. This calls the handler defined in interrupts.c.
+extern interrupts_isr_handler
+isr_common_stub:
     pusha
     push ds
     push es
@@ -434,7 +400,7 @@ irq_common_stub:
     mov eax, esp
 
     push eax
-    mov eax, interrupts_irq_handler
+    mov eax, interrupts_isr_handler
     call eax
     pop eax
 

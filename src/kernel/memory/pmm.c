@@ -170,7 +170,7 @@ void pmm_init(multiboot_info_t* mbootInfo) {
     if (!pass)
         panic("Test of memory page failed.\n");
     
-	memory = memory / 1024 / 1024;
+    memory = memory / 1024 / 1024;
 	kprintf("Detected usable RAM: %uMB\n", memory);
 
     kprintf("Physical memory manager initialized!\n");
