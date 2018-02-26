@@ -24,6 +24,9 @@ struct mem_info {
 	// Page stack.
     uint32_t pageStackStart;
     uint32_t pageStackEnd;
+
+	// Memory info.
+	uint32_t memoryKb;
 };
 typedef struct mem_info mem_info_t;
 
@@ -35,6 +38,6 @@ typedef struct mem_info mem_info_t;
 extern mem_info_t memInfo;
 extern void pmm_push_page(page_t page);
 extern page_t pmm_pop_page();
-extern void pmm_init(multiboot_info_t* mbootInfo);
+extern mem_info_t pmm_init(multiboot_info_t* mbootInfo);
 
 #endif

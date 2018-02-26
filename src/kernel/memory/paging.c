@@ -7,8 +7,9 @@
 
 // http://www.rohitab.com/discuss/topic/31139-tutorial-paging-memory-mapping-with-a-recursive-page-directory/
 
-page_t kernelPageDirAddr;
-page_t *kernelPageDirPtr;
+page_t kernelPageDir[1024] __attribute__((aligned(PAGE_SIZE_4K)));
+page_t lowPageTable[1024] __attribute__((aligned(PAGE_SIZE_4K)));
+page_t kernelPageTable[1024] __attribute__((aligned(PAGE_SIZE_4K)));
 
 static uint32_t* page_directory = 0;
 static uint32_t page_dir_loc = 0;
@@ -70,26 +71,61 @@ static void paging_pagefault_handler(registers_t *regs) {
 	panic("Page fault at 0x%X!\n", addr);
 }
 
-void paging_init() {
+void paging_init(mem_info_t memInfo) {
 	// Create table for kernel.
-	kernelPageDirAddr = paging_create_page_directory(PAGING_PAGE_READWRITE);
-	kernelPageDirPtr = (page_t*)kernelPageDirAddr;
-
 	for (page_t i = 0; i < PAGE_DIRECTORY_SIZE; i++)
-		kernelPageDirPtr[i] = 0;
+		kernelPageDir[i] = 0;
+
+	//kernelPageDirAddr = paging_create_page_directory(PAGING_PAGE_READWRITE);
+	//kernelPageDirPtr = (page_t*)kernelPageDirAddr;
+
+//	for (page_t i = 0; i < PAGE_DIRECTORY_SIZE; i++)
+		//kernelPageDirPtr[i] = 0;
 
 	// Map 0x0 to end of page stack.
-	for (page_t i = 0; i <= memInfo.pageStackEnd; i += PAGE_SIZE_4K)
-		paging_map_virtual_to_phys(kernelPageDirPtr, i, i);
+	uint32_t currentPage = 0;
+	for (page_t i = 0; i < 256; i++, currentPage += PAGE_SIZE_4K) {
+	//	paging_map_virtual_to_phys(kernelPageDir, i, i);
+	// Calculate table and entry of virtual address.
+	//uint32_t entryIndex = paging_calculate_entry(i);
+
+	// Get address of table from directory.
+	// If there isn't one, create one.
+	// Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.	
+	//if (MASK_PAGE_4K(directory[tableIndex]) == 0)
+		//directory[tableIndex] = pmm_pop_page() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+
+	// Add address to table.
+	lowPageTable[i] = currentPage | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+	}
+
+	currentPage = 0x00000000;
+	for (page_t i = 0; i < memInfo.pageStackEnd / PAGE_SIZE_4K; i++, currentPage += PAGE_SIZE_4K) {
+	//	paging_map_virtual_to_phys(kernelPageDir, i, i);
+	// Calculate table and entry of virtual address.
+	//uint32_t entryIndex = paging_calculate_entry(i);
+
+	// Get address of table from directory.
+	// If there isn't one, create one.
+	// Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.	
+	//if (MASK_PAGE_4K(directory[tableIndex]) == 0)
+		//directory[tableIndex] = pmm_pop_page() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+
+	// Add address to table.
+	kernelPageTable[i] = currentPage | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+	}
+
+	kernelPageDir[0] = (((uint32_t)lowPageTable) - 0xC0000000) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+	kernelPageDir[768] = (((uint32_t)kernelPageTable) - 0xC0000000) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
 	// Map ourself (page directory).
-	paging_map_virtual_to_phys(kernelPageDirPtr, kernelPageDirAddr, kernelPageDirAddr);
+	//paging_map_virtual_to_phys(kernelPageDir, (uint32_t)kernelPageDir, (uint32_t)kernelPageDir);
 
 	// Wire up handler for page faults.
 	interrupts_isr_install_handler(ISR_EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
 
 	// Enable paging.
-	asm volatile("mov %%eax, %%cr3": :"a"(kernelPageDirAddr));	
+	asm volatile("mov %%eax, %%cr3": :"a"(((uint32_t)kernelPageDir) - 0xC0000000));	
 	asm volatile("mov %cr0, %eax");
 	asm volatile("orl $0x80000000, %eax");
 	asm volatile("mov %eax, %cr0");

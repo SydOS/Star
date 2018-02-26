@@ -40,7 +40,7 @@ void panic(const char *format, ...) {
 /**
  * The main function for the kernel, called from boot.asm
  */
-void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
+void kernel_main(multiboot_info_t* mboot_info)
 {
 	// Ensure interrupts are disabled.
 	asm volatile("cli");
@@ -63,17 +63,23 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	vga_writes("          __/ |                    \n");
 	vga_writes("         |___/                     \n");
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
-	
-	// Ensure multiboot magic value is good.
-	if (mboot_magic != MULTIBOOT_BOOTLOADER_MAGIC)
-	{
-		kprintf("MULTIBOOT BOOTLOADER MAGIC NUMBER 0x%X IS INVALID!\n", mboot_magic);
-		// Kernel should die at this point.....
-		return;
-	}
 
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	kprintf("Initializing GDT...\n");
 	gdt_init();
+
+	// -------------------------------------------------------------------------
+	// MEMORY RELATED STUFF
+	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+	
+	// Initialize physical memory manager.
+	kprintf("Initializing Physical memory manager...\n");
+	mem_info_t minfo = pmm_init(mboot_info);
+
+	// Initialize paging.
+	kprintf("Initializing paging...\n");
+    paging_init(minfo);
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	kprintf("Initializing IDT...\n");
 	idt_init();
@@ -91,17 +97,7 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	
-	// -------------------------------------------------------------------------
-	// MEMORY RELATED STUFF
-	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
-	
-	// Initialize physical memory manager.
-	kprintf("Initializing Physical memory manager...\n");
-	pmm_init(mboot_info);
 
-	// Initialize paging.
-	kprintf("Initializing paging...\n");
-    paging_init();
 
 	kprintf("Setting up PIT...\n");
     pit_init();
@@ -130,11 +126,17 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
     vga_enable_cursor();
 
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
+	
+	vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+	kprintf("Kernel is located at 0x%X!\n", minfo.kernelStart);
+	kprintf("Detected usable RAM: %uMB\n", minfo.memoryKb / 1024);
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	kprintf("root@sydos ~: ");
 	serial_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+	
 
     // Ring serial and VGA terminals.
 	serial_write('\a');

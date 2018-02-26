@@ -145,7 +145,12 @@ void interrupts_isr_handler(registers_t *regs) {
     else {
         // If we have an exception, print default message.
         if (regs->intNum < IRQ_OFFSET)
+        {
+            uint32_t addr;
+	asm volatile ("mov %%cr2, %0" : "=r"(addr));
             panic("Exception: %s\n", exception_messages[regs->intNum]);
+
+        }   
     }
 
     // Send EOI to PIC if IRQ.

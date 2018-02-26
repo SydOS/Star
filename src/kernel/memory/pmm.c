@@ -6,8 +6,11 @@
 #include <kernel/pmm.h>
 
 // Kernel's starting and ending addresses in RAM.
-extern uint32_t kernel_end;
-extern uint32_t kernel_base;
+extern uint32_t KERNEL_VIRTUAL_START;
+extern uint32_t KERNEL_VIRTUAL_END;
+extern uint32_t KERNEL_VIRTUAL_OFFSET;
+extern uint32_t PAGE_STACK_START;
+extern uint32_t PAGE_STACK_END;
 
 // Used to store info about memory in the system.
 mem_info_t memInfo;
@@ -21,10 +24,7 @@ void pmm_push_page(page_t page) {
     // Increment stack pointer and check its within bounds.
     pageStack++;
     if (((uint32_t)(pageStack)) < memInfo.pageStackStart || ((uint32_t)(pageStack)) >= memInfo.pageStackEnd)
-    {
-        kprintf("Error!\n");
-        while (true);
-    }
+        panic("Page stack pointer out of bounds!\n");
 
     // Push page to stack.
     *pageStack = page;
@@ -55,11 +55,11 @@ static void pmm_build_stack() {
 
     // Perform memory test on stack areas.
 	kprintf("Testing %uKB of memory at 0x%X...\n", (memInfo.pageStackEnd - memInfo.pageStackStart) / 1024, memInfo.pageStackStart);
-	for (page_t i = 0; i < memInfo.pageStackEnd - memInfo.pageStackStart; i++)
+	for (page_t i = 0; i <= (memInfo.pageStackEnd - memInfo.pageStackStart) / sizeof(page_t); i++)
 		pageStack[i] = i;
 
     bool pass = true;
-	for (page_t i = 0; i < (memInfo.pageStackEnd - memInfo.pageStackStart) / sizeof(page_t); i++)
+	for (page_t i = 0; i <= (memInfo.pageStackEnd - memInfo.pageStackStart) / sizeof(page_t); i++)
 		if (pageStack[i] != i) {
 			pass = false;
 			break;
@@ -89,7 +89,6 @@ static void pmm_build_stack() {
 				continue;
 
             // Add page to stack.
-            // kprintf("Adding page 0x%X...\n", addr);
             pmm_push_page(addr);
 		}       
 	}
@@ -98,11 +97,7 @@ static void pmm_build_stack() {
 }
 
 // Initializes the physical memory manager.
-void pmm_init(multiboot_info_t* mbootInfo) {
-	// Ensure a memory map is present.
-	if ((mbootInfo->flags & MULTIBOOT_INFO_MEM_MAP) == 0)
-		panic("NO MULTIBOOT MEMORY MAP FOUND!\n");
-
+mem_info_t pmm_init(multiboot_info_t* mbootInfo) {
 	// Store away Multiboot info.
 	memInfo.mbootInfo = mbootInfo;
 	memInfo.mmap = (multiboot_memory_map_t*)mbootInfo->mmap_addr;
@@ -113,8 +108,12 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 	memInfo.mbootEnd = (uint32_t)(mbootInfo + sizeof(multiboot_info_t));
 
 	// Store where the kernel is. These come from the linker.
-	memInfo.kernelStart = (uint32_t)&kernel_base;
-	memInfo.kernelEnd = (uint32_t)&kernel_end;
+	memInfo.kernelStart = (uint32_t)&KERNEL_VIRTUAL_START;
+	memInfo.kernelEnd = (uint32_t)&KERNEL_VIRTUAL_END;
+
+    // Store page stack location. This is determined during early boot in kernel_main_early().
+    memInfo.pageStackStart = PAGE_STACK_START;
+    memInfo.pageStackEnd = PAGE_STACK_END;
 
 	kprintf("Physical memory map:\n");
 	uint64_t memory = 0;
@@ -134,10 +133,6 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 			memory += entry->len;
 	}
 
-    // Calculate page stack location after the kernel.
-    memInfo.pageStackStart = ALIGN_4K(memInfo.kernelEnd);
-    memInfo.pageStackEnd = memInfo.pageStackStart + memory / 1024; // Size of stack is the same as memory in KB.
-
 	// Print summary.
 	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
 	kprintf("Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
@@ -147,12 +142,12 @@ void pmm_init(multiboot_info_t* mbootInfo) {
     pmm_build_stack();
 
     // Test out stack.
-    kprintf("Testing physical stack...\n");
-    page_t page = pmm_pop_page();
-    page_t *pagePtr = (page_t*)page;
-    kprintf("Popped page 0x%X!\n", page);
+    //kprintf("Testing physical stack...\n");
+    //page_t page = pmm_pop_page();
+    //page_t *pagePtr = (page_t*)page;
+    //kprintf("Popped page 0x%X!\n", page);
 
-    page_t i = 0;
+    /*page_t i = 0;
     for (i = 0; i < PAGE_SIZE_4K / sizeof(page_t); i++) // 1024 = 4096 / 4 bytes, pointer/array moves in 4 byte increments.
         pagePtr[i] = i;
 
@@ -168,10 +163,11 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 
     kprintf("Stack test %s!\n", pass ? "passed" : "failed");
     if (!pass)
-        panic("Test of memory page failed.\n");
+        panic("Test of memory page failed.\n");*/
     
-    memory = memory / 1024 / 1024;
-	kprintf("Detected usable RAM: %uMB\n", memory);
+    memInfo.memoryKb = memory / 1024;
+	kprintf("Detected usable RAM: %uKB\n", memInfo.memoryKb);
 
     kprintf("Physical memory manager initialized!\n");
+    return memInfo;
 }
