@@ -20,7 +20,7 @@ all:
 
 	[[ -d build ]] || mkdir build
 	mkdir build/$(TIME)
-	cp *.kernel *.sym *.bin build/$(TIME)
+	cp *.kernel *.sym build/$(TIME)
 
 	make test
 
