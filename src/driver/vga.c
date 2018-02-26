@@ -81,6 +81,9 @@ void vga_putentryat(char c, uint8_t color, size_t x, size_t y) {
 	terminal_buffer[index] = vga_entry(c, color);
 }
 
+/**
+ * Scrolls the terminal up a line
+ */
 void vga_scroll() {
 	terminal_row = VGA_HEIGHT-1;
 	for (size_t y = 1; y < VGA_HEIGHT; y++) {
@@ -164,6 +167,11 @@ void vga_setcolor(enum vga_color fg, enum vga_color bg) {
 // Cursor stuff
 // -----------------------------------------------------------------------------
 
+/**
+ * Updates the position of the VGA cursor
+ * @param x X coordinate for cursor
+ * @param y Y coordinate for cursor
+ */
 void vga_update_cursor(int x, int y)
 {
 	uint16_t pos = y * VGA_WIDTH + x;
@@ -174,10 +182,17 @@ void vga_update_cursor(int x, int y)
 	outb(0x3D5, (uint8_t) ((pos >> 8) & 0xFF));
 }
 
+/**
+ * Trigger an update to the cursor. Simple call to vga_update_cursor
+ * with arguments pre-filled
+ */
 void vga_trigger_cursor_update() {
 	vga_update_cursor(terminal_column, terminal_row);
 }
 
+/**
+ * Send data over I/O port to enable the VGA cursor and update
+ */
 void vga_enable_cursor() {
 	outb(0x3D4, 0x0A);
 	outb(0x3D5, (inb(0x3D5) & 0xC0) | 0);
@@ -190,6 +205,9 @@ void vga_enable_cursor() {
 	vga_update_cursor(terminal_column, terminal_row);
 }
 
+/**
+ * Send data over I/O port to disable the VGA cursor
+ */
 void vga_disable_cursor() {
 	outb(0x3D4, 0x0A);
 	outb(0x3D5, 0x20);
@@ -197,6 +215,11 @@ void vga_disable_cursor() {
 	cursor_enabled = false;
 }
 
+/**
+ * Get the current X and Y position of the cursor
+ * @param p A 2 element array to write results to
+ * @return A 2 element array, X and Y
+ */
 int* vga_cursor_pos(int* p) {
 	p[0] = terminal_column;
 	p[1] = terminal_row;
