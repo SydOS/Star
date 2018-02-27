@@ -29,6 +29,7 @@ struct mem_info {
 	uint32_t memoryKb;
 };
 typedef struct mem_info mem_info_t;
+extern mem_info_t memInfo;
 
 // Macros for checking and aligning.
 #define ALIGN_4K(size)          (((uint32_t)(size) + 0x1000) & 0xFFFFF000)
@@ -38,6 +39,6 @@ typedef struct mem_info mem_info_t;
 extern mem_info_t memInfo;
 extern void pmm_push_page(page_t page);
 extern page_t pmm_pop_page();
-extern mem_info_t pmm_init(multiboot_info_t* mbootInfo);
+extern void pmm_init(multiboot_info_t* mbootInfo);
 
 #endif

@@ -97,7 +97,7 @@ static void pmm_build_stack() {
 }
 
 // Initializes the physical memory manager.
-mem_info_t pmm_init(multiboot_info_t* mbootInfo) {
+void pmm_init(multiboot_info_t* mbootInfo) {
 	// Store away Multiboot info.
 	memInfo.mbootInfo = mbootInfo;
 	memInfo.mmap = (multiboot_memory_map_t*)mbootInfo->mmap_addr;
@@ -169,5 +169,4 @@ mem_info_t pmm_init(multiboot_info_t* mbootInfo) {
 	kprintf("Detected usable RAM: %uKB\n", memInfo.memoryKb);
 
     kprintf("Physical memory manager initialized!\n");
-    return memInfo;
 }

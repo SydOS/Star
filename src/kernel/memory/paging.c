@@ -7,13 +7,16 @@
 
 // http://www.rohitab.com/discuss/topic/31139-tutorial-paging-memory-mapping-with-a-recursive-page-directory/
 
-page_t kernelPageDir[1024] __attribute__((aligned(PAGE_SIZE_4K)));
+page_t *kernelPageDirectory;
 page_t lowPageTable[1024] __attribute__((aligned(PAGE_SIZE_4K)));
 page_t kernelPageTable[1024] __attribute__((aligned(PAGE_SIZE_4K)));
 
 static uint32_t* page_directory = 0;
 static uint32_t page_dir_loc = 0;
 static uint32_t* last_page = 0;
+
+extern uint32_t KERNEL_VIRTUAL_START;
+extern uint32_t KERNEL_PAGE_DIRECTORY;
 
 static uint32_t paging_calculate_table(page_t virtAddr) {
 	return virtAddr / 0x400000;
@@ -41,12 +44,12 @@ void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
 	table[entryIndex] = phys | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 }
 
-void paging_enable()
-{
-	asm volatile("mov %%eax, %%cr3": :"a"(page_dir_loc));	
-	asm volatile("mov %cr0, %eax");
-	asm volatile("orl $0x80000000, %eax");
-	asm volatile("mov %eax, %cr0");
+void paging_change_directory(page_t directoryPhysicalAddr) {
+	// Tell CPU the directory and enable paging.
+	asm volatile ("mov %%eax, %%cr3": :"a"(directoryPhysicalAddr));	
+	asm volatile ("mov %cr0, %eax");
+	asm volatile ("orl $0x80000000, %eax");
+	asm volatile ("mov %eax, %cr0");
 }
 
 page_t paging_create_page_directory(uint16_t flags) {
@@ -71,10 +74,14 @@ static void paging_pagefault_handler(registers_t *regs) {
 	panic("Page fault at 0x%X!\n", addr);
 }
 
-void paging_init(mem_info_t memInfo) {
-	// Create table for kernel.
-	for (page_t i = 0; i < PAGE_DIRECTORY_SIZE; i++)
-		kernelPageDir[i] = 0;
+void paging_init() {
+	// Create page directory for kernel.
+	kernelPageDirectory = (page_t*)KERNEL_PAGE_DIRECTORY;
+
+	// Unmap first table (first 4MB) as it is no longer needed.
+	kernelPageDirectory[0] = 0;
+
+
 
 	//kernelPageDirAddr = paging_create_page_directory(PAGING_PAGE_READWRITE);
 	//kernelPageDirPtr = (page_t*)kernelPageDirAddr;
@@ -83,7 +90,7 @@ void paging_init(mem_info_t memInfo) {
 		//kernelPageDirPtr[i] = 0;
 
 	// Map 0x0 to end of page stack.
-	uint32_t currentPage = 0;
+	/*uint32_t currentPage = 0;
 	for (page_t i = 0; i < 256; i++, currentPage += PAGE_SIZE_4K) {
 	//	paging_map_virtual_to_phys(kernelPageDir, i, i);
 	// Calculate table and entry of virtual address.
@@ -97,10 +104,10 @@ void paging_init(mem_info_t memInfo) {
 
 	// Add address to table.
 	lowPageTable[i] = currentPage | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-	}
+	}*/
 
-	currentPage = 0x00000000;
-	for (page_t i = 0; i < memInfo.pageStackEnd / PAGE_SIZE_4K; i++, currentPage += PAGE_SIZE_4K) {
+	/*uint32_t currentPage = 0;
+	for (page_t i = 0; i <= memInfo.pageStackEnd % 0x400000 / PAGE_SIZE_4K; i++, currentPage += PAGE_SIZE_4K) {
 	//	paging_map_virtual_to_phys(kernelPageDir, i, i);
 	// Calculate table and entry of virtual address.
 	//uint32_t entryIndex = paging_calculate_entry(i);
@@ -115,8 +122,8 @@ void paging_init(mem_info_t memInfo) {
 	kernelPageTable[i] = currentPage | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 	}
 
-	kernelPageDir[0] = (((uint32_t)lowPageTable) - 0xC0000000) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-	kernelPageDir[768] = (((uint32_t)kernelPageTable) - 0xC0000000) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+	//kernelPageDir[0] = (((uint32_t)lowPageTable) - 0xC0000000) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+	kernelPageDir[((uint32_t)&KERNEL_VIRTUAL_OFFSET) / 0x400000] = (((uint32_t)kernelPageTable) - 0xC0000000) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;*/
 
 	// Map ourself (page directory).
 	//paging_map_virtual_to_phys(kernelPageDir, (uint32_t)kernelPageDir, (uint32_t)kernelPageDir);
@@ -124,15 +131,8 @@ void paging_init(mem_info_t memInfo) {
 	// Wire up handler for page faults.
 	interrupts_isr_install_handler(ISR_EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
 
+
 	// Enable paging.
-	asm volatile("mov %%eax, %%cr3": :"a"(((uint32_t)kernelPageDir) - 0xC0000000));	
-	asm volatile("mov %cr0, %eax");
-	asm volatile("orl $0x80000000, %eax");
-	asm volatile("mov %eax, %cr0");
-
-	//kprintf("Attempting to write to (probably) non-existing page...\n");
-	//page_t *test = (page_t*)0xFFFFFF;
-	//*test = 0xFF;
-
+	paging_change_directory(((uint32_t)kernelPageDirectory) - ((uint32_t)&KERNEL_VIRTUAL_OFFSET));
 	kprintf("Paging initialized!\n");
 }

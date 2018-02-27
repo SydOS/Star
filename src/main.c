@@ -74,11 +74,11 @@ void kernel_main(multiboot_info_t* mboot_info)
 	
 	// Initialize physical memory manager.
 	kprintf("Initializing Physical memory manager...\n");
-	mem_info_t minfo = pmm_init(mboot_info);
+	pmm_init(mboot_info);
 
 	// Initialize paging.
 	kprintf("Initializing paging...\n");
-    paging_init(minfo);
+    paging_init();
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	kprintf("Initializing IDT...\n");
@@ -128,8 +128,8 @@ void kernel_main(multiboot_info_t* mboot_info)
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
 	
 	vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-	kprintf("Kernel is located at 0x%X!\n", minfo.kernelStart);
-	kprintf("Detected usable RAM: %uMB\n", minfo.memoryKb / 1024);
+	kprintf("Kernel is located at 0x%X!\n", memInfo.kernelStart);
+	kprintf("Detected usable RAM: %uMB\n", memInfo.memoryKb / 1024);
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	kprintf("root@sydos ~: ");
