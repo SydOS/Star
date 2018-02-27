@@ -3,6 +3,7 @@
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/interrupts.h>
 #include <arch/i386/kernel/pic.h>
+#include <arch/i386/kernel/lapic.h>
 
 // Functions defined by Intel for service extensions.
 extern void _isr0();
@@ -56,14 +57,18 @@ extern void _irq13();
 extern void _irq14();
 extern void _irq15();
 
-// Array of IRQ handler pointers.
-void* irqHandlers[16] = {
+// Array of ISR handler pointers.
+static isr_handler isrHandlers[ISR_COUNT] = {
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0
 };
 
 // Exception messages array.
-char* exception_messages[] = {
+static char *exception_messages[] = {
     "Division By Zero",
     "Debug",
     "Non Maskable Interrupt",
@@ -101,40 +106,56 @@ char* exception_messages[] = {
     "Reserved"
 };
 
+// Installs an ISR handler.
+void interrupts_isr_install_handler(uint8_t isr, isr_handler handler) {
+    // Add handler for ISR to array.
+    isrHandlers[isr] = handler;
+    kprintf("Interrupt for ISR%u installed!\n", isr);
+}
+
+// Removes an ISR handler.
+void interrupts_isr_remove_handler(uint8_t isr) {
+    // Null out handler for ISR in array.
+    isrHandlers[isr] = 0;
+}
+
 // Installs an IRQ handler.
-void interrupts_irq_install_handler(uint8_t irq, void (*handler)(registers_t *regs)) {
+void interrupts_irq_install_handler(uint8_t irq, isr_handler handler) {
     // Add handler for IRQ to array.
-    irqHandlers[irq] = handler;
+    isrHandlers[irq + IRQ_OFFSET] = handler;
     kprintf("Interrupt for IRQ%u installed!\n", irq);
 }
 
 // Removes an IRQ handler.
 void interrupts_irq_remove_handler(uint8_t irq) {
     // Null out handler for IRQ in array.
-    irqHandlers[irq] = 0;
+    isrHandlers[irq + IRQ_OFFSET] = 0;
 }
 
-// Handler for exception ISRs.
-void interrupts_fault_handler(registers_t *regs) {
-    if(regs->intNum < 32) {
-        // Log exception and stop. Maybe have panic thingy.
-        kprintf("%s\nHalted.", exception_messages[regs->intNum]);
-        while (true);
-    }
-}
-
-// Handler for IRQ ISRs.
-void interrupts_irq_handler(registers_t *regs) {
+// Handler for ISRs.
+void interrupts_isr_handler(registers_t *regs) {
     // Blank handler pointer.
-    void (*handler)(struct regs *r);
+    isr_handler handler;
 
     // Invoke any handler registered.
-    handler = irqHandlers[regs->intNum - 32];
-    if (handler)
+    handler = isrHandlers[regs->intNum];
+    if (handler) {
         handler(regs);
+    }
+    else {
+        // If we have an exception, print default message.
+        if (regs->intNum < IRQ_OFFSET)
+        {
+            uint32_t addr;
+	asm volatile ("mov %%cr2, %0" : "=r"(addr));
+            panic("Exception: %s\n", exception_messages[regs->intNum]);
 
-    // Send EOI to PIC.
-    pic_eoi(regs->intNum);
+        }   
+    }
+
+    // Send EOI to PIC if IRQ.
+    if (regs->intNum >= IRQ_OFFSET)
+        pic_eoi(regs->intNum);
 }
 
 // Initializes interrupts.

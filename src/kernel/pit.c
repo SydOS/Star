@@ -9,7 +9,7 @@
 // https://wiki.osdev.org/Programmable_Interval_Timer
 
 // Variable to hold the amount of ticks since the OS started.
-uint64_t ticks;
+uint64_t ticks = 0;
 uint8_t task = 0;
 uint8_t task_was_on = 0;
 
@@ -77,5 +77,12 @@ void pit_init() {
 
 	// Register the handler with IRQ 0.
     interrupts_irq_install_handler(0, pit_callback);
+
+    // Wait for a tick to happen
+    kprintf("Waiting for PIT test...\n");
+	while (ticks == 0) {
+
+	}
+
 	kprintf("PIT initialized!\n");
 }

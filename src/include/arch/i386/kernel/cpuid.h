@@ -195,3 +195,7 @@ static inline int cpuid_string(int code, uint32_t where[4]) {
                "=c"(*(where+2)),"=d"(*(where+3)):"a"(code),"b"(0),"c"(0),"d"(0));
   return (int)where[0];
 }
+
+extern uint32_t _cpuid_detect();
+
+extern void cpuid_query(uint32_t function, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);

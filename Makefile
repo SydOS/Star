@@ -20,7 +20,7 @@ all:
 
 	[[ -d build ]] || mkdir build
 	mkdir build/$(TIME)
-	cp *.kernel *.sym *.bin build/$(TIME)
+	cp *.kernel *.sym build/$(TIME)
 
 	make test
 
@@ -31,7 +31,7 @@ build-kernel: $(ASM_OBJECTS) $(C_OBJECTS)
 	# Strip out debug info into separate files.
 	$(ARCH)-elf-objcopy --only-keep-debug Star-$(ARCH).kernel Star-$(ARCH).sym
 	$(ARCH)-elf-objcopy --strip-debug Star-$(ARCH).kernel
-	$(ARCH)-elf-objcopy -O binary Star-$(ARCH).kernel Star-$(ARCH).kernel.bin
+	# $(ARCH)-elf-objcopy -O binary Star-$(ARCH).kernel Star-$(ARCH).kernel.bin
 
 	# Clean the build directory.
 	rm -rfd build

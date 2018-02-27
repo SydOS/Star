@@ -30,5 +30,6 @@ extern void vga_putchar(char c);
 extern void vga_enable_cursor();
 extern void vga_disable_cursor();
 extern int* vga_cursor_pos(int* p);
+extern void vga_trigger_cursor_update();
 
 #endif

@@ -9,6 +9,7 @@
 #include <arch/i386/kernel/interrupts.h>
 #include "kernel/nmi.h"
 #include "kernel/pit.h"
+#include <kernel/pmm.h>
 #include "kernel/memory.h"
 #include "kernel/paging.h"
 #include "kernel/tasking.h"
@@ -19,10 +20,28 @@
 #include "driver/speaker.h"
 #include "driver/ps2/ps2.h"
 
+// Displays a kernel panic message and halts the system.
+void panic(const char *format, ...) {
+	// Disable interrupts.
+	asm volatile("cli");
+
+    // Get args.
+    va_list args;
+	va_start(args, format);
+
+	// Show panic.
+	kprintf("\nPANIC:\n");
+	kprintf_va(format, args);
+	kprintf("\n\nHalted.");
+
+	// Halt forever.
+	while (true);
+}
+
 /**
  * The main function for the kernel, called from boot.asm
  */
-void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
+void kernel_main(multiboot_info_t* mboot_info)
 {
 	// Ensure interrupts are disabled.
 	asm volatile("cli");
@@ -45,20 +64,23 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 	vga_writes("          __/ |                    \n");
 	vga_writes("         |___/                     \n");
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
-	
-	// Ensure multiboot magic value is good.
-	if (mboot_magic != MULTIBOOT_BOOTLOADER_MAGIC)
-	{
-		kprintf("MULTIBOOT BOOTLOADER MAGIC NUMBER 0x%X IS INVALID!\n", mboot_magic);
-		// Kernel should die at this point.....
-		return;
-	}
 
-
-
-
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	kprintf("Initializing GDT...\n");
 	gdt_init();
+
+	// -------------------------------------------------------------------------
+	// MEMORY RELATED STUFF
+	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+	
+	// Initialize physical memory manager.
+	kprintf("Initializing Physical memory manager...\n");
+	pmm_init(mboot_info);
+
+	// Initialize paging.
+	kprintf("Initializing paging...\n");
+    paging_init();
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	kprintf("Initializing IDT...\n");
 	idt_init();
@@ -68,10 +90,6 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
 
 	kprintf("Enabling NMI...\n");
 	NMI_enable();
-
-	//vga_setcolor(VGA_COLOR_BLACK, VGA_COLOR_LIGHT_GREEN);
-	//log("Kernel has entered protected mode.\n");
-	//vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
     // Enable interrupts.
 	asm volatile("sti");
@@ -79,23 +97,14 @@ void kernel_main(uint32_t mboot_magic, multiboot_info_t* mboot_info)
     kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-
-	
-	// -------------------------------------------------------------------------
-	// MEMORY RELATED STUFF
-	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 	
 
-	memory_init(mboot_info);
-	//memory_print_out();
 
-
-
-		kprintf("Setting up PIT...\n");
+	kprintf("Setting up PIT...\n");
     pit_init();
 
-		kprintf("Sleeping for 5 seconds...\n");
-	sleep(5000);
+	kprintf("Sleeping for 2 seconds...\n");
+	sleep(2000);
 
 		kprintf("Starting tasking...\n");
 	tasking_init();
@@ -110,8 +119,7 @@ void kernel_late() {
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 	// -------------------------------------------------------------------------
 
-    kprintf("Initializing paging...\n");
-    paging_initialize();
+
 
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
@@ -124,44 +132,34 @@ void kernel_late() {
     vga_enable_cursor();
 
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
+	
+	vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+	kprintf("Kernel is located at 0x%X!\n", memInfo.kernelStart);
+	kprintf("Detected usable RAM: %uMB\n", memInfo.memoryKb / 1024);
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-	vga_writes("root@sydos ~: ");
+	kprintf("root@sydos ~: ");
 	serial_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+	
 
     // Ring serial and VGA terminals.
 	serial_write('\a');
 	vga_putchar('\a');
 
-	/*char* bee_movie = "According to all known laws\r\nof aviation,\r\nthere is no way a bee\r\nshould be able to fly.\r\nIts wings are too small to get\r\nits fat little body off the ground.\r\nThe bee, of course, flies anyway\r\nbecause bees don't care\r\nwhat humans think is impossible.\r\nYellow, black. Yellow, black.\r\nYellow, black. Yellow, black.\r\nOoh, black and yellow!\r\nLet's shake it up a little.\r\nBarry! Breakfast is ready!";
-	for (size_t i = 0; i < strlen(bee_movie); i++)
-	{
-		parallel_sendbyte(0x378, bee_movie[i]);
-	}
-
-	// Send eject page PCL command.
-	parallel_sendbyte(0x378, 0x1B);
-	parallel_sendbyte(0x378, 0x26);
-	parallel_sendbyte(0x378, 0x6C);
-	parallel_sendbyte(0x378, 0x30);
-	parallel_sendbyte(0x378, 0x48);*/
-
 	for(;;) {
-		char* input[80];
-		int i = 0;
 		char c = serial_read();
 
 		if (c == '\r' || c == '\n') {
 			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-			vga_writes("\nroot@sydos ~: ");
+			kprintf("\nroot@sydos ~: ");
 			serial_writes("\nroot@sydos ~: ");
 			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 		} else {
-			input[i] = &c;
-			i++;
 			vga_putchar(c);
 			serial_write(c);
+			vga_trigger_cursor_update();
 		}
 	}
 }

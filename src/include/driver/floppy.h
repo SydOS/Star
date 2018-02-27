@@ -141,3 +141,6 @@ enum {
 #define FLOPPY_SECTORS_PER_TRACK 18
 #define FLOPPY_VERSION_NONE     0xFF
 #define FLOPPY_VERSION_ENHANCED 0x90
+
+extern void floppy_detect();
+extern void floppy_init();
