@@ -99,7 +99,7 @@ void __addProcess(PROCESS* p)
 PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	// Set up our new process
 	PROCESS* p = (PROCESS *)malloc(sizeof(PROCESS));
-	memset16(p, 0, sizeof(PROCESS));
+	memset(p, 0, sizeof(PROCESS));
 	p->name = name;
 	p->pid = ++lpid;
 	p->eip = addr;
