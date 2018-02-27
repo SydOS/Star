@@ -16,6 +16,4 @@
 #error "You don't appear to be using the proper cross-compiler toolchain! (Wrong architecture)"
 #endif
 
-extern uint32_t KERNEL_VIRTUAL_OFFSET;
-
 extern void panic(const char *format, ...);

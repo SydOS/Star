@@ -108,6 +108,7 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 	memInfo.mbootEnd = (uint32_t)(mbootInfo + sizeof(multiboot_info_t));
 
 	// Store where the kernel is. These come from the linker.
+    memInfo.kernelVirtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
 	memInfo.kernelStart = (uint32_t)&KERNEL_VIRTUAL_START;
 	memInfo.kernelEnd = (uint32_t)&KERNEL_VIRTUAL_END;
 

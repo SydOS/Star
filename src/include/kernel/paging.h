@@ -18,6 +18,6 @@ enum {
     PAGING_PAGE_GLOBAL          = 0x80
 };
 
-extern void paging_initialize();
+extern void paging_init();
 
 #endif

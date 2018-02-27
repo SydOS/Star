@@ -40,8 +40,7 @@ void panic(const char *format, ...) {
 /**
  * The main function for the kernel, called from boot.asm
  */
-void kernel_main(multiboot_info_t* mboot_info)
-{
+void kernel_main(multiboot_info_t* mboot_info) {
 	// Ensure interrupts are disabled.
 	asm volatile("cli");
 	vga_disable_cursor();
@@ -96,9 +95,6 @@ void kernel_main(multiboot_info_t* mboot_info)
     kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	
-
-
 	kprintf("Setting up PIT...\n");
     pit_init();
 
@@ -111,8 +107,6 @@ void kernel_main(multiboot_info_t* mboot_info)
 	cpuid_print_capabilities();
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-	// -------------------------------------------------------------------------
-
 
 
 	kprintf("Initializing PS/2...\n");
@@ -135,8 +129,6 @@ void kernel_main(multiboot_info_t* mboot_info)
 	kprintf("root@sydos ~: ");
 	serial_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
-	
 
     // Ring serial and VGA terminals.
 	serial_write('\a');

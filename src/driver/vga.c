@@ -5,6 +5,8 @@
 #include <driver/vga.h>
 #include <driver/speaker.h>
 
+extern uint32_t KERNEL_VIRTUAL_OFFSET;
+
 /**
  * Returns a uint8_t for internal usage in coloring the terminal
  * @param  fg Foreground color from vga_color struct
