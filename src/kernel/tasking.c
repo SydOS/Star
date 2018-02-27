@@ -98,22 +98,22 @@ void __addProcess(PROCESS* p)
 
 PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	// Set up our new process
-	kprintf("Allocating memory for our process");
+	kprintf("Allocating memory for our process\n");
 	PROCESS* p = (PROCESS *)malloc(sizeof(PROCESS));
-	kprintf("memset");
+	kprintf("memset\n");
 	memset(p, 0, sizeof(PROCESS));
-	kprintf("Setting up process");
+	kprintf("Setting up process\n");
 	p->name = name;
 	p->pid = ++lpid;
 	p->eip = addr;
 	p->state = PROCESS_STATE_ALIVE;
 	p->notify = __notified;
-	kprintf("Allocating memory for stack");
+	kprintf("Allocating memory for stack\n");
 	p->esp = (uint32_t)malloc(4096);
 	asm volatile("mov %%cr3, %%eax":"=a"(p->cr3));
 	uint32_t* stack = (uint32_t *)(p->esp + 4096);
 	p->stacktop = p->esp;
-	kprintf("Setting up stack");
+	kprintf("Setting up stack\n");
 	// Set up our stack
 	*--stack = 0x00000202;     // eflags
 	*--stack = 0x8;            // cs
@@ -130,7 +130,7 @@ PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	*--stack = 0x10;           // es
 	*--stack = 0x10;           // gs
 	// Set our new stack to the process's stack pointer and return
-	kprintf("Setting stack to process");
+	kprintf("Setting stack to process\n");
 	p->esp = (uint32_t)stack;
 	return p;
 }
@@ -185,12 +185,12 @@ void tasking_exec()
 }
 
 void tasking_init() {
-	kprintf("Creating kernel task...");
+	kprintf("Creating kernel task...\n");
 	c = tasking_create_process("kernel", (uint32_t)kernel_main_thread);
 	c->next = c;
 	c->prev = c;
-	kprintf("Adding second task...");
+	kprintf("Adding second task...\n");
 	__addProcess(tasking_create_process("hmmm", (uint32_t)hmmm_thread));
-	kprintf("Starting tasking...");
+	kprintf("Starting tasking...\n");
 	tasking_exec();
 }
