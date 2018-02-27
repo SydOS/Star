@@ -106,7 +106,7 @@ void kernel_main(multiboot_info_t* mboot_info)
 	kprintf("Sleeping for 2 seconds...\n");
 	sleep(2000);
 
-		kprintf("Starting tasking...\n");
+	kprintf("Starting tasking...\n");
 	tasking_init();
 }
 
