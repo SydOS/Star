@@ -22,6 +22,10 @@ static uint32_t paging_calculate_entry(page_t virtAddr) {
     return virtAddr % PAGE_SIZE_4M / PAGE_SIZE_4K;
 }
 
+void paging_map_kernel_virtual_to_phys(page_t virt, page_t phys) {
+    paging_map_virtual_to_phys(kernelPageDirectory, virt, phys);
+}
+
 void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
     // Calculate table and entry of virtual address.
     uint32_t tableIndex = paging_calculate_table(virt);
@@ -34,7 +38,7 @@ void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
         directory[tableIndex] = pmm_pop_page() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
     }
-    page_t *table = (page_t*)(PAGE_TABLE_ADDRESS_START + tableIndex);// MASK_PAGE_4K(directory[]);
+    page_t *table = (page_t*)(PAGE_TABLE_ADDRESS_START + (tableIndex * PAGE_SIZE_4K));
 
     // Add address to table.
     table[entryIndex] = phys | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
@@ -118,8 +122,8 @@ void paging_init() {
     // Enable paging.
     paging_change_directory(((uint32_t)kernelPageDirectory) - memInfo.kernelVirtualOffset);
 
-    // Test.
-    paging_map_virtual_to_phys(kernelPageDirectory, 0x1000, 0x8000);
+    // Test. TODO: unmap this after done.
+    paging_map_virtual_to_phys(kernelPageDirectory, 0x1000, pmm_pop_page());
     kprintf("Testing memory at virtual address 0x1000...\n");
     page_t *testPage = (page_t*)0x1000;
     for (page_t i = 0; i < PAGE_TABLE_SIZE; i++)
