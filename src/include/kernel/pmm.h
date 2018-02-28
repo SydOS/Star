@@ -23,16 +23,17 @@ struct mem_info {
 	uint32_t mbootStart;
 	uint32_t mbootEnd;
 
-	// Page stack.
-    uint32_t pageStackStart;
-    uint32_t pageStackEnd;
-
 	// Memory info.
 	uint32_t memoryKb;
 
 	// Paging tables.
 	uint32_t kernelPageDirectory;
-	uint32_t KernelPageTableTemp;
+	uint32_t KernelPageTemp; // Used for directly accessing a 4KB block of RAM.
+
+	// Page stack.
+    uint32_t pageStackStart;
+    uint32_t pageStackEnd;
+	// * End of reserved kernel addresses *
 };
 typedef struct mem_info mem_info_t;
 extern mem_info_t memInfo;

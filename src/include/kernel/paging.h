@@ -2,9 +2,11 @@
 #define PAGING_H
 
 #include <main.h>
+#include <kernel/pmm.h>
 
 #define PAGE_DIRECTORY_SIZE 1024
 #define PAGE_TABLE_SIZE     1024
+#define PAGE_TABLE_ADDRESS_START (PAGE_SIZE_4M * (PAGE_DIRECTORY_SIZE - 1))
 
 enum {
     PAGING_PAGE_PRESENT         = 0x01,

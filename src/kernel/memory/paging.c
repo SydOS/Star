@@ -6,11 +6,13 @@
 #include <kernel/pmm.h>
 
 // http://www.rohitab.com/discuss/topic/31139-tutorial-paging-memory-mapping-with-a-recursive-page-directory/
+// https://forum.osdev.org/viewtopic.php?f=15&t=19387
+// https://medium.com/@connorstack/recursive-page-tables-ad1e03b20a85
 
 static page_t *kernelPageDirectory;
 
 extern uint32_t KERNEL_PAGE_DIRECTORY;
-extern uint32_t KERNEL_PAGE_TABLE_TEMP;
+extern uint32_t KERNEL_PAGE_TEMP;
 
 static uint32_t paging_calculate_table(page_t virtAddr) {
 	return virtAddr / PAGE_SIZE_4M;
@@ -21,8 +23,6 @@ static uint32_t paging_calculate_entry(page_t virtAddr) {
 }
 
 void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
-	//kprintf("Mapping virtual 0x%X to physical 0x%X...\n", virt, phys);
-
 	// Calculate table and entry of virtual address.
 	uint32_t tableIndex = paging_calculate_table(virt);
 	uint32_t entryIndex = paging_calculate_entry(virt);
@@ -30,9 +30,11 @@ void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
 	// Get address of table from directory.
 	// If there isn't one, create one.
 	// Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.	
-	if (MASK_PAGE_4K(directory[tableIndex]) == 0)
+	if (MASK_PAGE_4K(directory[tableIndex]) == 0) {
 		directory[tableIndex] = pmm_pop_page() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-	page_t *table = (page_t*)MASK_PAGE_4K(directory[tableIndex]);
+		paging_flush_tlb();
+	}
+	page_t *table = (page_t*)(PAGE_TABLE_ADDRESS_START + tableIndex);// MASK_PAGE_4K(directory[]);
 
 	// Add address to table.
 	table[entryIndex] = phys | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
@@ -52,19 +54,6 @@ void paging_flush_tlb() {
 	asm volatile ("mov %eax, %cr3");
 }
 
-page_t paging_create_page_directory(uint16_t flags) {
-	// Pop page for page directory.
-	page_t pageDir = pmm_pop_page();
-	kprintf("Popped page 0x%X for page directory.\n", pageDir);
-
-	// Create pointer and zero out page.
-	page_t *pageDirPtr = (page_t*)pageDir;
-	for (page_t i = 0; i < PAGE_DIRECTORY_SIZE; i++)
-		pageDirPtr[i] = 0 | flags;
-		
-	return pageDir;
-}
-
 static void paging_pagefault_handler(registers_t *regs) {
 	
 
@@ -77,18 +66,18 @@ static void paging_pagefault_handler(registers_t *regs) {
 void paging_init() {
 	// Store paging addresses.
 	memInfo.kernelPageDirectory = KERNEL_PAGE_DIRECTORY;
-	memInfo.KernelPageTableTemp = KERNEL_PAGE_TABLE_TEMP;
+	memInfo.KernelPageTemp = KERNEL_PAGE_TEMP;
 
 	// Get pointer to kernel page directory made earlier in boot.
 	kernelPageDirectory = (page_t*)memInfo.kernelPageDirectory;
 
-	// Unmap first table (first 4MB) as it is no longer needed.
-	kernelPageDirectory[0] = 0;
-	paging_flush_tlb();
+	// Set last entry of directory to point to itself.
+	kernelPageDirectory[PAGE_DIRECTORY_SIZE - 1] =
+		(memInfo.kernelPageDirectory - memInfo.kernelVirtualOffset) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
-	// Map temporary page table at virtual address 0x0.
-	kernelPageDirectory[0] = memInfo.KernelPageTableTemp | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-	page_t *tempPageTable = (page_t*)(memInfo.KernelPageTableTemp + memInfo.kernelVirtualOffset);
+	// Map temporary page table at virtual address 0x0, replacing the identity-mapped first 4MB.
+	kernelPageDirectory[0] = memInfo.KernelPageTemp - memInfo.kernelVirtualOffset | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+	page_t *tempPageTable = (page_t*)(memInfo.KernelPageTemp);
 	paging_flush_tlb();
 
     // Pop a page and map it to 0x00000000.
@@ -119,6 +108,7 @@ void paging_init() {
     }
 
 	// Zero out temporary table.
+	kernelPageDirectory[0] = 0;
 	tempPageTable[0] = 0;
 	paging_flush_tlb();
 
@@ -127,5 +117,23 @@ void paging_init() {
 
 	// Enable paging.
 	paging_change_directory(((uint32_t)kernelPageDirectory) - memInfo.kernelVirtualOffset);
+
+	// Test.
+	paging_map_virtual_to_phys(kernelPageDirectory, 0x1000, 0x8000);
+	kprintf("Testing memory at virtual address 0x1000...\n");
+	page_t *testPage = (page_t*)0x1000;
+	for (page_t i = 0; i < PAGE_TABLE_SIZE; i++)
+		testPage[i] = i;
+
+    bool pass = true;
+	for (page_t i = 0; i < PAGE_TABLE_SIZE; i++)
+		if (testPage[i] != i) {
+			pass = false;
+			break;
+		}
+	kprintf("Test %s!\n", pass ? "passed" : "failed");
+    if (!pass)
+        panic("Memory test of virtual address 0x1000 failed.\n");
+
 	kprintf("Paging initialized!\n");
 }

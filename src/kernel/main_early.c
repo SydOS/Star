@@ -9,7 +9,7 @@ extern uint32_t KERNEL_PHYSICAL_END;
 extern uint32_t KERNEL_INIT_END;
 
 uint32_t KERNEL_PAGE_DIRECTORY __attribute__((section(".inittables")));
-uint32_t KERNEL_PAGE_TABLE_TEMP __attribute__((section(".inittables")));
+uint32_t KERNEL_PAGE_TEMP __attribute__((section(".inittables")));
 uint32_t PAGE_STACK_START __attribute__((section(".inittables")));
 uint32_t PAGE_STACK_END __attribute__((section(".inittables")));
 
@@ -35,16 +35,16 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     for (uint32_t i = 0; i < 1024; i++)
         kernelPageDirectory[i] = 0;
 
-    // Determine stack offset and size.
-    PAGE_STACK_START = ALIGN_4K(KERNEL_PAGE_DIRECTORY);
-    PAGE_STACK_END = PAGE_STACK_START + memory / 1024;
+    // Allocate temp location for later use.
+    KERNEL_PAGE_TEMP = ALIGN_4K(KERNEL_PAGE_DIRECTORY);
 
-    // Allocate temp location for a page table for later use.
-    KERNEL_PAGE_TABLE_TEMP = ALIGN_4K(PAGE_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET);
+    // Determine stack offset and size.
+    PAGE_STACK_START = ALIGN_4K(KERNEL_PAGE_TEMP);
+    PAGE_STACK_END = PAGE_STACK_START + memory / 1024;
 
     // Identity map low memory and init section of kernel.
     page_t currentPage = 0;
-    page_t *bootPageLowTable = (page_t*)ALIGN_4K(KERNEL_PAGE_TABLE_TEMP);
+    page_t *bootPageLowTable = (page_t*)ALIGN_4K(PAGE_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET);
     for (uint32_t i = 0; i <= (((uint32_t)&KERNEL_INIT_END) / PAGE_SIZE_4K); i++, currentPage += PAGE_SIZE_4K)
         bootPageLowTable[i] = (currentPage) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     kernelPageDirectory[0] = ((uint32_t)bootPageLowTable) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
@@ -57,7 +57,7 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     // Map low memory and kernel to higher-half virtual space.
     uint32_t offset = 0;
     currentPage = 0;
-    for (uint32_t i = 0; i <= (KERNEL_PAGE_TABLE_TEMP / PAGE_SIZE_4K); i++, currentPage += PAGE_SIZE_4K) {
+    for (uint32_t i = 0; i <= ((PAGE_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET) / PAGE_SIZE_4K); i++, currentPage += PAGE_SIZE_4K) {
         // Have we reached the need to create another table?
         if (i > 0 && i % 1024 == 0) {
             // Create a new table after the previous one.        

@@ -84,8 +84,10 @@ static void pmm_build_stack() {
 
 			// If the address is in conventional memory (low memory), or is reserved by
 			// the kernel, Multiboot header, or the page stack, don't mark it free.
-			if (addr <= 0x100000 || (addr >= memInfo.kernelStart && addr <= memInfo.kernelEnd) || 
-                (addr >= memInfo.pageStackStart && addr <= memInfo.pageStackEnd) || addr >= entry->addr + entry->len)
+			if (addr <= 0x100000 ||
+                (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) && addr <= (memInfo.kernelEnd - memInfo.kernelVirtualOffset)) || 
+                (addr >= (memInfo.pageStackStart - memInfo.kernelVirtualOffset) && addr <= (memInfo.pageStackEnd - memInfo.kernelVirtualOffset)) ||
+                addr >= entry->addr + entry->len)
 				continue;
 
             // Add page to stack.
@@ -123,8 +125,7 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 	uint32_t end = base + mbootInfo->mmap_length;
 	multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
 
-	for(; base < end; base += entry->size + sizeof(uint32_t))
-	{
+	for(; base < end; base += entry->size + sizeof(uint32_t)) {
 		entry = (multiboot_memory_map_t*)base;
 
 		// Print out info.
@@ -141,33 +142,8 @@ void pmm_init(multiboot_info_t* mbootInfo) {
 
     // Build stack.
     pmm_build_stack();
-
-    // Test out stack.
-    //kprintf("Testing physical stack...\n");
-    //page_t page = pmm_pop_page();
-    //page_t *pagePtr = (page_t*)page;
-    //kprintf("Popped page 0x%X!\n", page);
-
-    /*page_t i = 0;
-    for (i = 0; i < PAGE_SIZE_4K / sizeof(page_t); i++) // 1024 = 4096 / 4 bytes, pointer/array moves in 4 byte increments.
-        pagePtr[i] = i;
-
-    bool pass = true;
-    for (i = 0; i < PAGE_SIZE_4K / sizeof(page_t); i++)
-        if (pagePtr[i] != i) {
-            pass = false;
-            break;
-        }
-
-    // Push page back to stack.
-    pmm_push_page(page);
-
-    kprintf("Stack test %s!\n", pass ? "passed" : "failed");
-    if (!pass)
-        panic("Test of memory page failed.\n");*/
     
     memInfo.memoryKb = memory / 1024;
 	kprintf("Detected usable RAM: %uKB\n", memInfo.memoryKb);
-
     kprintf("Physical memory manager initialized!\n");
 }
