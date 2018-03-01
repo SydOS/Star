@@ -1,4 +1,5 @@
-extern void cpuid_print_capabilities();
+#ifndef CPUID_H
+#define CPUID_H
 
 enum cpuid_requests {
   CPUID_GETVENDORSTRING,
@@ -174,28 +175,7 @@ enum {
     CPUID_FEAT_ECX_MWAITX       = 1 << 29  // MWAIT extensions.
 };
 
-static inline int cpuid_vendorstring(uint32_t where[3]) {
-  asm volatile("cpuid":"=b"(*where),"=d"(*(where+1)),
-               "=c"(*(where+2)):"a"(CPUID_GETVENDORSTRING),"b"(0),"c"(0),"d"(0));
-  return (int)where[0];
-}
+extern bool cpuid_query(uint32_t function, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);
+extern void cpuid_print_capabilities();
 
-/** issue a single request to CPUID. Fits 'intel features', for instance
- *  note that even if only "eax" and "edx" are of interest, other registers
- *  will be modified by the operation, so we need to tell the compiler about it.
- */
-static inline void cpuid(int code, uint32_t *a, uint32_t *d) {
-  asm volatile("cpuid":"=a"(*a),"=d"(*d):"a"(code):"ecx","ebx");
-}
- 
-/** issue a complete request, storing general registers output as a string
- */
-static inline int cpuid_string(int code, uint32_t where[4]) {
-  asm volatile("cpuid":"=a"(*where),"=b"(*(where+1)),
-               "=c"(*(where+2)),"=d"(*(where+3)):"a"(code),"b"(0),"c"(0),"d"(0));
-  return (int)where[0];
-}
-
-extern uint32_t _cpuid_detect();
-
-extern void cpuid_query(uint32_t function, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);
+#endif

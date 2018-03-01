@@ -42,6 +42,7 @@ void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
 
     // Add address to table.
     table[entryIndex] = phys | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    paging_flush_tlb_address(virt);
 }
 
 void paging_change_directory(page_t directoryPhysicalAddr) {
@@ -56,6 +57,11 @@ void paging_flush_tlb() {
     // Flush TLB.
     asm volatile ("mov %cr3, %eax");
     asm volatile ("mov %eax, %cr3");
+}
+
+void paging_flush_tlb_address(page_t address) {
+    // Flush specified address in TLB.
+    asm volatile ("invlpg (%0)" : : "b"(address) : "memory");
 }
 
 static void paging_pagefault_handler(registers_t *regs) {
@@ -122,7 +128,7 @@ void paging_init() {
     // Enable paging.
     paging_change_directory(((uint32_t)kernelPageDirectory) - memInfo.kernelVirtualOffset);
 
-    // Test. TODO: unmap this after done.
+    /*// Test. TODO: unmap this after done.
     paging_map_virtual_to_phys(kernelPageDirectory, 0x1000, pmm_pop_page());
     kprintf("Testing memory at virtual address 0x1000...\n");
     page_t *testPage = (page_t*)0x1000;
@@ -137,7 +143,7 @@ void paging_init() {
         }
     kprintf("Test %s!\n", pass ? "passed" : "failed");
     if (!pass)
-        panic("Memory test of virtual address 0x1000 failed.\n");
+        panic("Memory test of virtual address 0x1000 failed.\n");*/
 
     kprintf("Paging initialized!\n");
 }

@@ -11,7 +11,8 @@
 #include "kernel/pit.h"
 #include <kernel/pmm.h>
 #include "kernel/memory.h"
-#include "kernel/paging.h"
+#include <kernel/paging.h>
+#include <kernel/kheap.h>
 #include <arch/i386/kernel/cpuid.h>
 #include "driver/vga.h"
 #include "driver/floppy.h"
@@ -75,9 +76,6 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Initializing Physical memory manager...\n");
 	pmm_init(mboot_info);
 
-	// Initialize paging.
-	kprintf("Initializing paging...\n");
-    paging_init();
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	kprintf("Initializing IDT...\n");
@@ -95,18 +93,21 @@ void kernel_main(multiboot_info_t* mboot_info) {
     kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
+
+	// Initialize paging.
+	kprintf("Initializing paging...\n");
+    paging_init();
+
+	// Initialize kernel heap.
+	kprintf("Initializing kernel heap...\n");
+	kheap_init();
+
 	kprintf("Setting up PIT...\n");
     pit_init();
 
 	kprintf("Sleeping for 2 seconds...\n");
 	sleep(2000);
 
-	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-
-	// Print CPUID info.
-	cpuid_print_capabilities();
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 
 	kprintf("Initializing PS/2...\n");
@@ -118,6 +119,14 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	floppy_init();
 
     vga_enable_cursor();
+
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+
+	// Print CPUID info.
+	cpuid_print_capabilities();
+
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
 
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
 	
