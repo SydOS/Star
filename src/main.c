@@ -16,7 +16,7 @@
 #include <arch/i386/kernel/cpuid.h>
 #include "driver/vga.h"
 #include "driver/floppy.h"
-#include "driver/serial.h"
+#include <driver/serial.h>
 #include "driver/speaker.h"
 #include "driver/ps2/ps2.h"
 
@@ -46,11 +46,8 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	asm volatile("cli");
 	vga_disable_cursor();
 	
-	serial_initialize();
-	const char* data = "If you're reading this, serial works.\n";
-	for (size_t i = 0; i < strlen(data); i++) {
-		serial_write(data[i]);
-	}
+	// Initialize serial for logging.
+	serial_init();
 
 	vga_initialize();
 	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
@@ -142,6 +139,12 @@ void kernel_main(multiboot_info_t* mboot_info) {
     // Ring serial and VGA terminals.
 	serial_write('\a');
 	vga_putchar('\a');
+
+	// If serial isn't present, just loop.
+	if (!serial_present()) {
+		kprintf("No serial port present for logging, waiting here.");
+		while (true);
+	}
 
 	for(;;) {
 		char c = serial_read();
