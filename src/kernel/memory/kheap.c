@@ -94,15 +94,18 @@ static kheap_node_t *kheap_get_best_fit(uint32_t binIndex, size_t size) {
             return tempNode;
         tempNode = tempNode->nextNode;
     }
+
+    // No fit found.
+    return NULL;
 }
 
-static kheap_node_t *kheap_get_last_node(uint32_t binIndex) {
+/*static kheap_node_t *kheap_get_last_node(uint32_t binIndex) {
     // Get the last node in list.
     kheap_node_t *node = bins[binIndex].header;
     while (node->nextNode != NULL)
         node = node->nextNode;
     return node;
-}
+}*/
 
 static void kheap_dump_bin(uint32_t binIndex) {
     kheap_node_t *node = bins[binIndex].header;
@@ -162,7 +165,7 @@ void *kheap_alloc(size_t size) {
     // If the difference between the found and requested chunks is bigger than overhead, then split the chunk.
     if ((node->size - size) > (KHEAP_OVERHEAD + 4)) {
         // Determine where to split at.
-        kheap_node_t *splitNode = ((uint8_t*)node + KHEAP_OVERHEAD) + size;
+        kheap_node_t *splitNode = (kheap_node_t*)(((uint8_t*)node + KHEAP_OVERHEAD) + size);
         splitNode->size = node->size - size - (KHEAP_OVERHEAD);
         splitNode->hole = true;
 
@@ -195,7 +198,7 @@ void kheap_free(void *ptr) {
     kheap_node_t *header = (kheap_node_t*)((uint8_t*)ptr - KHEAP_HEADER_OFFSET);
 
     // If the node is also the start of the heap, just put it in the correct bin.
-    if (header == KHEAP_START) {
+    if (header == (kheap_node_t*)KHEAP_START) {
         header->hole = true;
         kheap_add_node(kheap_get_bin_index(header->size), header);
         return;

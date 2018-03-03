@@ -20,6 +20,8 @@ uint32_t memory_used = 0;
 
 // https://forum.osdev.org/viewtopic.php?f=15&t=29101
 
+// THIS FILE SHOULD BE REMOVED.
+
 void memory_init() {
 	//kprintf("Highest free address: 0x%X\n", memInfo.highestFreeAddress);
 	//kprintf("Maximum possible 4K pages: %u\n", pages);

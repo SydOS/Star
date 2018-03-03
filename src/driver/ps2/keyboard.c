@@ -238,7 +238,7 @@ static void ps2_keyboard_set_leds()
 }
 
 // Callback for keyboard on IRQ1.
-static void ps2_keyboard_callback(registers_t* regs)
+static void ps2_keyboard_callback()
 {	
     // Read data from keyboard.
     uint8_t data = ps2_get_data();

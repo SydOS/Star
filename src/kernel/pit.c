@@ -50,7 +50,7 @@ void pit_startcounter(uint32_t freq, uint8_t counter, uint8_t mode)
 }
 
 // Callback for PIT channel 0 on IRQ0.
-static void pit_callback(registers_t* regs)
+static void pit_callback()
 {	
 	// Increment the number of ticks.
 	ticks++;

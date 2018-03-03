@@ -22,8 +22,23 @@ static uint32_t paging_calculate_entry(page_t virtAddr) {
     return virtAddr % PAGE_SIZE_4M / PAGE_SIZE_4K;
 }
 
-void paging_map_kernel_virtual_to_phys(page_t virt, page_t phys) {
-    paging_map_virtual_to_phys(kernelPageDirectory, virt, phys);
+void paging_change_directory(page_t directoryPhysicalAddr) {
+    // Tell CPU the directory and enable paging.
+    asm volatile ("mov %%eax, %%cr3": :"a"(directoryPhysicalAddr)); 
+    asm volatile ("mov %cr0, %eax");
+    asm volatile ("orl $0x80000000, %eax");
+    asm volatile ("mov %eax, %cr0");
+}
+
+void paging_flush_tlb() {
+    // Flush TLB.
+    asm volatile ("mov %cr3, %eax");
+    asm volatile ("mov %eax, %cr3");
+}
+
+void paging_flush_tlb_address(page_t address) {
+    // Flush specified address in TLB.
+    asm volatile ("invlpg (%0)" : : "b"(address) : "memory");
 }
 
 void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
@@ -45,26 +60,11 @@ void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
     paging_flush_tlb_address(virt);
 }
 
-void paging_change_directory(page_t directoryPhysicalAddr) {
-    // Tell CPU the directory and enable paging.
-    asm volatile ("mov %%eax, %%cr3": :"a"(directoryPhysicalAddr)); 
-    asm volatile ("mov %cr0, %eax");
-    asm volatile ("orl $0x80000000, %eax");
-    asm volatile ("mov %eax, %cr0");
+void paging_map_kernel_virtual_to_phys(page_t virt, page_t phys) {
+    paging_map_virtual_to_phys(kernelPageDirectory, virt, phys);
 }
 
-void paging_flush_tlb() {
-    // Flush TLB.
-    asm volatile ("mov %cr3, %eax");
-    asm volatile ("mov %eax, %cr3");
-}
-
-void paging_flush_tlb_address(page_t address) {
-    // Flush specified address in TLB.
-    asm volatile ("invlpg (%0)" : : "b"(address) : "memory");
-}
-
-static void paging_pagefault_handler(registers_t *regs) {
+static void paging_pagefault_handler() {
     
 
     page_t addr;
@@ -86,7 +86,7 @@ void paging_init() {
         (memInfo.kernelPageDirectory - memInfo.kernelVirtualOffset) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Map temporary page table at virtual address 0x0, replacing the identity-mapped first 4MB.
-    kernelPageDirectory[0] = memInfo.KernelPageTemp - memInfo.kernelVirtualOffset | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    kernelPageDirectory[0] = (memInfo.KernelPageTemp - memInfo.kernelVirtualOffset) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     page_t *tempPageTable = (page_t*)(memInfo.KernelPageTemp);
     paging_flush_tlb();
 

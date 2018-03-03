@@ -6,7 +6,7 @@
 
 #define PAGE_DIRECTORY_SIZE 1024
 #define PAGE_TABLE_SIZE     1024
-#define PAGE_TABLE_ADDRESS_START (PAGE_SIZE_4M * (PAGE_DIRECTORY_SIZE - 1))
+#define PAGE_TABLE_ADDRESS_START ((uint32_t)PAGE_SIZE_4M * (uint32_t)(PAGE_DIRECTORY_SIZE - 1))
 
 enum {
     PAGING_PAGE_PRESENT         = 0x01,
@@ -20,6 +20,7 @@ enum {
     PAGING_PAGE_GLOBAL          = 0x80
 };
 
+extern void paging_map_kernel_virtual_to_phys(page_t virt, page_t phys);
 extern void paging_init();
 
 #endif
