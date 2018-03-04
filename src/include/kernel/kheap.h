@@ -5,7 +5,7 @@
 
 #define KHEAP_START         0xD0000000
 #define KHEAP_END           0xDFFFFFFF
-#define KHEAP_INITIAL_SIZE  (4096*1024)
+#define KHEAP_INITIAL_SIZE  0x1000
 #define KHEAP_MAX_SIZE      (KHEAP_END - KHEAP_START)
 
 struct kheap_node {
@@ -29,6 +29,9 @@ typedef struct kheap_bin kheap_bin_t;
 
 #define KHEAP_OVERHEAD              (sizeof(kheap_footer_t) + sizeof(kheap_node_t))
 #define KHEAP_HEADER_OFFSET         (sizeof(kheap_node_t))
+#define KHEAP_MIN_WILDERNESS        0x2000
+#define KHEAP_MAX_WILDERNESS        0x1000000
+#define KHEAP_BIN_COUNT             9
 
 extern void *kheap_alloc(size_t size);
 extern void kheap_free(void *ptr);

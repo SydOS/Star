@@ -8,7 +8,7 @@
 // Based on code from https://github.com/CCareaga/heap_allocator. Licensed under the MIT.
 
 static page_t currentKernelHeapSize;
-static kheap_bin_t bins[9];
+static kheap_bin_t bins[KHEAP_BIN_COUNT];
 
 static void kheap_add_node(uint32_t binIndex, kheap_node_t *node) {
     // Null out the sibling nodes.
@@ -145,10 +145,32 @@ static kheap_footer_t *kheap_get_footer(kheap_node_t *node) {
     return (kheap_footer_t*)((uint8_t*)node + sizeof(kheap_node_t) + node->size);
 }
 
+static kheap_node_t *kheap_get_wilderness() {
+    kheap_footer_t *wildFooter = (kheap_footer_t*)(KHEAP_START + currentKernelHeapSize - sizeof(kheap_footer_t));
+    return wildFooter->header;
+}
+
 static void kheap_create_footer(kheap_node_t *header) {
     // Create a footer from the header.
     kheap_footer_t *footer = kheap_get_footer(header);
     footer->header = header;
+}
+
+static bool kheap_expand() {
+    // Pop another page and increase size of heap.
+    paging_map_kernel_virtual_to_phys(KHEAP_START + currentKernelHeapSize, pmm_pop_page());
+    
+    // Increase wilderness size.
+    kheap_node_t *wildNode = kheap_get_wilderness();
+    wildNode->size += PAGE_SIZE_4K;
+    currentKernelHeapSize += PAGE_SIZE_4K;
+
+    kprintf("Heap expanded by 4KB to %u!\n", currentKernelHeapSize);
+    return true;
+}
+
+static void kheap_contract() {
+    // TODO.
 }
 
 void *kheap_alloc(size_t size) {
@@ -185,7 +207,15 @@ void *kheap_alloc(size_t size) {
     node->hole = false;
     kheap_remove_node(binIndex, node);
 
-    // Check if heap needs to be expanded or contracted. TODO
+    // Check if heap needs to be expanded or contracted.
+    kheap_node_t *wildNode = kheap_get_wilderness();
+    if (wildNode->size < KHEAP_MIN_WILDERNESS) {
+        if (!kheap_expand())
+            return NULL;
+    }
+    else if (wildNode->size > KHEAP_MAX_WILDERNESS) {
+        kheap_contract();
+    }
 
     // As the chunk is in use, clear the next and previous node fields.
     node->previousNode = NULL;
@@ -279,29 +309,44 @@ void kheap_init() {
     kheap_add_node(kheap_get_bin_index(initialRegion->size), initialRegion);
     kprintf("Kernel heap at 0x%X with a size of %uKB initialized!\n", KHEAP_START, currentKernelHeapSize / 1024);
 
-    kheap_dump_all_bins();
-
     // Attempt allocation.
-    kprintf("Allocation 1\n");
+    kprintf("Allocation 1: ");
     uint32_t *test = kheap_alloc(sizeof(uint32_t)*2);
+    kprintf("0x%X\n", test);
     test[1] = 55555;
 
-    kheap_dump_all_bins();
-
-    kprintf("Allocation 2\n");
+    kprintf("Allocation 2: ");
     uint32_t *test2 = kheap_alloc(sizeof(uint32_t)*2);
-
+    kprintf("0x%X\n", test2);
     test2[1] = 55335;
 
-    kheap_dump_all_bins();
+    kprintf("Big allocation: ");
+    uint32_t *big = kheap_alloc(sizeof(uint32_t)*1000);
+    kprintf("0x%X, size: %u\n", big, sizeof(uint32_t)*1000);
 
-    kprintf("free 1");
+    for (uint32_t i = 0; i < 1000; i++)
+        big[i] = i*2;
+
+    for (uint32_t i = 0; i < 1000; i++) {
+        if (big[i] != i*2) {
+            kprintf("Error.\n");
+            break;
+        }
+    }
+
+
+    kprintf("Allocation 4: ");
+    uint32_t *test4 = kheap_alloc(sizeof(uint32_t)*2);
+    kprintf("0x%X\n", test4);
+
+    test4[1] = 55335;
+
     kheap_free(test);
-
-    kheap_dump_all_bins();
-
-    kprintf("free 2");
+    kheap_free(big);
     kheap_free(test2);
+    kheap_free(test4);
 
     kheap_dump_all_bins();
+    kprintf("Waiting two seconds for user verification...\n");
+    sleep(2000);
 }
