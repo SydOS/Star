@@ -1,7 +1,7 @@
 #include <main.h>
 #include <kprint.h>
 #include <kernel/pit.h>
-#include <kernel/memory.h>
+#include <kernel/kheap.h>
 #include <kernel/main.h>
 
 typedef struct _process {
@@ -47,9 +47,9 @@ void _kill() {
 	if(c->pid == 1) { pit_set_task(0); kprintf("Idle can't be killed!"); }
 	kprintf("Killing process %s (%d)\n", c->name, c->pid);
 	pit_set_task(0);
-	free((void *)c->stacktop);
-	free(c);
-	pfree(c->cr3);
+	kheap_free((void *)c->stacktop);
+	kheap_free(c);
+	kheap_free(c->cr3);
 	c->prev->next = c->next;
 	c->next->prev = c->prev;
 	pit_set_task(1);
@@ -99,7 +99,7 @@ void __addProcess(PROCESS* p)
 PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	// Set up our new process
 	kprintf("Allocating memory for our process\n");
-	PROCESS* p = (PROCESS *)malloc(sizeof(PROCESS));
+	PROCESS* p = (PROCESS *)kheap_alloc(sizeof(PROCESS));
 	kprintf("memset\n");
 	memset(p, 0, sizeof(PROCESS));
 	kprintf("Setting up process\n");
@@ -109,7 +109,7 @@ PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	p->state = PROCESS_STATE_ALIVE;
 	p->notify = __notified;
 	kprintf("Allocating memory for stack\n");
-	p->esp = (uint32_t)malloc(4096);
+	p->esp = (uint32_t)kheap_alloc(4096);
 	asm volatile("mov %%cr3, %%eax":"=a"(p->cr3));
 	uint32_t* stack = (uint32_t *)(p->esp + 4096);
 	p->stacktop = p->esp;

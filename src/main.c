@@ -10,13 +10,13 @@
 #include "kernel/nmi.h"
 #include "kernel/pit.h"
 #include <kernel/pmm.h>
-#include "kernel/memory.h"
-#include "kernel/paging.h"
-#include "kernel/tasking.h"
+#include <kernel/paging.h>
+#include <kernel/kheap.h>
+#include <kernel/tasking.h>
 #include <arch/i386/kernel/cpuid.h>
 #include "driver/vga.h"
 #include "driver/floppy.h"
-#include "driver/serial.h"
+#include <driver/serial.h>
 #include "driver/speaker.h"
 #include "driver/ps2/ps2.h"
 
@@ -41,17 +41,13 @@ void panic(const char *format, ...) {
 /**
  * The main function for the kernel, called from boot.asm
  */
-void kernel_main(multiboot_info_t* mboot_info)
-{
+void kernel_main(multiboot_info_t* mboot_info) {
 	// Ensure interrupts are disabled.
 	asm volatile("cli");
 	vga_disable_cursor();
 	
-	serial_initialize();
-	const char* data = "If you're reading this, serial works.\n";
-	for (size_t i = 0; i < strlen(data); i++) {
-		serial_write(data[i]);
-	}
+	// Initialize serial for logging.
+	serial_init();
 
 	vga_initialize();
 	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
@@ -80,6 +76,11 @@ void kernel_main(multiboot_info_t* mboot_info)
 	// Initialize paging.
 	kprintf("Initializing paging...\n");
     paging_init();
+
+	// Initialize kernel heap.
+	kprintf("Initializing kernel heap...\n");
+	kheap_init();
+
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	kprintf("Initializing IDT...\n");
@@ -96,9 +97,6 @@ void kernel_main(multiboot_info_t* mboot_info)
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
     kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
-	
-
 
 	kprintf("Setting up PIT...\n");
     pit_init();
@@ -131,6 +129,14 @@ void kernel_late() {
 
     vga_enable_cursor();
 
+	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+
+	// Print CPUID info.
+	cpuid_print_capabilities();
+
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
 	
 	vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
@@ -142,11 +148,15 @@ void kernel_late() {
 	serial_writes("root@sydos ~: ");
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	
-
     // Ring serial and VGA terminals.
 	serial_write('\a');
 	vga_putchar('\a');
+
+	// If serial isn't present, just loop.
+	if (!serial_present()) {
+		kprintf("No serial port present for logging, waiting here.");
+		while (true);
+	}
 
 	for(;;) {
 		char c = serial_read();

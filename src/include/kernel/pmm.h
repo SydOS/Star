@@ -7,6 +7,7 @@
 // Page sizes.
 #define PAGE_STACK_SIZE		(4096*1024)
 #define PAGE_SIZE_4K        4096
+#define PAGE_SIZE_4M		(PAGE_SIZE_4K*1024)
 
 // Type for pages.
 typedef uint32_t page_t;
@@ -16,17 +17,23 @@ struct mem_info {
 	multiboot_memory_map_t *mmap;
 	uint32_t mmapLength;
 
+	uint32_t kernelVirtualOffset;
 	uint32_t kernelStart;
 	uint32_t kernelEnd;
 	uint32_t mbootStart;
 	uint32_t mbootEnd;
 
+	// Memory info.
+	uint32_t memoryKb;
+
+	// Paging tables.
+	uint32_t kernelPageDirectory;
+	uint32_t KernelPageTemp; // Used for directly accessing a 4KB block of RAM.
+
 	// Page stack.
     uint32_t pageStackStart;
     uint32_t pageStackEnd;
-
-	// Memory info.
-	uint32_t memoryKb;
+	// * End of reserved kernel addresses *
 };
 typedef struct mem_info mem_info_t;
 extern mem_info_t memInfo;
