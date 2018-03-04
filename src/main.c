@@ -10,7 +10,6 @@
 #include "kernel/nmi.h"
 #include "kernel/pit.h"
 #include <kernel/pmm.h>
-#include "kernel/memory.h"
 #include <kernel/paging.h>
 #include <kernel/kheap.h>
 #include <arch/i386/kernel/cpuid.h>
@@ -73,6 +72,14 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Initializing Physical memory manager...\n");
 	pmm_init(mboot_info);
 
+	// Initialize paging.
+	kprintf("Initializing paging...\n");
+    paging_init();
+
+	// Initialize kernel heap.
+	kprintf("Initializing kernel heap...\n");
+	kheap_init();
+
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	kprintf("Initializing IDT...\n");
@@ -90,22 +97,11 @@ void kernel_main(multiboot_info_t* mboot_info) {
     kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-
-	// Initialize paging.
-	kprintf("Initializing paging...\n");
-    paging_init();
-
-	// Initialize kernel heap.
-	kprintf("Initializing kernel heap...\n");
-	kheap_init();
-
 	kprintf("Setting up PIT...\n");
     pit_init();
 
 	kprintf("Sleeping for 2 seconds...\n");
 	sleep(2000);
-
-
 
 	kprintf("Initializing PS/2...\n");
 	ps2_init();

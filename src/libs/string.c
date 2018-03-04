@@ -2,8 +2,7 @@
 #include <string.h>
 
 // Compares the first n bytes of memory area str1 and memory area str2.
-int32_t memcmp(const void *str1, const void *str2, size_t n)
-{
+int32_t memcmp(const void *str1, const void *str2, size_t n) {
 	const uint8_t *s1 = (const uint8_t*)str1;
 	const uint8_t *s2 = (const uint8_t*)str2;
 
@@ -19,8 +18,7 @@ int32_t memcmp(const void *str1, const void *str2, size_t n)
 }
 
 // Copies n bytes from memory area src to memory area dest.
-void memcpy(uint8_t *src, uint8_t *dest, size_t n)
-{
+void memcpy(uint8_t *src, uint8_t *dest, size_t n) {
 	// Copy bytes.
 	for (size_t i = 0; i < n; i++)
 	{
@@ -31,8 +29,7 @@ void memcpy(uint8_t *src, uint8_t *dest, size_t n)
 
 // Copies n bytes from memory area str1 to memory area str2,
 // but for overlapping memory blocks, memmove() is a safer approach than memcpy().
-void* memmove(void *str1, const void *str2, size_t n)
-{
+void* memmove(void *str1, const void *str2, size_t n) {
 	uint8_t *s1 = (uint8_t*)str1;
 	const uint8_t *s2 = (const uint8_t*)str2;
 
@@ -51,8 +48,7 @@ void* memmove(void *str1, const void *str2, size_t n)
 }
 
 // Copies the character c to the first n characters of the string pointed to by the argument str.
-void* memset(void *str, int32_t c, size_t n)
-{
+void* memset(void *str, int32_t c, size_t n) {
 	uint8_t *s = (uint8_t*)str;
 
 	// Copy byte.
@@ -61,9 +57,15 @@ void* memset(void *str, int32_t c, size_t n)
 	return str;
 }
 
+void* memset16 (void *ptr, uint16_t value, size_t num) {
+	uint16_t* p = ptr;
+	while(num--)
+		*p++ = value;
+	return ptr;
+}
+
 // Appends the string pointed to by src to the end of the string pointed to by dest.
-char* strcat(char *dest, const char *src)
-{
+char* strcat(char *dest, const char *src) {
 	size_t i, j;
 
 	// Get end of destination string.
@@ -79,8 +81,7 @@ char* strcat(char *dest, const char *src)
 }
 
 // Compares two strings.
-int32_t strcmp(const char *str1, const char *str2)
-{
+int32_t strcmp(const char *str1, const char *str2) {
 	// Compare the strings.
     while (*str1 && *str1 == *str2)
 	{
@@ -93,8 +94,7 @@ int32_t strcmp(const char *str1, const char *str2)
 }
 
 // Copies one string to another.
-char* strcpy(char *dest, const char *src)
-{
+char* strcpy(char *dest, const char *src) {
 	// Copy the entire string.
 	char *ret = dest;
 	while ((*dest++ = *src++));
@@ -102,8 +102,7 @@ char* strcpy(char *dest, const char *src)
 }
 
 // Copies up to n character in one string to another.
-char* strncpy(char *dest, const char *src, size_t n)
-{
+char* strncpy(char *dest, const char *src, size_t n) {
 	// Copy string until we reach the number of characters desired.
 	char *ret = dest;
 	while (n--)
@@ -112,8 +111,7 @@ char* strncpy(char *dest, const char *src, size_t n)
 }
 
 // Gets the length of the specified string.
-size_t strlen(const char *str)
-{
+size_t strlen(const char *str) {
     // Count characters in string.
 	size_t len = 0;
 	while (str[len])
