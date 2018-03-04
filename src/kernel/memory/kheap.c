@@ -347,6 +347,4 @@ void kheap_init() {
     kheap_free(test4);
 
     kheap_dump_all_bins();
-    kprintf("Waiting two seconds for user verification...\n");
-    sleep(2000);
 }
