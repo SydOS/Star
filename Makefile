@@ -26,7 +26,11 @@ all:
 
 build-kernel: $(ASM_OBJECTS) $(C_OBJECTS)
 	# Link objects together into binary.
-	$(ARCH)-elf-gcc -T linker.ld -o Star-$(ARCH).kernel -ffreestanding -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc
+ifeq ($(ARCH), x86_64)
+	$(ARCH)-elf-gcc -T src/arch/x86_64/kernel/linker.ld -o Star-$(ARCH).kernel -ffreestanding -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc
+else
+	$(ARCH)-elf-gcc -T src/arch/i386/kernel/linker.ld -o Star-$(ARCH).kernel -ffreestanding -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc
+endif
 
 	# Strip out debug info into separate files.
 	$(ARCH)-elf-objcopy --only-keep-debug Star-$(ARCH).kernel Star-$(ARCH).sym

@@ -9,7 +9,6 @@ SECTIONS {
 	/* Kernel will be loaded at the 3GB + 1MB mark in virtual space, which
 	   will be mapped to 1MB in the physical space. */
 
-
 	. = 1M;
 	KERNEL_INIT_START = .;
 	.init ALIGN(4K) : {
@@ -19,7 +18,6 @@ SECTIONS {
 	}
 
 	KERNEL_INIT_END = .;
-
 	. += KERNEL_VIRTUAL_OFFSET;
 
 	/* For use within code. */

@@ -29,14 +29,14 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
 			memory += entry->len;
 	}
 
-    // Determine location of kernel page directory.
+    // Determine location of kernel page directory for later use.
     KERNEL_PAGE_DIRECTORY = ALIGN_4K((uint32_t)&KERNEL_VIRTUAL_END);
-    page_t *kernelPageDirectory = (page_t*)(KERNEL_PAGE_DIRECTORY - ((uint32_t)&KERNEL_VIRTUAL_OFFSET));
+
+    // Allocate temp location. This is used for the pre-boot page directory, and for temp purposes later on.
+    KERNEL_PAGE_TEMP = ALIGN_4K(KERNEL_PAGE_DIRECTORY);
+    page_t *kernelPageDirectory = (page_t*)(KERNEL_PAGE_TEMP - ((uint32_t)&KERNEL_VIRTUAL_OFFSET));
     for (uint32_t i = 0; i < 1024; i++)
         kernelPageDirectory[i] = 0;
-
-    // Allocate temp location for later use.
-    KERNEL_PAGE_TEMP = ALIGN_4K(KERNEL_PAGE_DIRECTORY);
 
     // Determine stack offset and size.
     PAGE_STACK_START = ALIGN_4K(KERNEL_PAGE_TEMP);
@@ -71,6 +71,9 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
         }
         bootKernelTable[i-(offset*1024)] = currentPage | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
+
+    // Set last entry to point to the new directory, this is used later.
+    kernelPageDirectory[PAGE_DIRECTORY_SIZE - 1] = (KERNEL_PAGE_DIRECTORY - ((uint32_t)&KERNEL_VIRTUAL_OFFSET)) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Enable paging.
 	asm volatile ("mov %%eax, %%cr3": :"a"((uint32_t)kernelPageDirectory));	
