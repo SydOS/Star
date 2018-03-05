@@ -92,9 +92,8 @@ void kernel_main_thread() {
 
 void hmmm_thread() {
 	while (1) { 
-		kprintf("hmm()\n");
+		kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
 		sleep(2000);
-		speaker_play_tone(2000, 200);
 	 }
 }
 
