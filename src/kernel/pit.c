@@ -3,13 +3,14 @@
 #include <tools.h>
 #include <kprint.h>
 #include <kernel/pit.h>
-#include <kernel/tasking.h>
 #include <arch/i386/kernel/interrupts.h>
+#include <kernel/tasking.h>
+
 
 // https://wiki.osdev.org/Programmable_Interval_Timer
 
 // Variable to hold the amount of ticks since the OS started.
-uint64_t ticks = 0;
+static uint64_t ticks = 0;
 uint8_t task = 0;
 uint8_t task_was_on = 0;
 
@@ -64,11 +65,11 @@ void pit_startcounter(uint32_t freq, uint8_t counter, uint8_t mode) {
 }
 
 // Callback for PIT channel 0 on IRQ0.
-static void pit_callback()
+static void pit_callback(registers_t *regs)
 {	
 	// Increment the number of ticks.
 	ticks++;
-	if (task_was_on) { tasking_tick(); }
+	if (task_was_on && ticks % 100 == 0) { tasking_tick(regs); }
 }
 
 // Initialize the PIT.

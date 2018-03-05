@@ -18,7 +18,7 @@ int32_t memcmp(const void *str1, const void *str2, size_t n) {
 }
 
 // Copies n bytes from memory area src to memory area dest.
-void memcpy(uint8_t *src, uint8_t *dest, size_t n) {
+void memcpy(uint8_t *dest, uint8_t *src, size_t n) {
 	// Copy bytes.
 	for (size_t i = 0; i < n; i++)
 	{

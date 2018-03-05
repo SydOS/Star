@@ -64,12 +64,12 @@ void paging_map_kernel_virtual_to_phys(page_t virt, page_t phys) {
     paging_map_virtual_to_phys(kernelPageDirectory, virt, phys);
 }
 
-static void paging_pagefault_handler() {
-    
-
+static void paging_pagefault_handler(registers_t *regs) {
     page_t addr;
     asm volatile ("mov %%cr2, %0" : "=r"(addr));
-
+    kprintf("EAX: 0x%X, EBX: 0x%X, ECX: 0x%X, EDX: 0x%X\n", regs->eax, regs->ebx, regs->ecx, regs->edx);
+    kprintf("ESI: 0x%X, EDI: 0x%X, EBP: 0x%X, ESP: 0x%X\n", regs->esi, regs->edi, regs->ebp, regs->esp);
+    kprintf("EIP: 0x%X, EFLAGS: 0x%X\n", regs->eip, regs->eflags);
     panic("Page fault at 0x%X!\n", addr);
 }
 
