@@ -6,26 +6,10 @@
 #include <arch/i386/kernel/interrupts.h>
 #include <kernel/tasking.h>
 
-
 // https://wiki.osdev.org/Programmable_Interval_Timer
 
 // Variable to hold the amount of ticks since the OS started.
 static uint64_t ticks = 0;
-uint8_t task = 0;
-uint8_t task_was_on = 0;
-
-// Set currently running task
-void pit_set_task(uint8_t i)
-{
-	if(!task_was_on) return;
-	task = i;
-}
-
-// Enable tasking
-void pit_enable_tasking() {
-	task_was_on = 1;
-	task = 1;
-}
 
 // Return the number of ticks elapsed.
 uint64_t pit_ticks() {
@@ -69,7 +53,9 @@ static void pit_callback(registers_t *regs)
 {	
 	// Increment the number of ticks.
 	ticks++;
-	if (task_was_on && ticks % 100 == 0) { tasking_tick(regs); }
+
+	// Change tasks.
+	tasking_tick(regs);
 }
 
 // Initialize the PIT.

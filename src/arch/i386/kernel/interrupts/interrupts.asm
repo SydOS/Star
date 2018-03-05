@@ -403,6 +403,8 @@ isr_common_stub:
     call interrupts_isr_handler
     pop eax
 
+global _isr_exit
+_isr_exit:
     pop gs
     pop fs
     pop es

@@ -104,22 +104,21 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Sleeping for 2 seconds...\n");
 	sleep(2000);
 
-	kprintf("Initializing PS/2...\n");
-	ps2_init();
-
 	kprintf("Starting tasking...\n");
 	tasking_init();
 }
 
 void kernel_late() {
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-	// -------------------------------------------------------------------------
-
-	// Floppy test.
+	// Initialize PS/2.
+	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	
+	kprintf("Initializing PS/2...\n");
+	ps2_init();
+	
+	// Initialize floppy.
+	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
 	floppy_detect();
 	kprintf("Initialize floppy drives...\n");
-	//floppy_init();
+	floppy_init();
 
     vga_enable_cursor();
 
