@@ -4,11 +4,10 @@
 #include <main.h>
 #include <multiboot.h>
 
-#define PAGE_FRAME_STACK_SIZE		(4096*1024)
-#define ALIGN_4K(size)          (((uint32_t)(size) + 0x1000) & 0xFFFFF000)
+#define ALIGN_4K(size)          	(((uint32_t)(size) + 0x1000) & 0xFFFFF000)
 
 // Type for pages.
-typedef uint32_t page_t;
+typedef uint64_t page_t;
 
 struct mem_info {
 	// Multiboot header.
@@ -26,7 +25,8 @@ struct mem_info {
 
 	// Paging tables.
 	uint32_t kernelPageDirectory;
-	uint32_t KernelPageTemp; // Used for directly accessing a 4KB block of RAM.
+	uint32_t kernelPageTemp; // Used for directly accessing a 4KB block of RAM.
+	bool paeEnabled;
 
 	// Page frame stack.
     uint32_t pageFrameStackStart;

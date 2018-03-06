@@ -4,12 +4,23 @@
 #include <main.h>
 #include <kernel/pmm.h>
 
+// Refer to Chapter 4: Paging of volume 3 of the Intel SDM for more info.
+
 // Sizes.
-#define PAGE_SIZE_4K                4096
-#define PAGE_SIZE_4M		        (PAGE_SIZE_4K * 1024)
+#define PAGE_SIZE_4K                0x1000
+#define PAGE_SIZE_2M		        0x200000
+#define PAGE_SIZE_4M		        0x400000
+#define PAGE_SIZE_1G		        0x40000000
 #define PAGE_DIRECTORY_SIZE         1024
 #define PAGE_TABLE_SIZE             1024
 #define PAGE_TABLE_ADDRESS_START    ((uint32_t)PAGE_SIZE_4M * (uint32_t)(PAGE_DIRECTORY_SIZE - 1))
+
+// PAE sizes.
+#ifndef NO_PAE
+#define PAGE_PAE_PDPT_SIZE          4
+#define PAGE_PAE_DIRECTORY_SIZE     512
+#define PAGE_PAE_TABLE_SIZE         512
+#endif
 
 // Mask macros.
 #define MASK_PAGE_4K(size)          ((uint32_t)(size) & 0xFFFFF000)     // Get only the page address.
