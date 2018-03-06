@@ -4,9 +4,16 @@
 #include <main.h>
 #include <kernel/pmm.h>
 
-#define PAGE_DIRECTORY_SIZE 1024
-#define PAGE_TABLE_SIZE     1024
-#define PAGE_TABLE_ADDRESS_START ((uint32_t)PAGE_SIZE_4M * (uint32_t)(PAGE_DIRECTORY_SIZE - 1))
+// Sizes.
+#define PAGE_SIZE_4K                4096
+#define PAGE_SIZE_4M		        (PAGE_SIZE_4K * 1024)
+#define PAGE_DIRECTORY_SIZE         1024
+#define PAGE_TABLE_SIZE             1024
+#define PAGE_TABLE_ADDRESS_START    ((uint32_t)PAGE_SIZE_4M * (uint32_t)(PAGE_DIRECTORY_SIZE - 1))
+
+// Mask macros.
+#define MASK_PAGE_4K(size)          ((uint32_t)(size) & 0xFFFFF000)     // Get only the page address.
+#define MASK_PAGEFLAGS_4K(size)     ((uint32_t)(size) & ~0xFFFFF000)    // Get only the page flags.
 
 enum {
     PAGING_PAGE_PRESENT         = 0x01,

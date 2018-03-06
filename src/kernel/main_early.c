@@ -10,8 +10,8 @@ extern uint32_t KERNEL_INIT_END;
 
 uint32_t KERNEL_PAGE_DIRECTORY __attribute__((section(".inittables")));
 uint32_t KERNEL_PAGE_TEMP __attribute__((section(".inittables")));
-uint32_t PAGE_STACK_START __attribute__((section(".inittables")));
-uint32_t PAGE_STACK_END __attribute__((section(".inittables")));
+uint32_t PAGE_FRAME_STACK_START __attribute__((section(".inittables")));
+uint32_t PAGE_FRAME_STACK_END __attribute__((section(".inittables")));
 
 // Performs pre-boot tasks. This function must not call code in other files.
 __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, multiboot_info_t* mbootInfo) {
@@ -35,18 +35,17 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     // Allocate temp location. This is used for the pre-boot page directory, and for temp purposes later on.
     KERNEL_PAGE_TEMP = ALIGN_4K(KERNEL_PAGE_DIRECTORY);
     page_t *kernelPageDirectory = (page_t*)(KERNEL_PAGE_TEMP - ((uint32_t)&KERNEL_VIRTUAL_OFFSET));
-    for (uint32_t i = 0; i < 1024; i++)
+    for (uint32_t i = 0; i < PAGE_DIRECTORY_SIZE; i++)
         kernelPageDirectory[i] = 0;
 
     // Determine stack offset and size.
-    PAGE_STACK_START = ALIGN_4K(KERNEL_PAGE_TEMP);
-    PAGE_STACK_END = PAGE_STACK_START + memory / 1024;
+    PAGE_FRAME_STACK_START = ALIGN_4K(KERNEL_PAGE_TEMP);
+    PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + memory / 1024;
 
     // Identity map low memory and init section of kernel.
-    page_t currentPage = 0;
-    page_t *bootPageLowTable = (page_t*)ALIGN_4K(PAGE_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET);
-    for (uint32_t i = 0; i <= (((uint32_t)&KERNEL_INIT_END) / PAGE_SIZE_4K); i++, currentPage += PAGE_SIZE_4K)
-        bootPageLowTable[i] = (currentPage) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    page_t *bootPageLowTable = (page_t*)ALIGN_4K(PAGE_FRAME_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET);
+    for (page_t currentPage = 0; currentPage <= ((uint32_t)&KERNEL_INIT_END); currentPage += PAGE_SIZE_4K)
+        bootPageLowTable[currentPage / PAGE_SIZE_4K] = (currentPage) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     kernelPageDirectory[0] = ((uint32_t)bootPageLowTable) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Create first table and add it to directory.
@@ -56,10 +55,9 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     
     // Map low memory and kernel to higher-half virtual space.
     uint32_t offset = 0;
-    currentPage = 0;
-    for (uint32_t i = 0; i <= ((PAGE_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET) / PAGE_SIZE_4K); i++, currentPage += PAGE_SIZE_4K) {
+    for (page_t page = 0; page <= (PAGE_FRAME_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET); page += PAGE_SIZE_4K) {
         // Have we reached the need to create another table?
-        if (i > 0 && i % 1024 == 0) {
+        if (page > 0 && page % PAGE_SIZE_4K == 0) {
             // Create a new table after the previous one.        
             uint32_t prevAddr = (uint32_t)bootKernelTable;
             bootKernelTable = (page_t*)ALIGN_4K(prevAddr);
@@ -69,11 +67,12 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
             kernelPageDirectory[(((uint32_t)&KERNEL_VIRTUAL_OFFSET) / PAGE_SIZE_4M) + offset] =
                 ((uint32_t)bootKernelTable) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         }
-        bootKernelTable[i-(offset*1024)] = currentPage | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        bootKernelTable[(page / PAGE_SIZE_4K) - (offset * PAGE_TABLE_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
     // Set last entry to point to the new directory, this is used later.
-    kernelPageDirectory[PAGE_DIRECTORY_SIZE - 1] = (KERNEL_PAGE_DIRECTORY - ((uint32_t)&KERNEL_VIRTUAL_OFFSET)) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    kernelPageDirectory[PAGE_DIRECTORY_SIZE - 1] =
+        (KERNEL_PAGE_DIRECTORY - ((uint32_t)&KERNEL_VIRTUAL_OFFSET)) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Enable paging.
 	asm volatile ("mov %%eax, %%cr3": :"a"((uint32_t)kernelPageDirectory));	

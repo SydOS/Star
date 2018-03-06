@@ -50,7 +50,7 @@ void paging_map_virtual_to_phys(page_t *directory, page_t virt, page_t phys) {
     // If there isn't one, create one.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.   
     if (MASK_PAGE_4K(directory[tableIndex]) == 0) {
-        directory[tableIndex] = pmm_pop_page() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        directory[tableIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
     }
     page_t *table = (page_t*)(PAGE_TABLE_ADDRESS_START + (tableIndex * PAGE_SIZE_4K));
@@ -81,6 +81,15 @@ void paging_unmap_kernel_virtual(page_t virt) {
     paging_unmap_virtual(kernelPageDirectory, virt);
 }
 
+void paging_map_region(page_t *directory, page_t startAddress, page_t endAddress, bool kernel, bool writeable) {
+    // Ensure addresses are on 4KB boundaries.
+    startAddress = MASK_PAGE_4K(startAddress);
+    endAddress = MASK_PAGE_4K(endAddress);
+
+    // Map space.
+    
+}
+
 static void paging_pagefault_handler() {
     
 
@@ -105,7 +114,7 @@ void paging_init() {
         (memInfo.kernelPageDirectory - memInfo.kernelVirtualOffset) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Map kernel.
-    for (uint32_t i = memInfo.kernelVirtualOffset; i <= memInfo.pageStackEnd; i+= PAGE_SIZE_4K) {
+    for (uint32_t i = memInfo.kernelVirtualOffset; i <= memInfo.pageFrameStackEnd; i+= PAGE_SIZE_4K) {
         paging_map_kernel_virtual_to_phys(i, i - memInfo.kernelVirtualOffset);
     }
 
@@ -117,7 +126,7 @@ void paging_init() {
     memset((uint32_t*)memInfo.KernelPageTemp, 0, PAGE_SIZE_4K);
 
     // Pop physical page for test.
-    page_t page = pmm_pop_page();
+    page_t page = pmm_pop_frame();
     kprintf("Popped page 0x%X for test...\n", page);
     
     // Map physical page to 0x1000 for testing.
@@ -142,7 +151,7 @@ void paging_init() {
     // Unmap virtual address and return page to stack.
     kprintf("Unmapping 0x1000 and pushing page 0x%X back to stack...\n", page);
     paging_unmap_kernel_virtual(0x1000);
-    pmm_push_page(page);
+    pmm_push_frame(page);
 
     kprintf("Paging initialized!\n");
 }
