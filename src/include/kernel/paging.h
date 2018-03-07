@@ -17,9 +17,27 @@
 
 // PAE sizes.
 #ifndef NO_PAE
-#define PAGE_PAE_PDPT_SIZE          4
-#define PAGE_PAE_DIRECTORY_SIZE     512
-#define PAGE_PAE_TABLE_SIZE         512
+#define PAGE_PAE_PDPT_SIZE              4
+#define PAGE_PAE_DIRECTORY_SIZE         512
+#define PAGE_PAE_TABLE_SIZE             512
+
+#define PAGE_PAE_TABLES_ADDRESS(index)  (((uint32_t)PAGE_SIZE_1G * 3) + ((uint32_t)PAGE_SIZE_2M * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 4 + (uint32_t)index)))
+#define PAGE_PAE_TABLES_3GB_ADDRESS     (((uint32_t)PAGE_SIZE_1G * 3) + ((uint32_t)PAGE_SIZE_2M * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 1)))
+#define PAGE_PAE_TABLES_2GB_ADDRESS     (((uint32_t)PAGE_SIZE_1G * 3) + ((uint32_t)PAGE_SIZE_2M * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 2)))
+#define PAGE_PAE_TABLES_1GB_ADDRESS     (((uint32_t)PAGE_SIZE_1G * 3) + ((uint32_t)PAGE_SIZE_2M * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 3)))
+#define PAGE_PAE_TABLES_0GB_ADDRESS     (((uint32_t)PAGE_SIZE_1G * 3) + ((uint32_t)PAGE_SIZE_2M * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 4)))
+
+#define PAGE_PAE_DIR_ADDRESS(index)     ((uint32_t)PAGE_PAE_TABLES_3GB_ADDRESS + ((uint32_t)PAGE_SIZE_4K * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 4 + (uint32_t)index)))
+#define PAGE_PAE_DIR_3GB_ADDRESS        PAGE_PAE_DIR_ADDRESS(3)
+#define PAGE_PAE_DIR_2GB_ADDRESS        PAGE_PAE_DIR_ADDRESS(2)
+#define PAGE_PAE_DIR_1GB_ADDRESS        PAGE_PAE_DIR_ADDRESS(1)
+#define PAGE_PAE_DIR_0GB_ADDRESS        PAGE_PAE_DIR_ADDRESS(0)
+#define PAGE_PAE_PDPT_ADDRESS           ((uint32_t)PAGE_PAE_TABLES_3GB_ADDRESS + ((uint32_t)PAGE_SIZE_4K * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 5)))
+
+// Masks.
+#define MASK_DIRECTORY_PAE(addr)        ((uint64_t)(addr) & 0xFFFFFFF0)     // Get only the PDPT address.
+#define MASK_PAGE_PAE_4K(size)          ((uint64_t)(size) & 0xFFFFF000)     // Get only the page address.
+#define MASK_PAGEFLAGS_PAE_4K(size)     ((uint64_t)(size) & ~0xFFFFF000)    // Get only the page flags.
 #endif
 
 // Mask macros.

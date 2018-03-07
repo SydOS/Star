@@ -9,8 +9,6 @@ extern uint32_t KERNEL_VIRTUAL_END;
 extern uint32_t KERNEL_PHYSICAL_END;
 extern uint32_t KERNEL_INIT_END;
 
-uint32_t KERNEL_PAGE_DIRECTORY __attribute__((section(".inittables")));
-uint32_t KERNEL_PAGE_TEMP __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_START __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_END __attribute__((section(".inittables")));
 uint32_t EARLY_PAGES_LAST __attribute__((section(".inittables")));
@@ -92,7 +90,7 @@ __attribute__((section(".init"))) static void setup_pae_paging() {
     // Create page directory for the 0GB space.
     uint64_t *pageDirectoryLow = (uint64_t*)ALIGN_4K((uint32_t)pageDirectoryPointerTable);
     memset(pageDirectoryLow, 0, PAGE_SIZE_4K);
-    pageDirectoryPointerTable[0] = (uint64_t)pageDirectoryLow | PAGING_PAGE_PRESENT;
+    pageDirectoryPointerTable[0] = (uint32_t)pageDirectoryLow | PAGING_PAGE_PRESENT;
 
     // Create page table for mapping low memory + ".init" section of kernel. This is an identity mapping.
     uint64_t *pageTableLow = (uint64_t*)ALIGN_4K((uint32_t)pageDirectoryLow);
@@ -130,6 +128,11 @@ __attribute__((section(".init"))) static void setup_pae_paging() {
         pageTableKernel[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
+    // Recursively map PDPT and both page directories.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 1] = (uint64_t)pageDirectoryKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 3GB directory.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 4] = (uint64_t)pageDirectoryLow | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 0GB directory.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 5] = (uint64_t)pageDirectoryPointerTable | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // PDPT.
+
     // Set end of temporary reserved pages.
     EARLY_PAGES_LAST = (uint32_t)pageTableKernel;
 
@@ -166,7 +169,7 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     }
 
     // Force PAE off for now.
-    PAE_ENABLED = false;
+    //PAE_ENABLED = false;
 
     // Count up memory in bytes.
     uint64_t memory = 0;

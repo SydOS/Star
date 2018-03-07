@@ -24,8 +24,7 @@ struct mem_info {
 	uint32_t memoryKb;
 
 	// Paging tables.
-	uint32_t kernelPageDirectory;
-	uint32_t kernelPageTemp; // Used for directly accessing a 4KB block of RAM.
+	page_t kernelPageDirectory;
 	bool paeEnabled;
 
 	// Page frame stack.
