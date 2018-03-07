@@ -60,7 +60,7 @@ static void pit_callback()
 void pit_init()
 {
 	// Start main timer at 1 tick = 1 ms.
-	pit_startcounter(1000, PIT_CMD_COUNTER0, PIT_CMD_MODE_RATEGEN);
+	pit_startcounter(1193, PIT_CMD_COUNTER0, PIT_CMD_MODE_RATEGEN);
 
 	// Register the handler with IRQ 0.
     interrupts_irq_install_handler(0, pit_callback);
