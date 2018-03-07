@@ -153,7 +153,7 @@ void paging_init() {
         for (uint32_t d = 0; d < PAGE_PAE_PDPT_SIZE; d++)
             pageDirectoryPointerTable[d] = pmm_pop_frame() | PAGING_PAGE_PRESENT;
 
-        // Map kernel page directory and map it to 0x0.
+        // Create temporary page directory and map it to 0x0.
         uint64_t *pageTempTable = (uint64_t*)memInfo.kernelPageTemp;
 
        // pageDirectoryPointerTablePreBoot[0] =  | PAGING_PAGE_PRESENT;
