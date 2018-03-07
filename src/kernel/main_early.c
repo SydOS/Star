@@ -13,7 +13,7 @@ uint32_t KERNEL_PAGE_DIRECTORY __attribute__((section(".inittables")));
 uint32_t KERNEL_PAGE_TEMP __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_START __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_END __attribute__((section(".inittables")));
-uint32_t EARLY_PAGES_END __attribute__((section(".inittables")));
+uint32_t EARLY_PAGES_LAST __attribute__((section(".inittables")));
 bool PAE_ENABLED __attribute__((section(".inittables"))) = false;
 
 extern uint32_t _cpuid_detect_early();
@@ -66,6 +66,9 @@ __attribute__((section(".init"))) static void setup_paging() {
         // Add page to table.
         pageTableKernel[(page / PAGE_SIZE_4K) - (offset * PAGE_TABLE_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
+
+    // Set end of temporary reserved pages.
+    EARLY_PAGES_LAST = (uint32_t)pageTableKernel;
 
     // Set last entry to point to the new directory, this is used later.
     pageDirectory[PAGE_DIRECTORY_SIZE - 1] = (uint32_t)pageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
@@ -125,6 +128,9 @@ __attribute__((section(".init"))) static void setup_pae_paging() {
         }
         pageTableKernel[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
+
+    // Set end of temporary reserved pages.
+    EARLY_PAGES_LAST = (uint32_t)pageTableKernel;
 
     // Enable PAE.
     asm volatile ("mov %cr4, %eax");

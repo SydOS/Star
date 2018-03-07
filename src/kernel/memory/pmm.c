@@ -11,6 +11,7 @@ extern uint32_t KERNEL_VIRTUAL_START;
 extern uint32_t KERNEL_VIRTUAL_END;
 extern uint32_t PAGE_FRAME_STACK_START;
 extern uint32_t PAGE_FRAME_STACK_END;
+extern uint32_t EARLY_PAGES_LAST;
 
 // Used to store info about memory in the system.
 mem_info_t memInfo;
