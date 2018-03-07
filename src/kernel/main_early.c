@@ -64,13 +64,14 @@ __attribute__((section(".init"))) static void setup_paging() {
         }
 
         // Add page to table.
-        pageTableKernel[(page / PAGE_SIZE_4K) - (offset * PAGE_TABLE_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        pageTableKernel[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
     // Set end of temporary reserved pages.
     EARLY_PAGES_LAST = (uint32_t)pageTableKernel;
 
-    // Set last entry to point to the new directory, this is used later.
+    // Set last entry to point to the directory, this is used later.
+    // The page tables within the directory can then be accessed starting at 0xFFC00000.
     pageDirectory[PAGE_DIRECTORY_SIZE - 1] = (uint32_t)pageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Enable 32-bit paging.
@@ -165,7 +166,7 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     }
 
     // Force PAE off for now.
-    //PAE_ENABLED = false;
+    PAE_ENABLED = false;
 
     // Count up memory in bytes.
     uint64_t memory = 0;

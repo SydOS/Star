@@ -6,8 +6,8 @@
 
 #define ALIGN_4K(size)          	(((uint32_t)(size) + 0x1000) & 0xFFFFF000)
 
-// Type for pages.
-typedef uint64_t page_t;
+// Type for page frames.
+typedef uintptr_t page_t;
 
 struct mem_info {
 	// Multiboot header.
