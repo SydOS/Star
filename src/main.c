@@ -164,6 +164,8 @@ void kernel_late() {
 	serial_write('\a');
 	vga_putchar('\a');
 
+	rtc_get_time();
+
 	// If serial isn't present, just loop.
 	if (!serial_present()) {
 		kprintf("No serial port present for logging, waiting here.");
