@@ -3,6 +3,15 @@
 #include <kprint.h>
 #include <driver/rtc.h>
 #include <kernel/kheap.h>
+#include <kernel/tasking.h>
+#include <arch/i386/kernel/interrupts.h>
+
+void rtc_thread() {
+	rtc_time = rtc_get_time();
+	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, 
+		rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
+	sleep(500);
+}
 
 /**
  * Reads from a specific register for RTC
@@ -59,7 +68,7 @@ struct RTC_Status_Register_B* rtc_get_settings() {
 
 	settings->twentyfour_hour_time = (data & ( 1 << 1 )) >> 1;
 	settings->binary_input = (data & ( 1 << 2 )) >> 2;
-	
+
 	return settings;
 }
 
@@ -68,4 +77,7 @@ struct RTC_Status_Register_B* rtc_get_settings() {
  */
 void rtc_init() {
 	rtc_settings = rtc_get_settings();
+	rtc_time = rtc_get_time();
+
+	tasking_add_process(tasking_create_process("rtc", (uint32_t)rtc_thread));
 }

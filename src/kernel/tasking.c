@@ -54,6 +54,15 @@ void __notified(int sig) {
 
 // -----------------------------------------------------------------------------
 
+/* add process but take care of others also! */
+int tasking_add_process(PROCESS* p)
+{
+	taskingEnabled = false;
+	__addProcess(p);
+	taskingEnabled = true;
+	return p->pid;
+}
+
 void kernel_main_thread() {
 	taskingEnabled = true;
 	kernel_late();
