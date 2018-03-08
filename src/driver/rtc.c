@@ -6,6 +6,9 @@
 #include <kernel/tasking.h>
 #include <arch/i386/kernel/interrupts.h>
 
+/**
+ * Thread to update the RTC every 500ms, and print out the time for debugging
+ */
 void rtc_thread() {
 	uint8_t last_second = 0;
 	while(true) {
