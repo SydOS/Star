@@ -167,7 +167,7 @@ void kernel_late() {
 
 	while(true) {
 		struct RTCTime* time = rtc_get_time();
-		kprintf("%d\n", time->seconds);
+		kprintf("%d:%d:%d %d/%d/%d\n", time->hours, time->minutes, time->seconds, time->month, time->day, time->year);
 		kheap_free(time);
 		sleep(1000);
 	}
