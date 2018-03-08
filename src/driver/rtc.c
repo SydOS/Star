@@ -7,11 +7,15 @@
 #include <arch/i386/kernel/interrupts.h>
 
 void rtc_thread() {
+	uint8_t last_second = 0;
 	while(true) {
 		rtc_time = rtc_get_time();
-		kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, 
-			rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
-		sleep(1000);
+		if (rtc_time->seconds != last_second) {
+			last_second = rtc_time->seconds;
+			kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, 
+				rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
+		}
+		sleep(500);
 	}
 }
 
