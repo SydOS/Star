@@ -156,6 +156,13 @@ void kernel_late() {
 	if (memInfo.nxEnabled)
 		kprintf("NX enabled!\n");
 
+	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	rtc_init();
+	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
+	struct RTCTime* time = rtc_get_time();
+	kprintf("%d:%d:%d %d/%d/%d\n", time->hours, time->minutes, time->seconds, time->month, time->day, time->year);
+	kheap_free(time);
+
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	kprintf("root@sydos ~: ");
 	serial_writes("root@sydos ~: ");
@@ -167,7 +174,7 @@ void kernel_late() {
 
 	rtc_init();
 	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
-
+  
 	// If serial isn't present, just loop.
 	if (!serial_present()) {
 		kprintf("No serial port present for logging, waiting here.");
