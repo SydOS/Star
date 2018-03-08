@@ -229,11 +229,11 @@ static void paging_late() {
 
             // Increase offset and add the table to our new directory.
             offset++;
-            pageDirectory[paging_calculate_table(memInfo.kernelVirtualOffset) + offset] = pageKernelTableAddr;
+            pageDirectory[paging_calculate_table(memInfo.kernelVirtualOffset) + offset] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         }
 
         // Add page to table.
-        pageKernelTable[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        pageKernelTable[(page / PAGE_SIZE_4K) - (offset * PAGE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
     // Recursively map page directory to last entry.
@@ -256,8 +256,8 @@ static void paging_pae_late() {
 
     // Pop a new page for the 3GB page directory, which will hold the kernel at 0xC0000000.
     // This is mapped to 0x1000 in the current virtual address space.
-    uint32_t pageDirectoryAddr = pmm_pop_frame();
-    earlyPageTableLow[1] = (uint64_t)pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    uint64_t pageDirectoryAddr = pmm_pop_frame();
+    earlyPageTableLow[1] = pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     pageDirectoryPointerTable[3] = pageDirectoryAddr | PAGING_PAGE_PRESENT;
     paging_flush_tlb();
 
@@ -292,19 +292,19 @@ static void paging_pae_late() {
 
             // Increase offset and add the table to our new directory.
             offset++;
-            pageDirectory[offset] = pageKernelTableAddr;
+            pageDirectory[offset] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         }
 
         // Add page to table.
-        pageKernelTable[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        pageKernelTable[(page / PAGE_SIZE_4K) - (offset * PAGE_PAE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
     // Recursively map kernel page directory.
-    pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 1] = (uint64_t)pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 3GB directory.
+    pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 1] = pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 3GB directory.
 
     // Create 2GB page directory.
     pageDirectoryAddr = pmm_pop_frame();
-    earlyPageTableLow[1] = (uint64_t)pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    earlyPageTableLow[1] = pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     pageDirectoryPointerTable[2] = pageDirectoryAddr | PAGING_PAGE_PRESENT;
     paging_flush_tlb();
 

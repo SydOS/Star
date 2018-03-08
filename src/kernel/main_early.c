@@ -62,7 +62,7 @@ __attribute__((section(".init"))) static void setup_paging() {
         }
 
         // Add page to table.
-        pageTableKernel[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        pageTableKernel[(page / PAGE_SIZE_4K) - (offset * PAGE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
     // Set end of temporary reserved pages.
@@ -125,7 +125,7 @@ __attribute__((section(".init"))) static void setup_pae_paging() {
             offset++;
             pageDirectoryKernel[offset] = (uint64_t)pageTableKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         }
-        pageTableKernel[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        pageTableKernel[(page / PAGE_SIZE_4K) - (offset * PAGE_PAE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
     // Recursively map PDPT and both page directories.
