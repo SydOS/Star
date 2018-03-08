@@ -19,6 +19,7 @@
 #include <driver/serial.h>
 #include "driver/speaker.h"
 #include "driver/ps2/ps2.h"
+#include "driver/rtc.h"
 
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
@@ -165,7 +166,9 @@ void kernel_late() {
 	vga_putchar('\a');
 
 	while(true) {
-		rtc_get_time();
+		struct RTCTime* time = rtc_get_time();
+		kprintf("%d\n", time->seconds);
+		kheap_free(time);
 		sleep(1000);
 	}
 

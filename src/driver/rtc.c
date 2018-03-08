@@ -17,6 +17,5 @@ struct RTCTime* rtc_get_time() {
 	time->day = rtc_read(0x07);
 	time->month = rtc_read(0x08);
 	time->year = rtc_read(0x09);
-	kprintf("%d", time->seconds);
 	return time;
 }
