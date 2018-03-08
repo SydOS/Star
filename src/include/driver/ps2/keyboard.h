@@ -102,4 +102,4 @@ enum
 
 
 
-extern void keyboard_init();
+extern void ps2_keyboard_init();

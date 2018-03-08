@@ -1,5 +1,6 @@
 // https://wiki.osdev.org/Floppy_Disk_Controller
 // https://github.com/1byte2bytes/SydOS/blob/master/res/82077AA_FloppyControllerDatasheet.pdf
+// https://forum.osdev.org/viewtopic.php?t=13538
 
 // Floppy registers.
 enum {
@@ -140,3 +141,6 @@ enum {
 #define FLOPPY_SECTORS_PER_TRACK 18
 #define FLOPPY_VERSION_NONE     0xFF
 #define FLOPPY_VERSION_ENHANCED 0x90
+
+extern void floppy_detect();
+extern void floppy_init();

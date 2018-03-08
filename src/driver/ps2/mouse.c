@@ -3,7 +3,7 @@
 #include <tools.h>
 #include <driver/ps2/mouse.h>
 #include <driver/ps2/ps2.h>
-#include <kernel/interrupts.h>
+#include <arch/i386/kernel/interrupts.h>
 
 // https://wiki.osdev.org/Mouse
 // https://wiki.osdev.org/PS/2_Mouse
@@ -208,7 +208,6 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
     if (x > 240 || x < -240 || y > 240 || y < -240 || z > 240 || z < -240)
         return;
 
-    char* tmp;
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_LEFT_BTN)
         kprintf("Left mouse button pressed!\n");
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_RIGHT_BTN)
@@ -222,7 +221,7 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
 }
 
 // Callback for mouse on IRQ12.
-static void ps2_mouse_callback(registers_t* regs)
+static void ps2_mouse_callback()
 {	
     // Get data.
     uint8_t data = ps2_get_data();

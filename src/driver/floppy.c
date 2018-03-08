@@ -3,7 +3,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <driver/floppy.h>
-#include <kernel/interrupts.h>
+#include <arch/i386/kernel/interrupts.h>
 
 static bool irq_triggered = false;
 static bool implied_seeks = false;
@@ -40,10 +40,10 @@ static uint8_t floppy_parse_error(uint8_t st0, uint8_t st1, uint8_t st2) {
 		kprintf("Drive not ready.\n");
 		error = 1;
 	}
-	if (st1 & FLOPPY_ST1_MISSING_ADDR_MARK || st2 & FLOPPY_ST2_MISSING_DATA_MARK) {
-		kprintf("Missing address mark.\n");
-		error = 1;
-	}
+	//if (st1 & FLOPPY_ST1_MISSING_ADDR_MARK || st2 & FLOPPY_ST2_MISSING_DATA_MARK) {
+	//	kprintf("Missing address mark.\n");
+	//	error = 1;
+	//}
 	if (st1 & FLOPPY_ST1_NOT_WRITABLE) {
 		kprintf("Disk is write-protected.\n");
 		error = 2;
@@ -332,14 +332,14 @@ bool floppy_seek(uint8_t drive, uint8_t track) {
 }
 
 // Read the specified sector.
-int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
+int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize) {
 	if (drive >= 4)
 		return -1;
 	uint8_t st0, cyl = 0;
 
 	// Convert LBA to CHS.
 	uint16_t head = 0, track = 0, sector = 1;
-	floppy_lba_to_chs(sector_lba, &head, &track, &sector);
+	floppy_lba_to_chs(sectorLba, &head, &track, &sector);
 
 	// Seek to track.	
 	if (!floppy_seek(drive, track))
@@ -380,9 +380,8 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 
 		// If no error, we are done.
 		if (!error) {
-			for (uint16_t i = 0; i < 128; i++)
-				kprintf("%X ", (uint8_t)(floppyDmaBuffer[i]));
-			kprintf("\n");
+			// Copy data to buffer.
+			memcpy(floppyDmaBuffer, buffer, bufferSize);
 			return 0;
 		}
 		else if (error > 1) {
@@ -393,6 +392,66 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sector_lba) {
 
 	// Failed.
 	kprintf("Get sector failed!\n");
+	return - 1;
+}
+
+// Read the specified track.
+int8_t floppy_read_track(uint8_t drive, uint8_t track, uint8_t buffer[], uint16_t bufferSize) {
+	if (drive >= 4)
+		return -1;
+	uint8_t st0, cyl = 0;
+
+	// Seek to track.	
+	if (!floppy_seek(drive, track))
+		return -1;
+
+	// Attempt to read sector.
+	floppy_set_motor(drive, true);
+	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
+		sleep(100);
+
+		// Send read command to disk.
+		kprintf("Attempting to read track %u...\n", track);
+		floppy_write_command(FLOPPY_CMD_READ_DATA | FLOPPY_CMD_EXT_MFM);
+		floppy_write_command(0 << 2 | drive);
+		floppy_write_command(track);
+		floppy_write_command(0);
+		floppy_write_command(1); // First sector.
+		floppy_write_command(FLOPPY_BYTES_SECTOR_512);
+		floppy_write_command(18); // read 18 sectors.
+		floppy_write_command(FLOPPY_GAP3_3_5);
+		floppy_write_command(0xFF);
+
+		// Wait for IRQ.
+		floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
+		floppy_sense_interrupt(&st0, &cyl);
+
+		// Get status registers.
+		st0 = floppy_read_data();
+		uint8_t st1 = floppy_read_data();
+		uint8_t st2 = floppy_read_data();
+		uint8_t rTrack = floppy_read_data();
+		uint8_t rHead = floppy_read_data();
+		uint8_t rSector = floppy_read_data();
+		uint8_t bytesPerSector = floppy_read_data();
+
+		// Determine errors if any.
+		uint8_t error = floppy_parse_error(st0, st1, st2);
+
+		// If no error, we are done.
+		if (!error) {
+			// Copy data to buffer.
+			memcpy(floppyDmaBuffer, buffer, bufferSize);
+			return 0;
+		}
+		else if (error > 1) {
+			kprintf("Not retrying...\n");
+			return 2;
+		}
+	}
+
+	// Failed.
+	kprintf("Get track failed!\n");
 	return - 1;
 }
 
@@ -428,8 +487,21 @@ void floppy_init()
 	// Reset floppy controller.
 	kprintf("Resetting floppy drive controller...\n");
 	floppy_controller_reset(true);
-
-	kprintf("Getting sector 0...\n");
-	floppy_read_sector(0, 0);
 	floppy_set_motor(0, false);
+
+	/*uint8_t data[16000];
+	kprintf("Getting sector 0...\n");
+	floppy_read_track(0, 0, data, 16000);
+	floppy_set_motor(0, false);
+
+	for (int i = 0; i < 60; i++)
+		kprintf("%X ", data[i]);
+	kprintf("\n");
+
+	char volumeName[12];
+	memcpy(data+43, volumeName, sizeof(volumeName));
+	volumeName[11] = '\0';
+
+	// Print volume name.
+	kprintf("FAT12 volume string: %s\n", volumeName);*/
 }

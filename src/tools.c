@@ -78,5 +78,7 @@ void sleep(uint32_t ms)
 	// 1 tick = 1 ms.
 	uint64_t startTick = pit_ticks();
 	uint64_t endTick = startTick + ms;
-	while (pit_ticks() < endTick);
+	uint32_t tick = pit_ticks();
+	while (tick < endTick)
+		tick = pit_ticks();
 }

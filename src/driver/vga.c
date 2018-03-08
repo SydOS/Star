@@ -5,6 +5,8 @@
 #include <driver/vga.h>
 #include <driver/speaker.h>
 
+extern uint32_t KERNEL_VIRTUAL_OFFSET;
+
 /**
  * Returns a uint8_t for internal usage in coloring the terminal
  * @param  fg Foreground color from vga_color struct
@@ -51,7 +53,7 @@ void vga_initialize(void) {
 	terminal_row = 0;
 	terminal_column = 0;
 	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-	terminal_buffer = (uint16_t*) 0xB8000;
+	terminal_buffer = (uint16_t*) (0x000B8000 + (uint32_t)&KERNEL_VIRTUAL_OFFSET);
 
 	for (size_t y = 0; y < VGA_HEIGHT; y++) {
 		for (size_t x = 0; x < VGA_WIDTH; x++) {
@@ -81,6 +83,9 @@ void vga_putentryat(char c, uint8_t color, size_t x, size_t y) {
 	terminal_buffer[index] = vga_entry(c, color);
 }
 
+/**
+ * Scrolls the terminal up a line
+ */
 void vga_scroll() {
 	terminal_row = VGA_HEIGHT-1;
 	for (size_t y = 1; y < VGA_HEIGHT; y++) {
@@ -130,10 +135,6 @@ void vga_putchar(char c) {
 			vga_scroll();
 		}
 	}
-
-	if (cursor_enabled == true) {
-		vga_update_cursor(terminal_column, terminal_row);
-	}
 }
 
 /**
@@ -144,10 +145,6 @@ void vga_putchar(char c) {
 void vga_write(const char* data, size_t size) {
 	for (size_t i = 0; i < size; i++) {
 		vga_putchar(data[i]);
-	}
-
-	if (cursor_enabled == true) {
-		vga_update_cursor(terminal_column, terminal_row);
 	}
 }
 
@@ -168,23 +165,15 @@ void vga_setcolor(enum vga_color fg, enum vga_color bg) {
 	terminal_color = vga_entry_color(fg, bg);
 }
 
-void vga_enable_cursor() {
-	outb(0x3D4, 0x0A);
-	outb(0x3D5, (inb(0x3D5) & 0xC0) | 0);
- 
-	outb(0x3D4, 0x0B);
-	outb(0x3D5, (inb(0x3E0) & 0xE0) | 15);
+// -----------------------------------------------------------------------------
+// Cursor stuff
+// -----------------------------------------------------------------------------
 
-	cursor_enabled = true;
-}
-
-void vga_disable_cursor() {
-	outb(0x3D4, 0x0A);
-	outb(0x3D5, 0x20);
-
-	cursor_enabled = false;
-}
-
+/**
+ * Updates the position of the VGA cursor
+ * @param x X coordinate for cursor
+ * @param y Y coordinate for cursor
+ */
 void vga_update_cursor(int x, int y)
 {
 	uint16_t pos = y * VGA_WIDTH + x;
@@ -195,6 +184,44 @@ void vga_update_cursor(int x, int y)
 	outb(0x3D5, (uint8_t) ((pos >> 8) & 0xFF));
 }
 
+/**
+ * Trigger an update to the cursor. Simple call to vga_update_cursor
+ * with arguments pre-filled
+ */
+void vga_trigger_cursor_update() {
+	vga_update_cursor(terminal_column, terminal_row);
+}
+
+/**
+ * Send data over I/O port to enable the VGA cursor and update
+ */
+void vga_enable_cursor() {
+	outb(0x3D4, 0x0A);
+	outb(0x3D5, (inb(0x3D5) & 0xC0) | 0);
+ 
+	outb(0x3D4, 0x0B);
+	outb(0x3D5, (inb(0x3E0) & 0xE0) | 15);
+
+	cursor_enabled = true;
+
+	vga_update_cursor(terminal_column, terminal_row);
+}
+
+/**
+ * Send data over I/O port to disable the VGA cursor
+ */
+void vga_disable_cursor() {
+	outb(0x3D4, 0x0A);
+	outb(0x3D5, 0x20);
+
+	cursor_enabled = false;
+}
+
+/**
+ * Get the current X and Y position of the cursor
+ * @param p A 2 element array to write results to
+ * @return A 2 element array, X and Y
+ */
 int* vga_cursor_pos(int* p) {
 	p[0] = terminal_column;
 	p[1] = terminal_row;

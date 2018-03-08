@@ -4,7 +4,7 @@
 #include <tools.h>
 #include <driver/ps2/keyboard.h>
 #include <driver/ps2/ps2.h>
-#include <kernel/interrupts.h>
+#include <arch/i386/kernel/interrupts.h>
 #include <driver/vga.h>
 
 // http://www.computer-engineering.org/ps2keyboard/scancodes2.html
@@ -238,7 +238,7 @@ static void ps2_keyboard_set_leds()
 }
 
 // Callback for keyboard on IRQ1.
-static void ps2_keyboard_callback(registers_t* regs)
+static void ps2_keyboard_callback()
 {	
     // Read data from keyboard.
     uint8_t data = ps2_get_data();
