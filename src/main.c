@@ -128,6 +128,8 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Detected usable RAM: %uMB\n", memInfo.memoryKb / 1024);
 	if (memInfo.paeEnabled)
 		kprintf("PAE enabled!\n");
+	if (memInfo.nxEnabled)
+		kprintf("NX enabled!\n");
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	kprintf("root@sydos ~: ");

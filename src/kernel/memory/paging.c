@@ -314,6 +314,16 @@ static void paging_pae_late() {
     // Map the 2GB page directory and the PDPT recursively.
     pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 1] = (uint64_t)pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 2GB directory.
     pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 4] = (uint64_t)memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // PDPT.
+
+    // Detect and enable the NX bit if supported.
+    uint32_t result, unused;
+    if (cpuid_query(CPUID_INTELFEATURES, &unused, &unused, &unused, &result) && (result & CPUID_FEAT_EDX_NX)) {
+        // Enable NX bit.
+        uint64_t msr = cpu_msr_read(0xC0000080);
+        cpu_msr_write(0xC0000080, msr | 0x800);
+        memInfo.nxEnabled = true;
+        kprintf("NX bit enabled!\n");
+    }
 }
 
 void paging_init() {
@@ -322,12 +332,11 @@ void paging_init() {
 
     // Is PAE enabled?
     memInfo.paeEnabled = PAE_ENABLED;
-    if (memInfo.paeEnabled) {
-        paging_pae_late();
-    }
+    if (memInfo.paeEnabled)
+        paging_pae_late(); // Use PAE paging.
     else 
         paging_late(); // No PAE, using standard paging.
-
+        
     // Change to use our new page directory.
     paging_change_directory(memInfo.kernelPageDirectory);
 

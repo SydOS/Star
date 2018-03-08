@@ -26,6 +26,7 @@ struct mem_info {
 	// Paging tables.
 	page_t kernelPageDirectory;
 	bool paeEnabled;
+	bool nxEnabled;
 
 	// Page frame stack.
     uint32_t pageFrameStackStart;
