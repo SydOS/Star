@@ -52,7 +52,40 @@ void paging_flush_tlb_address(uintptr_t address) {
     asm volatile ("invlpg (%0)" : : "b"(address) : "memory");
 }
 
-static void paging_map(uint32_t *directory, page_t virtual, page_t physical) {
+static uint64_t paging_get_pae_directory_address(uint32_t directoryIndex) {
+    switch (directoryIndex) {
+        case 0:
+            return (uint64_t)PAGE_PAE_DIR_0GB_ADDRESS;
+        case 1:
+            return (uint64_t)PAGE_PAE_DIR_1GB_ADDRESS;
+        case 2:
+            return (uint64_t)PAGE_PAE_DIR_2GB_ADDRESS;
+        case 3:
+            return (uint64_t)PAGE_PAE_DIR_3GB_ADDRESS;
+        default:
+            panic("Invalid PAE page directory index specified.\n");
+    }
+}
+
+static uint64_t paging_get_pae_tables_address(uint32_t directoryIndex) {
+    switch (directoryIndex) {
+        case 0:
+            return (uint64_t)PAGE_PAE_TABLES_0GB_ADDRESS;
+        case 1:
+            return (uint64_t)PAGE_PAE_TABLES_1GB_ADDRESS;
+        case 2:
+            return (uint64_t)PAGE_PAE_TABLES_2GB_ADDRESS;
+        case 3:
+            return (uint64_t)PAGE_PAE_TABLES_3GB_ADDRESS;
+        default:
+            panic("Invalid PAE page directory index specified.\n");
+    }
+}
+
+static void paging_map_std(page_t virtual, page_t physical) {
+    // Get pointer to page directory.
+    uint32_t *directory = (uint32_t*)( PAGE_DIR_ADDRESS );
+
     // Calculate table and entry of virtual address.
     uint32_t tableIndex = paging_calculate_table(virtual);
     uint32_t entryIndex = paging_calculate_entry(virtual);
@@ -64,10 +97,10 @@ static void paging_map(uint32_t *directory, page_t virtual, page_t physical) {
         directory[tableIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
     }
-    uint32_t *table = (uint32_t*)(PAGE_TABLE_ADDRESS_START + (tableIndex * PAGE_SIZE_4K));
+    uint32_t *table = (uint32_t*)(PAGE_TABLES_ADDRESS + (tableIndex * PAGE_SIZE_4K));
 
     // Add address to table.
-    table[entryIndex] = physical | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    table[entryIndex] = physical == 0 ? 0 : (physical | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
 }
 
 static void paging_map_pae(page_t virtual, page_t physical) {
@@ -82,17 +115,17 @@ static void paging_map_pae(page_t virtual, page_t physical) {
     // Get address of directory from PDPT.
     // If there isn't one, create one.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no directory defined.
-    uint64_t* directory = (uint64_t*)PAGE_PAE_DIR_ADDRESS(dirIndex);
+    uint64_t* directory = (uint64_t*)paging_get_pae_directory_address(dirIndex);
     if (MASK_DIRECTORY_PAE(directoryPointerTable[dirIndex]) == 0) {
         // Pop page for new directory.
         uint64_t directoryFrameAddr = pmm_pop_frame();
         directoryPointerTable[dirIndex] = directoryFrameAddr | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
 
-        // Get pointer to 3GB directory, and map in the new directory.
-        uint64_t *kernelDirectory = (uint64_t*)PAGE_PAE_DIR_ADDRESS(3);
-        kernelDirectory[PAGE_PAE_DIRECTORY_SIZE - 4 + dirIndex] = directoryFrameAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-        paging_flush_tlb_address(PAGE_PAE_DIR_ADDRESS(dirIndex));
+        // Get pointer to 2GB directory, and map in the new directory.
+        uint64_t *kernelDirectory = (uint64_t*)PAGE_PAE_DIR_2GB_ADDRESS;
+        kernelDirectory[PAGE_PAE_DIRECTORY_SIZE - 3 + dirIndex] = directoryFrameAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        paging_flush_tlb_address(paging_get_pae_directory_address(dirIndex));
 
         // Zero out new directory.
         memset(directory, 0, PAGE_SIZE_4K);
@@ -101,7 +134,7 @@ static void paging_map_pae(page_t virtual, page_t physical) {
     // Get address of table from directory.
     // If there isn't one, create one.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.
-    uint64_t *table = (uint64_t*)(PAGE_PAE_TABLES_ADDRESS(dirIndex) + (tableIndex * PAGE_SIZE_4K)); 
+    uint64_t *table = (uint64_t*)(paging_get_pae_tables_address(dirIndex) + (tableIndex * PAGE_SIZE_4K)); 
     if (MASK_PAGE_PAE_4K(directory[tableIndex]) == 0) {
         // Pop page frame for new table.
         directory[tableIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
@@ -112,39 +145,29 @@ static void paging_map_pae(page_t virtual, page_t physical) {
     }
     
     // Add address to table.
-    table[entryIndex] = physical | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    table[entryIndex] = physical == 0 ? 0 : (physical | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
 }
 
-void paging_map_virtual_to_phys(void *directory, page_t virtual, page_t physical) {
+void paging_map_virtual_to_phys(page_t virtual, page_t physical) {
     // Are we in PAE mode?
     if (memInfo.paeEnabled)
         paging_map_pae(virtual, physical);
     else
-        paging_map((uint32_t*)directory, virtual, physical);
+        paging_map_std(virtual, physical);
 
     // Flush TLB
     paging_flush_tlb_address(virtual);
 }
 
-void paging_map_kernel_virtual_to_phys(page_t virt, page_t phys) {
-    paging_map_virtual_to_phys((uint32_t*)0xFFFFF000, virt, phys);
-}
+void paging_unmap_virtual(page_t virtual) {
+    // Are we in PAE mode?
+    if (memInfo.paeEnabled)
+        paging_map_pae(virtual, 0);
+    else
+        paging_map_std(virtual, 0);
 
-void paging_unmap_virtual(uintptr_t *directory, page_t virt) {
-    // Calculate table and entry of virtual address.
-    uint32_t tableIndex = paging_calculate_table(virt);
-    uint32_t entryIndex = paging_calculate_entry(virt);
-
-    // Get pointer to table.
-    page_t *table = (page_t*)(PAGE_TABLE_ADDRESS_START + (tableIndex * PAGE_SIZE_4K));
-
-    // Clear address from table.
-    table[entryIndex] = 0;
-    paging_flush_tlb_address(virt);
-}
-
-void paging_unmap_kernel_virtual(page_t virt) {
-    paging_unmap_virtual((uint32_t*)memInfo.kernelPageDirectory, virt);
+    // Flush TLB
+    paging_flush_tlb_address(virtual);
 }
 
 void paging_map_region(page_t *directory, page_t startAddress, page_t endAddress, bool kernel, bool writeable) {
@@ -169,7 +192,7 @@ static void paging_late() {
     kprintf("Initializing standard 32-bit paging!\n");
 
     // Get pointer to the early-paging page table for 0x0.
-    uint32_t *earlyPageTableLow = (uint32_t*)(PAGE_TABLE_ADDRESS_START);
+    uint32_t *earlyPageTableLow = (uint32_t*)(PAGE_TABLES_ADDRESS);
 
     // Pop a new page frame for the page directory, and map it to 0x0 in the current virtual space.
     memInfo.kernelPageDirectory = pmm_pop_frame();
@@ -276,9 +299,21 @@ static void paging_pae_late() {
         pageKernelTable[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
-    // Recursively map PDPT and kernel page directory.
+    // Recursively map kernel page directory.
     pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 1] = (uint64_t)pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 3GB directory.
-    pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 5] = (uint64_t)memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // PDPT.
+
+    // Create 2GB page directory.
+    pageDirectoryAddr = pmm_pop_frame();
+    earlyPageTableLow[1] = (uint64_t)pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    pageDirectoryPointerTable[2] = pageDirectoryAddr | PAGING_PAGE_PRESENT;
+    paging_flush_tlb();
+
+    // Zero out new directory.
+    memset(pageDirectory, 0, PAGE_SIZE_4K);
+
+    // Map the 2GB page directory and the PDPT recursively.
+    pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 1] = (uint64_t)pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 2GB directory.
+    pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 4] = (uint64_t)memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // PDPT.
 }
 
 void paging_init() {
@@ -301,7 +336,7 @@ void paging_init() {
     kprintf("Popped page 0x%X for test...\n", page);
     
     // Map physical page to 0x1000 for testing.
-    paging_map_kernel_virtual_to_phys(0x1000, page);
+    paging_map_virtual_to_phys(0x1000, page);
 
     // Test memory at location.
     kprintf("Testing memory at virtual address 0x1000...\n");
@@ -321,7 +356,7 @@ void paging_init() {
 
     // Unmap virtual address and return page to stack.
     kprintf("Unmapping 0x1000 and pushing page 0x%X back to stack...\n", page);
-    paging_unmap_kernel_virtual(0x1000);
+    paging_unmap_virtual(0x1000);
     pmm_push_frame(page);
 
     kprintf("Paging initialized!\n");

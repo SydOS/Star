@@ -158,7 +158,7 @@ static void kheap_create_footer(kheap_node_t *header) {
 
 static bool kheap_expand() {
     // Pop another page and increase size of heap.
-    paging_map_kernel_virtual_to_phys(KHEAP_START + currentKernelHeapSize, pmm_pop_frame());
+    paging_map_virtual_to_phys(KHEAP_START + currentKernelHeapSize, pmm_pop_frame());
     
     // Increase wilderness size.
     kheap_node_t *wildNode = kheap_get_wilderness();
@@ -278,7 +278,7 @@ void kheap_init() {
     // Start with 4MB heap. TODO: better VMM allocation code, the heap shouldn't need to invoke the PMM.
     currentKernelHeapSize = KHEAP_INITIAL_SIZE;
     for (page_t i = KHEAP_START; i <= KHEAP_START + currentKernelHeapSize; i+=PAGE_SIZE_4K)
-        paging_map_kernel_virtual_to_phys(i, pmm_pop_frame());
+        paging_map_virtual_to_phys(i, pmm_pop_frame());
 
     // Test heap area.
     kprintf("Testing %uKB of heap memory...\n", currentKernelHeapSize / 1024);
