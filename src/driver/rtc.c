@@ -28,11 +28,9 @@ struct RTCTime* rtc_get_time() {
 	time->month = rtc_read(0x08);
 	time->year = rtc_read(0x09);
 
-	struct RTC_Status_Register_B* settings = rtc_get_settings();
-	if(settings->binary_input == 0) {
+	if(rtc_settings->binary_input == 0) {
 		rtc_bcd_to_int(time);
 	}
-	kheap_free(settings);
 
 	return time;
 }
@@ -43,4 +41,8 @@ struct RTC_Status_Register_B* rtc_get_settings() {
 	settings->twentyfour_hour_time = (data & ( 1 << 1 )) >> 1;
 	settings->binary_input = (data & ( 1 << 2 )) >> 2;
 	return settings;
+}
+
+void rtc_init() {
+	rtc_settings = rtc_get_settings();
 }

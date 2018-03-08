@@ -165,9 +165,8 @@ void kernel_late() {
 	serial_write('\a');
 	vga_putchar('\a');
 
-	struct RTC_Status_Register_B* settings = rtc_get_settings();
-	kprintf("24 hour time: %d, binary input: %d\n", settings->twentyfour_hour_time, settings->binary_input);
-	kheap_free(settings);
+	rtc_init();
+	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 
 	while(true) {
 		struct RTCTime* time = rtc_get_time();
