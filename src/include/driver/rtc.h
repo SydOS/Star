@@ -9,13 +9,14 @@ struct RTCTime {
 	uint8_t century;
 };
 
-struct Status_Register_A {
+struct RTC_Status_Register_A {
 	bool update_in_progess;
 };
 
-struct Status_Register_B {
+struct RTC_Status_Register_B {
 	bool twentyfour_hour_time;
 	bool binary_input;
 };
 
 extern struct RTCTime* rtc_get_time();
+extern struct RTC_Status_Register_B* rtc_get_settings();

@@ -19,3 +19,11 @@ struct RTCTime* rtc_get_time() {
 	time->year = rtc_read(0x09);
 	return time;
 }
+
+struct RTC_Status_Register_B* rtc_get_settings() {
+	struct RTC_Status_Register_B *settings = (struct RTC_Status_Register_B*)kheap_alloc(sizeof(struct RTC_Status_Register_B));
+	uint8_t data = rtc_read(0x0B);
+	settings->twentyfour_hour_time = (data & ( 1 << 1 )) >> 1;
+	settings->binary_input = (data & ( 1 << 2 )) >> 2;
+	return settings;
+}
