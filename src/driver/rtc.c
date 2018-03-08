@@ -9,6 +9,16 @@ uint8_t rtc_read(uint16_t reg) {
 	return inb(0x71);
 }
 
+struct RTCTime* rtc_bcd_to_int(struct RTCTime* time) {
+	time->seconds = (time->seconds & 0x0F) + ((time->seconds / 16) * 10);
+    time->minutes = (time->minutes & 0x0F) + ((time->minutes / 16) * 10);
+    time->hours = ( (time->hours & 0x0F) + (((time->hours & 0x70) / 16) * 10) ) | (time->hours & 0x80);
+    time->day = (time->day & 0x0F) + ((time->day / 16) * 10);
+    time->month = (time->month & 0x0F) + ((time->month / 16) * 10);
+    time->year = (time->year & 0x0F) + ((time->year / 16) * 10);
+    return time;
+}
+
 struct RTCTime* rtc_get_time() {
 	struct RTCTime *time = (struct RTCTime*)kheap_alloc(sizeof(struct RTCTime));
 	time->seconds = rtc_read(0x00);
@@ -17,6 +27,13 @@ struct RTCTime* rtc_get_time() {
 	time->day = rtc_read(0x07);
 	time->month = rtc_read(0x08);
 	time->year = rtc_read(0x09);
+
+	struct RTC_Status_Register_B* settings = rtc_get_settings();
+	if(settings->binary_input == 0) {
+		rtc_bcd_to_int(time);
+	}
+	kheap_free(settings);
+
 	return time;
 }
 
