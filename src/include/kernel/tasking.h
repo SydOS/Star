@@ -32,6 +32,7 @@ typedef struct _process {
 
 
 extern void __addProcess(PROCESS* p);
+extern int tasking_add_process(PROCESS* p);
 extern void tasking_tick(registers_t *regs);
 extern void tasking_init();
 

@@ -22,4 +22,5 @@ extern void rtc_init();
 extern struct RTCTime* rtc_get_time();
 extern struct RTC_Status_Register_B* rtc_get_settings();
 
+struct RTCTime* rtc_time;
 struct RTC_Status_Register_B* rtc_settings;
