@@ -19,6 +19,7 @@
 #include <driver/serial.h>
 #include "driver/speaker.h"
 #include "driver/ps2/ps2.h"
+#include "driver/rtc.h"
 
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
@@ -163,6 +164,13 @@ void kernel_late() {
     // Ring serial and VGA terminals.
 	serial_write('\a');
 	vga_putchar('\a');
+
+	rtc_init();
+	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
+
+	struct RTCTime* time = rtc_get_time();
+	kprintf("%d:%d:%d %d/%d/%d\n", time->hours, time->minutes, time->seconds, time->month, time->day, time->year);
+	kheap_free(time);
 
 	// If serial isn't present, just loop.
 	if (!serial_present()) {
