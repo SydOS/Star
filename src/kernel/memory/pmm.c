@@ -11,9 +11,11 @@ extern uint32_t KERNEL_VIRTUAL_START;
 extern uint32_t KERNEL_VIRTUAL_END;
 extern uint32_t PAGE_FRAME_STACK_START;
 extern uint32_t PAGE_FRAME_STACK_END;
+extern uint32_t EARLY_PAGES_LAST;
 
 // Used to store info about memory in the system.
 mem_info_t memInfo;
+uint32_t earlyPagesLast;
 
 // Page frame stack, stores addresses to 4K pages in physical memory.
 static page_t *pageFrameStack;
@@ -42,12 +44,38 @@ page_t pmm_pop_frame() {
 void pmm_push_frame(page_t frame) {
     // Increment stack pointer and check its within bounds.
     pageFrameStack++;
-    if (((uint32_t)pageFrameStack) < memInfo.pageFrameStackStart || ((uint32_t)pageFrameStack) >= memInfo.pageFrameStackEnd)
+    if (((page_t)pageFrameStack) < memInfo.pageFrameStackStart || ((page_t)pageFrameStack) >= memInfo.pageFrameStackEnd)
         panic("Page frame stack pointer out of bounds!\n");
 
     // Push frame to stack.
     *pageFrameStack = frame;
     pageFramesAvailable++;
+}
+
+void pmm_print_memmap() {
+	kprintf("Physical memory map:\n");
+	uint64_t memory = 0;
+
+	uint32_t base = memInfo.mbootInfo->mmap_addr;
+	uint32_t end = base + memInfo.mbootInfo->mmap_length;
+	multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
+
+	for(; base < end; base += entry->size + sizeof(uint32_t)) {
+		entry = (multiboot_memory_map_t*)base;
+
+		// Print out info.
+		kprintf("region start: 0x%llX length: 0x%llX type: 0x%X\n", entry->addr, entry->len, (uint64_t)entry->type);
+		if(entry->type == 1 && ((uint32_t)entry->addr) > 0)
+			memory += entry->len;
+	}
+
+	// Print summary.
+	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
+	kprintf("Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
+    kprintf("Page frame stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageFrameStackStart, memInfo.pageFrameStackEnd);
+
+	memInfo.memoryKb = memory / 1024;
+	kprintf("Detected usable RAM: %uKB\n", memInfo.memoryKb);
 }
 
 // Builds the page frame stack.
@@ -118,32 +146,11 @@ void pmm_init(multiboot_info_t *mbootInfo) {
     // Store page frame stack location. This is determined during early boot in kernel_main_early().
     memInfo.pageFrameStackStart = PAGE_FRAME_STACK_START;
     memInfo.pageFrameStackEnd = PAGE_FRAME_STACK_END;
+	earlyPagesLast = EARLY_PAGES_LAST;
 
-	kprintf("Physical memory map:\n");
-	uint64_t memory = 0;
-
-	uint32_t base = mbootInfo->mmap_addr;
-	uint32_t end = base + mbootInfo->mmap_length;
-	multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
-
-	for(; base < end; base += entry->size + sizeof(uint32_t)) {
-		entry = (multiboot_memory_map_t*)base;
-
-		// Print out info.
-		kprintf("region start: 0x%llX length: 0x%llX type: 0x%X\n", entry->addr, entry->len, (uint64_t)entry->type);
-		if(entry->type == 1 && ((uint32_t)entry->addr) > 0)
-			memory += entry->len;
-	}
-
-	// Print summary.
-	kprintf("Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
-	kprintf("Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
-    kprintf("Page frame stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageFrameStackStart, memInfo.pageFrameStackEnd);
+	pmm_print_memmap();
 
     // Build stack.
     pmm_build_stack();
-    
-    memInfo.memoryKb = memory / 1024;
-	kprintf("Detected usable RAM: %uKB\n", memInfo.memoryKb);
     kprintf("Physical memory manager initialized!\n");
 }

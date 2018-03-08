@@ -22,6 +22,13 @@ void io_wait() {
 }
 
 // Read MSR.
-void cpu_msr_read(uint32_t msr, uint32_t *low, uint32_t *high) {
-    asm volatile ("rdmsr" : "=a"(*low), "=d"(high) : "c"(msr));
+uint64_t cpu_msr_read(uint32_t msr) {
+    uint32_t low, high;
+    asm volatile ("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
+    return ((uint64_t)(high << 32)) | low;
+}
+
+// Write MSR.
+void cpu_msr_write(uint32_t msr, uint64_t value) {
+    asm volatile ("wrmsr" : : "a"((uint32_t)(value & 0xFFFFFFFF)), "d"((uint32_t)(value >> 32)), "c"(msr));
 }

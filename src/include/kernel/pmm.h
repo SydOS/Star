@@ -6,8 +6,8 @@
 
 #define ALIGN_4K(size)          	(((uint32_t)(size) + 0x1000) & 0xFFFFF000)
 
-// Type for pages.
-typedef uint64_t page_t;
+// Type for page frames.
+typedef uintptr_t page_t;
 
 struct mem_info {
 	// Multiboot header.
@@ -24,9 +24,9 @@ struct mem_info {
 	uint32_t memoryKb;
 
 	// Paging tables.
-	uint32_t kernelPageDirectory;
-	uint32_t kernelPageTemp; // Used for directly accessing a 4KB block of RAM.
+	page_t kernelPageDirectory;
 	bool paeEnabled;
+	bool nxEnabled;
 
 	// Page frame stack.
     uint32_t pageFrameStackStart;

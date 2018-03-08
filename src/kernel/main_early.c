@@ -9,13 +9,144 @@ extern uint32_t KERNEL_VIRTUAL_END;
 extern uint32_t KERNEL_PHYSICAL_END;
 extern uint32_t KERNEL_INIT_END;
 
-uint32_t KERNEL_PAGE_DIRECTORY __attribute__((section(".inittables")));
-uint32_t KERNEL_PAGE_TEMP __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_START __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_END __attribute__((section(".inittables")));
+uint32_t EARLY_PAGES_LAST __attribute__((section(".inittables")));
 bool PAE_ENABLED __attribute__((section(".inittables"))) = false;
 
 extern uint32_t _cpuid_detect_early();
+
+__attribute__((section(".init"))) static void memset(void *str, int32_t c, size_t n) {
+	uint8_t *s = (uint8_t*)str;
+
+	// Copy byte.
+	for (size_t i = 0; i < n; i++)
+		s[i] = (uint8_t)c;
+}
+
+__attribute__((section(".init"))) static void setup_paging() {
+    // Get kernel virtual offset.
+    uint32_t virtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
+
+    // Create page directory.
+    uint32_t *pageDirectory = (uint32_t*)ALIGN_4K(PAGE_FRAME_STACK_END - virtualOffset);
+    memset(pageDirectory, 0, PAGE_SIZE_4K);
+
+    // Create page table for mapping low memory + ".init" section of kernel. This is an identity mapping.
+    uint32_t *pageTableLow = (uint32_t*)ALIGN_4K((uint32_t)pageDirectory);
+    memset(pageTableLow, 0, PAGE_SIZE_4K);
+
+    // Identity map low memory + ".init" section of kernel.
+    for (uint32_t page = 0; page <= (uint32_t)&KERNEL_INIT_END; page += PAGE_SIZE_4K)
+        pageTableLow[page / PAGE_SIZE_4K] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    pageDirectory[0] = (uint32_t)pageTableLow | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+
+    // Create first kernel table and add it to directory.
+    uint32_t *pageTableKernel = (uint32_t*)ALIGN_4K((uint32_t)pageTableLow);
+    memset(pageTableKernel, 0, PAGE_SIZE_4K);
+    pageDirectory[virtualOffset / PAGE_SIZE_4M] = ((uint32_t)pageTableKernel) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+
+    // Map low memory and kernel to higher-half virtual space.
+    uint32_t offset = 0;
+    for (page_t page = 0; page <= PAGE_FRAME_STACK_END - virtualOffset; page += PAGE_SIZE_4K) {
+        // Have we reached the need to create another table?
+        if (page > 0 && page % PAGE_SIZE_4M == 0) {
+            // Create a new table after the previous one.        
+            uint32_t prevAddr = (uint32_t)pageTableKernel;
+            pageTableKernel = (uint32_t*)ALIGN_4K(prevAddr);
+            memset(pageTableKernel, 0, PAGE_SIZE_4K);
+
+            // Increase offset and add new table to directory.
+            offset++;
+            pageDirectory[(virtualOffset / PAGE_SIZE_4M) + offset] = ((uint32_t)pageTableKernel) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        }
+
+        // Add page to table.
+        pageTableKernel[(page / PAGE_SIZE_4K) - (offset * PAGE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    }
+
+    // Set end of temporary reserved pages.
+    EARLY_PAGES_LAST = (uint32_t)pageTableKernel;
+
+    // Set last entry to point to the directory, this is used later.
+    // The page tables within the directory can then be accessed starting at 0xFFC00000.
+    pageDirectory[PAGE_DIRECTORY_SIZE - 1] = (uint32_t)pageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+
+    // Enable 32-bit paging.
+    asm volatile ("mov %%eax, %%cr3" : : "a"((uint32_t)pageDirectory));	
+    asm volatile ("mov %cr0, %eax");
+    asm volatile ("orl $0x80000000, %eax");
+    asm volatile ("mov %eax, %cr0");
+}
+
+__attribute__((section(".init"))) static void setup_pae_paging() {
+    // Get kernel virtual offset.
+    uint32_t virtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
+
+    // Create page directory pointer table (PDPT).
+    uint64_t *pageDirectoryPointerTable = (uint64_t*)ALIGN_4K(PAGE_FRAME_STACK_END - virtualOffset);
+    memset(pageDirectoryPointerTable, 0, PAGE_SIZE_4K);
+
+    // Create page directory for the 0GB space.
+    uint64_t *pageDirectoryLow = (uint64_t*)ALIGN_4K((uint32_t)pageDirectoryPointerTable);
+    memset(pageDirectoryLow, 0, PAGE_SIZE_4K);
+    pageDirectoryPointerTable[0] = (uint32_t)pageDirectoryLow | PAGING_PAGE_PRESENT;
+
+    // Create page table for mapping low memory + ".init" section of kernel. This is an identity mapping.
+    uint64_t *pageTableLow = (uint64_t*)ALIGN_4K((uint32_t)pageDirectoryLow);
+    memset(pageTableLow, 0, PAGE_SIZE_4K);
+
+    // Identity map low memory + ".init" section of kernel.
+    for (uint32_t page = 0; page <= (uint32_t)&KERNEL_INIT_END; page += PAGE_SIZE_4K)
+        pageTableLow[page / PAGE_SIZE_4K] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    pageDirectoryLow[0] = (uint64_t)pageTableLow | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+
+    // Create our kernel page directory (0xC0000000 to 0xFFFFFFFF).
+    uint64_t *pageDirectoryKernel = (uint64_t*)ALIGN_4K((uint32_t)pageTableLow);
+    memset(pageDirectoryKernel, 0, PAGE_SIZE_4K);
+    pageDirectoryPointerTable[3] = (uint64_t)pageDirectoryKernel | PAGING_PAGE_PRESENT;
+
+    // Create first table and add it to directory.
+    uint64_t *pageTableKernel = (uint64_t*)ALIGN_4K((uint32_t)pageDirectoryKernel);
+    memset(pageTableKernel, 0, PAGE_SIZE_4K);
+    pageDirectoryKernel[0] = (uint64_t)pageTableKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+
+    // Map low memory and kernel to higher-half virtual space.
+    uint32_t offset = 0;
+    for (uint64_t page = 0; page <= PAGE_FRAME_STACK_END - virtualOffset; page += PAGE_SIZE_4K) {
+        // Have we reached the need to create another table?
+        if (page > 0 && page % PAGE_SIZE_2M == 0) {
+            // Create a new table after the previous one.        
+            uint32_t prevAddr = (uint32_t)pageTableKernel;
+            pageTableKernel = (uint64_t*)ALIGN_4K(prevAddr);
+            memset(pageTableKernel, 0, PAGE_SIZE_4K);
+
+            // Increase offset and add new table to directory.
+            offset++;
+            pageDirectoryKernel[offset] = (uint64_t)pageTableKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        }
+        pageTableKernel[(page / PAGE_SIZE_4K) - (offset * PAGE_PAE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    }
+
+    // Recursively map PDPT and both page directories.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 1] = (uint64_t)pageDirectoryKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 3GB directory.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 4] = (uint64_t)pageDirectoryLow | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 0GB directory.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 5] = (uint64_t)pageDirectoryPointerTable | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // PDPT.
+
+    // Set end of temporary reserved pages.
+    EARLY_PAGES_LAST = (uint32_t)pageTableKernel;
+
+    // Enable PAE.
+    asm volatile ("mov %cr4, %eax");
+    asm volatile ("bts $5, %eax");
+    asm volatile ("mov %eax, %cr4");
+
+    // Enable PAE paging.
+    asm volatile ("mov %%eax, %%cr3" : : "a"((uint32_t)pageDirectoryPointerTable));	
+    asm volatile ("mov %cr0, %eax");
+    asm volatile ("orl $0x80000000, %eax");
+    asm volatile ("mov %eax, %cr0");
+}
 
 // Performs pre-boot tasks. This function must not call code in other files.
 __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, multiboot_info_t* mbootInfo) {
@@ -38,9 +169,9 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     }
 
     // Force PAE off for now.
-    PAE_ENABLED = false;
+    //PAE_ENABLED = false;
 
-    // Count up memory.
+    // Count up memory in bytes.
     uint64_t memory = 0;
     uintptr_t base = mbootInfo->mmap_addr;
 	uintptr_t end = base + mbootInfo->mmap_length;
@@ -50,134 +181,13 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
 			memory += entry->len;
 	}
 
-    // Determine location of kernel page directory for later use.
-    // The pre-boot PDPT is also placed here if using PAE.
-    KERNEL_PAGE_DIRECTORY = ALIGN_4K((uintptr_t)&KERNEL_VIRTUAL_END);
-
-    // Allocate temp location. This is used for for temp purposes later on.
-    // The pre-boot page directory is placed here if using non-PAE mode.
-    KERNEL_PAGE_TEMP = ALIGN_4K(KERNEL_PAGE_DIRECTORY);
-
     // Determine stack offset and size.
-    PAGE_FRAME_STACK_START = ALIGN_4K(KERNEL_PAGE_TEMP);
-    PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + (memory / 1024) * 2; // Space for 64-bit addresses.
+    PAGE_FRAME_STACK_START = ALIGN_4K((uint32_t)&KERNEL_VIRTUAL_END);
+    PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + ((memory / PAGE_SIZE_4K) * sizeof(uint32_t)); // Space for 32-bit addresses.
 
-    // Can we use PAE?
-    if (PAE_ENABLED) {
-        // Get pointer to page directory pointer table page and clear it out. The pre-boot PDPT is located after the normal one.
-        uint64_t *pageDirectoryPointerTable = ((uint64_t*)(KERNEL_PAGE_DIRECTORY - (uint32_t)&KERNEL_VIRTUAL_OFFSET)) + 4;
-        for (uint32_t i = 0; i < PAGE_PAE_PDPT_SIZE; i++)
-            pageDirectoryPointerTable[i] = 0;
-
-        // Create our low page directory (0x0 to 0x3FFFFFFF).
-        uint64_t *pageLowDirectory = (uint64_t*)ALIGN_4K(PAGE_FRAME_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET);
-        for (uint32_t i = 0; i < PAGE_PAE_DIRECTORY_SIZE; i++)
-            pageLowDirectory[i] = 0;
-        pageDirectoryPointerTable[0] = (uint32_t)pageLowDirectory | PAGING_PAGE_PRESENT;
-
-        // Create page table for low memory and init section of kernel.
-        uint64_t *pageLowTable = (uint64_t*)ALIGN_4K((uint32_t)pageLowDirectory);
-        for (uint32_t i = 0; i < PAGE_PAE_TABLE_SIZE; i++)
-            pageLowTable[i] = 0;
-
-        // Identity map low memory and init section of kernel.
-        for (page_t page = 0; page <= ((uint32_t)&KERNEL_INIT_END); page += PAGE_SIZE_4K)
-            pageLowTable[page / PAGE_SIZE_4K] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-        pageLowDirectory[0] = (uint32_t)pageLowTable | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-
-        // Create our kernel page directory (0xC0000000 to 0xFFFFFFFF).
-        uint64_t *pageKernelDirectory = (uint64_t*)ALIGN_4K((uint32_t)pageLowTable);
-        uint32_t dirIndex = (uint32_t)&KERNEL_VIRTUAL_OFFSET / PAGE_SIZE_1G;
-        for (uint32_t i = 0; i < PAGE_PAE_DIRECTORY_SIZE; i++)
-            pageKernelDirectory[i] = 0;
-        pageDirectoryPointerTable[dirIndex] = (uint32_t)pageKernelDirectory | PAGING_PAGE_PRESENT;
-
-        // Create first table and add it to directory.
-        uint64_t *pageKernelTable = (uint64_t*)ALIGN_4K((uint32_t)pageKernelDirectory);
-        for (uint32_t i = 0; i < PAGE_PAE_TABLE_SIZE; i++)
-            pageKernelTable[i] = 0;
-        pageKernelDirectory[((uint32_t)&KERNEL_VIRTUAL_OFFSET - (dirIndex * PAGE_SIZE_1G)) / PAGE_SIZE_2M] =
-            (uint32_t)pageKernelTable | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-    
-        // Map low memory and kernel to higher-half virtual space.
-        uint32_t offset = 0;
-        for (page_t page = 0; page <= (PAGE_FRAME_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET); page += PAGE_SIZE_4K) {
-            // Have we reached the need to create another table?
-            if (page > 0 && page % PAGE_SIZE_2M == 0) {
-                // Create a new table after the previous one.        
-                uint32_t prevAddr = (uint32_t)pageKernelTable;
-                pageKernelTable = (uint64_t*)ALIGN_4K(prevAddr);
-                for (uint32_t i = 0; i < PAGE_PAE_TABLE_SIZE; i++)
-                    pageKernelTable[i] = 0;
-
-                // Increase offset and add new table to directory.
-                offset++;
-                pageKernelDirectory[(((uint32_t)&KERNEL_VIRTUAL_OFFSET - (dirIndex * PAGE_SIZE_1G)) / PAGE_SIZE_2M) + offset] =
-                    (uint32_t)pageKernelTable | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-            }
-            pageKernelTable[(page / PAGE_SIZE_4K) - (offset * 1024)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-        }
-
-        // Create temporary directory, and map it for later use.
-        pageKernelDirectory[PAGE_PAE_DIRECTORY_SIZE - 1] = (KERNEL_PAGE_TEMP - (uint32_t)&KERNEL_VIRTUAL_OFFSET) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-
-        // Enable PAE.
-        asm volatile ("mov %cr4, %eax");
-        asm volatile ("bts $5, %eax");
-        asm volatile ("mov %eax, %cr4");
-
-        // Enable paging.
-	    asm volatile ("mov %%eax, %%cr3": :"a"((uint32_t)pageDirectoryPointerTable));	
-	    asm volatile ("mov %cr0, %eax");
-	    asm volatile ("orl $0x80000000, %eax");
-	    asm volatile ("mov %eax, %cr0");
-    }
-    else { // Non-PAE paging mode.
-        // Get pointer to page directory and clear it out.
-        uint32_t *pageDirectory = (uint32_t*)(KERNEL_PAGE_TEMP - (uint32_t)&KERNEL_VIRTUAL_OFFSET);
-        for (uint32_t i = 0; i < PAGE_DIRECTORY_SIZE; i++)
-            pageDirectory[i] = 0;
-
-        // Create page table for low memory and init section of kernel.
-        uint32_t *pageLowTable = (uint32_t*)ALIGN_4K(PAGE_FRAME_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET);
-        for (uint32_t i = 0; i < PAGE_TABLE_SIZE; i++)
-            pageLowTable[i] = 0;
-
-        // Identity map low memory and init section of kernel.
-        for (page_t page = 0; page <= ((uint32_t)&KERNEL_INIT_END); page += PAGE_SIZE_4K)
-            pageLowTable[page / PAGE_SIZE_4K] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-        pageDirectory[0] = (uint32_t)pageLowTable | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-
-        // Create first kernel table and add it to directory.
-        uint32_t *pageKernelTable = (uint32_t*)ALIGN_4K((uintptr_t)pageLowTable);
-        pageDirectory[(uint32_t)&KERNEL_VIRTUAL_OFFSET / PAGE_SIZE_4M] =
-            ((uint32_t)pageKernelTable) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-
-        // Map low memory and kernel to higher-half virtual space.
-        uint32_t offset = 0;
-        for (page_t page = 0; page <= (PAGE_FRAME_STACK_END - (uint32_t)&KERNEL_VIRTUAL_OFFSET); page += PAGE_SIZE_4K) {
-            // Have we reached the need to create another table?
-            if (page > 0 && page % PAGE_SIZE_4M == 0) {
-                // Create a new table after the previous one.        
-                uint32_t prevAddr = (uint32_t)pageKernelTable;
-                pageKernelTable = (uint32_t*)ALIGN_4K(prevAddr);
-
-                // Increase offset and add new table to directory.
-                offset++;
-                pageDirectory[(((uint32_t)&KERNEL_VIRTUAL_OFFSET) / PAGE_SIZE_4M) + offset] =
-                    ((uint32_t)pageKernelTable) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-            }
-            pageKernelTable[(page / PAGE_SIZE_4K) - (offset * PAGE_TABLE_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-        }
-
-        // Set last entry to point to the new directory, this is used later.
-        pageDirectory[PAGE_DIRECTORY_SIZE - 1] =
-            (KERNEL_PAGE_DIRECTORY - (uint32_t)&KERNEL_VIRTUAL_OFFSET) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-
-        // Enable paging.
-        asm volatile ("mov %%eax, %%cr3": :"a"((uint32_t)pageDirectory));	
-        asm volatile ("mov %cr0, %eax");
-        asm volatile ("orl $0x80000000, %eax");
-        asm volatile ("mov %eax, %cr0");
-    }
+    // Is PAE enabled?
+    if (PAE_ENABLED)
+        setup_pae_paging(); // Set up PAE paging.
+    else
+        setup_paging(); // Set up non-PAE paging.
 }
