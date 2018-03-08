@@ -134,28 +134,32 @@ void interrupts_irq_remove_handler(uint8_t irq) {
 
 // Handler for ISRs.
 void interrupts_isr_handler(registers_t *regs) {
+    uint32_t intNum, errorCode;
     // Blank handler pointer.
     isr_handler handler;
 
+    intNum = regs->intNum;
+    errorCode = regs->errorCode;
+
     // Invoke any handler registered.
-    handler = isrHandlers[regs->intNum];
+    handler = isrHandlers[intNum];
     if (handler) {
         handler(regs);
     }
     else {
         // If we have an exception, print default message.
-        if (regs->intNum < IRQ_OFFSET)
+        if (intNum < IRQ_OFFSET)
         {
             uint32_t addr;
 	asm volatile ("mov %%cr2, %0" : "=r"(addr));
-            panic("Exception: %s\n", exception_messages[regs->intNum]);
+            panic("Exception: %s\n", exception_messages[intNum]);
 
         }   
     }
 
     // Send EOI to PIC if IRQ.
-    if (regs->intNum >= IRQ_OFFSET)
-        pic_eoi(regs->intNum);
+    if (intNum >= IRQ_OFFSET)
+        pic_eoi(intNum);
 }
 
 // Initializes interrupts.

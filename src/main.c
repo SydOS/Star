@@ -12,6 +12,7 @@
 #include <kernel/pmm.h>
 #include <kernel/paging.h>
 #include <kernel/kheap.h>
+#include <kernel/tasking.h>
 #include <arch/i386/kernel/cpuid.h>
 #include "driver/vga.h"
 #include "driver/floppy.h"
@@ -103,10 +104,33 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Sleeping for 2 seconds...\n");
 	sleep(2000);
 
+	// Start up tasking and create kernel task.
+	kprintf("Starting tasking...\n");
+	tasking_init();
+
+	// We should never get here.
+	panic("Tasking failed to start!\n");
+}
+
+void hmmm_thread() {
+	while (1) { 
+		kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
+		sleep(2000);
+	 }
+}
+
+void kernel_late() {
+	kprintf("Adding second task...\n");
+	__addProcess(tasking_create_process("hmmm", (uint32_t)hmmm_thread));
+	kprintf("Starting tasking...\n");
+
+	// Initialize PS/2.
+	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
-
-	// Floppy test.
+	
+	// Initialize floppy.
+	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
 	floppy_detect();
 	kprintf("Initialize floppy drives...\n");
 	floppy_init();

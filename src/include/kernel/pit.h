@@ -53,4 +53,7 @@ enum
 
 extern uint64_t pit_ticks();
 extern void pit_init();
+
+extern void pit_set_task(uint8_t i);
+extern void pit_enable_tasking();
 extern void pit_startcounter(uint32_t freq, uint8_t counter, uint8_t mode);

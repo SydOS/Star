@@ -386,7 +386,7 @@ _irq15:
 ; ISR common stub. This calls the handler defined in interrupts.c.
 extern interrupts_isr_handler
 isr_common_stub:
-    pusha
+    pushad
     push ds
     push es
     push fs
@@ -397,17 +397,18 @@ isr_common_stub:
     mov es, ax
     mov fs, ax
     mov gs, ax
-    mov eax, esp
 
-    push eax
-    mov eax, interrupts_isr_handler
-    call eax
+    mov eax, esp
+    push eax ; Push stack for use in handler.
+    call interrupts_isr_handler
     pop eax
 
+global _isr_exit
+_isr_exit:
     pop gs
     pop fs
     pop es
     pop ds
-    popa
+    popad
     add esp, 8
     iret
