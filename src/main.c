@@ -164,7 +164,10 @@ void kernel_late() {
 	serial_write('\a');
 	vga_putchar('\a');
 
-	rtc_get_time();
+	while(true) {
+		rtc_get_time();
+		sleep(1000);
+	}
 
 	// If serial isn't present, just loop.
 	if (!serial_present()) {

@@ -18,4 +18,4 @@ struct Status_Register_B {
 	bool binary_input;
 };
 
-extern struct RTCTime rtc_get_time();
+extern struct RTCTime* rtc_get_time();
