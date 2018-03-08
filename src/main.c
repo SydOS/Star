@@ -168,12 +168,9 @@ void kernel_late() {
 	rtc_init();
 	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 
-	while(true) {
-		struct RTCTime* time = rtc_get_time();
-		kprintf("%d:%d:%d %d/%d/%d\n", time->hours, time->minutes, time->seconds, time->month, time->day, time->year);
-		kheap_free(time);
-		sleep(1000);
-	}
+	struct RTCTime* time = rtc_get_time();
+	kprintf("%d:%d:%d %d/%d/%d\n", time->hours, time->minutes, time->seconds, time->month, time->day, time->year);
+	kheap_free(time);
 
 	// If serial isn't present, just loop.
 	if (!serial_present()) {
