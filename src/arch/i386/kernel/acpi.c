@@ -7,6 +7,7 @@
 // RSDP.
 static acpi_rsdp_t *rsdp;
 static acpi_rsdt_t *rsdt;
+static acpi_fadt_t *fadt;
 
 static acpi_rsdp_t *acpi_get_rsdp() {
     for (uint32_t i = 0xC00E0000; i < 0xC00FFFFF; i += 16) {
@@ -41,6 +42,7 @@ static acpi_rsdt_t *acpi_get_rsdt(uint32_t rsdtAddress) {
     // Map RSDT to virtual memory.
     paging_map_virtual_to_phys(ACPI_RSDT_ADDRESS, rsdtAddress);
     uint32_t add = ACPI_RSDT_ADDRESS + MASK_PAGEFLAGS_4K(rsdtAddress);
+
     // Get pointer to RSDT.
     acpi_rsdt_t* rsdt = (acpi_rsdt_t*)add;
 
@@ -50,6 +52,22 @@ static acpi_rsdt_t *acpi_get_rsdt(uint32_t rsdtAddress) {
 
     // Return the RSDT pointer.
     return rsdt;
+}
+
+static acpi_fadt_t *acpi_get_fadt(uint32_t fadtAddress) {
+    // Map RSDT to virtual memory.
+    paging_map_virtual_to_phys(ACPI_RSDT_ADDRESS, fadtAddress);
+    uint32_t add = ACPI_RSDT_ADDRESS + MASK_PAGEFLAGS_4K(fadtAddress);
+
+    // Get pointer to RSDT.
+    acpi_fadt_t* fadt = (acpi_rsdt_t*)add;
+
+    // Ensure FADT is valid.
+    if (fadt->header.signature != ACPI_FADT_SIGNATURE && acpi_checksum_sdt(fadt->header))
+        return NULL;
+
+    // Return the FADT pointer.
+    return fadt;
 }
 
 void acpi_init() {
@@ -73,5 +91,21 @@ void acpi_init() {
     if (rsdt == NULL)
         return;
 
-    kprintf("Got RSDT at 0x%X, size: %u bytes\n", rsdp->rsdtAddress, rsdt->header.length); 
+    kprintf("Got RSDT at 0x%X, size: %u bytes\n", rsdp->rsdtAddress, rsdt->header.length);
+
+    // Loop through entries.
+    for (uint32_t i = 0; i < (rsdt->header.length - sizeof(acpi_sdt_header_t)) / sizeof(uint32_t); i++)
+    {
+        
+        uint32_t addr = ACPI_RSDT_ADDRESS + MASK_PAGEFLAGS_4K(rsdt->entries[i]);
+        acpi_sdt_header_t* header = (acpi_sdt_header_t*)addr;
+        kprintf("Table: 0x%X\n", rsdt->entries[i]);
+
+        // Is it a FADT?
+        if (memcmp(header->signature, ACPI_FADT_SIGNATURE, 4) == 0)
+        {
+            fadt = acpi_get_fadt(rsdt->entries[i]);
+            kprintf("Got FADT at 0x%X, size: %u bytes\n", rsdt->entries[i], fadt->header.length);
+        }
+    }
 }
