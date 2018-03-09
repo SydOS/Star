@@ -3,7 +3,8 @@
 
 #include <main.h>
 
-#define ACPI_RSDT_ADDRESS   0xFF000000
+#define ACPI_FIRST_ADDRESS  0xFF000000
+#define ACPI_LAST_ADDRESS   0xFF00F000
 
 #define ACPI_RSDP_PATTERN1  0x20445352 // "RSD "
 #define ACPI_RSDP_PATTERN2  0x20525450 // "PTR "
@@ -158,28 +159,28 @@ typedef struct acpi_generic_address acpi_generic_address_t;
 
 // Root System Description Pointer.
 struct acpi_rsdp {
-    uint64_t signature;         // "RSD PTR " (Notice that this signature must contain a trailing blank character.)
-    uint8_t  checksum;          // This is the checksum of the fields defined in the ACPI 1.0 specification. This includes
+    char signature[8];          // "RSD PTR " (Notice that this signature must contain a trailing blank character.)
+    uint8_t checksum;           // This is the checksum of the fields defined in the ACPI 1.0 specification. This includes
                                 // only the first 20 bytes of this table, bytes 0 to 19, including the checksum field. These bytes must sum to zero.
-    char     oemId[6];          // An OEM-supplied string that identifies the OEM.
-    uint8_t  revision;          // The revision of this structure. Larger revision numbers are backward compatible to lower revision numbers.
+    char oemId[6];              // An OEM-supplied string that identifies the OEM.
+    uint8_t revision;           // The revision of this structure. Larger revision numbers are backward compatible to lower revision numbers.
     uint32_t rsdtAddress;       // 32 bit physical address of the RSDT.
 
     uint32_t length;            // The length of the table, in bytes, including the header, starting from offset 0.
                                 // This field is used to record the size of the entire table.
     uint64_t xsdtAddress;       // 64 bit physical address of the XSDT.
-    uint8_t  checksumExtended;  // This is a checksum of the entire table, including both checksum fields.
-    uint8_t  reserved[3];       // Reserved fields.
+    uint8_t checksumExtended;   // This is a checksum of the entire table, including both checksum fields.
+    uint8_t reserved[3];        // Reserved fields.
 } __attribute__((packed));
 typedef struct acpi_rsdp acpi_rsdp_t;
 
 // System Description Table header.
 struct acpi_sdt_header {
-    char     signature[4];      // Signature for the table.
+    char signature[4];          // Signature for the table.
     uint32_t length;            // Length, in bytes, of the entire table. The length implies the number of Entry fields (n) at the end of the table.
-    uint8_t  revision;          // 1.
-    uint8_t  checksum;          // Entire table must sum to zero.
-    char     oemId[6];          // OEM ID.
+    uint8_t revision;           // 1.
+    uint8_t checksum;           // Entire table must sum to zero.
+    char oemId[6];              // OEM ID.
     uint64_t oemTableId;        // For the table, the table ID is the manufacture model ID. This field must match the OEM Table ID in the FADT.
     uint32_t oemRevision;       // OEM revision of the table for supplied OEM Table ID.
     uint32_t creatorId;         // Vendor ID of utility that created the table. For tables containing Definition Blocks, this is the ID for the ASL Compiler.
@@ -273,6 +274,82 @@ struct acpi_fadt {
 } __attribute__((packed));
 typedef struct acpi_fadt acpi_fadt_t;
 
-extern void acpi_init();
+// Multiple APIC Flags.
+enum acpi_madt_flags {
+    // A one indicates that the system also has a PC-AT-compatible dual-8259 setup. The 8259 vectors must be
+    // disabled (that is, masked) when enabling the ACPI APIC operation.
+    ACPI_MADT_PCAT_COMPAT   = 0x01
+};
+
+// APIC Structure Types.
+enum acpi_madt_structure_types {
+    ACPI_MADT_STRUCT_LOCAL_APIC             = 0x0,
+    ACPI_MADT_STRUCT_IO_APIC                = 0x1,
+    ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE     = 0x2,
+    ACPI_MADT_STRUCT_NMI                    = 0x3,
+    ACPI_MADT_STRUCT_LAPIC_NMI              = 0x4,
+    ACPI_MADT_STRUCT_LAPIC_ADDR_OVERRIDE    = 0x5,
+    ACPI_MADT_STRUCT_IO_SAPIC               = 0x6,
+    ACPI_MADT_STRUCT_LOCAL_SAPIC            = 0x7,
+    ACPI_MADT_STRUCT_PLATFORM_INTERRUPT     = 0x8,
+    ACPI_MADT_STRUCT_LOCAL_X2APIC           = 0x9,
+    ACPI_MADT_STRUCT_LOCAL_X2APIC_NMI       = 0xA,
+    ACPI_MADT_STRUCT_GIC                    = 0xB,
+    ACPI_MADT_STRUCT_GICD                   = 0xC
+};
+
+// APIC Structure header.
+struct acpi_madt_entry_header {
+    uint8_t type;               // The type of structure.
+    uint8_t length;             // The length of the structure.
+} __attribute__((packed));
+typedef struct acpi_madt_entry_header acpi_madt_entry_header_t;
+
+// Local APIC Flags.
+enum apci_madt_entry_local_apic_flags {
+    // If zero, this processor is unusable, and the operating system support will not attempt to use it.
+    ACPI_MADT_ENTRY_LOCAL_APIC_ENABLED = 0x01
+};
+
+// Processor Local APIC Structure.
+struct acpi_madt_entry_local_apic {
+    acpi_madt_entry_header_t header;    // Header.
+    uint8_t acpiProcessorId;            // The ProcessorId for which this processor is listed in the ACPI Processor declaration operator.
+    uint8_t apicId;                     // The processor’s local APIC ID.
+    uint32_t flags;                     // Local APIC flags.
+} __attribute__((packed));
+typedef struct acpi_madt_entry_local_apic acpi_madt_entry_local_apic_t;
+
+// I/O APIC Structure.
+struct acpi_madt_entry_io_apic {
+    acpi_madt_entry_header_t header;    // Header.
+    uint8_t ioApicId;                   // The I/O APIC’s ID.
+    uint8_t reserved;                   // Must be zero.
+    uint32_t ioApicAddress;             // The 32-bit physical address to access this I/O APIC.
+    uint32_t globalSystemInterruptBase; // The global system interrupt number where this I/O APIC’s interrupt inputs start.
+} __attribute__((packed));
+typedef struct acpi_madt_entry_io_apic acpi_madt_entry_io_apic_t;
+
+// Interrupt Source Override Structure.
+struct acpi_madt_entry_interrupt_override {
+    acpi_madt_entry_header_t header;    // Header.
+    uint8_t bus;                        // 0 Constant, meaning ISA.
+    uint8_t source;                     // Bus-relative interrupt source (IRQ).
+    uint32_t globalSystemInterrupt;     // The Global System Interrupt that this bus-relative interrupt source will signal.
+    uint16_t flags;                     // MPS INTI flags.
+} __attribute__((packed));
+typedef struct acpi_madt_entry_interrupt_override acpi_madt_entry_interrupt_override_t;
+
+// Multiple APIC Description Table (MADT).
+struct acpi_madt {
+    acpi_sdt_header_t header;   // Header.
+    uint32_t localAddress;      // The 32-bit physical address at which each processor can access its local interrupt controller.
+    uint32_t flags;             // Multiple APIC flags.
+    uint8_t entries[0];        // A list of interrupt controller structures for this implementation.
+} __attribute__((packed));
+typedef struct acpi_madt acpi_madt_t;
+
+
+extern bool acpi_init();
 
 #endif
