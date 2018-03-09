@@ -102,9 +102,6 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Setting up PIT...\n");
     pit_init();
 
-	kprintf("Sleeping for 2 seconds...\n");
-	sleep(2000);
-
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");
 	tasking_init();

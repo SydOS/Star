@@ -164,12 +164,16 @@ void interrupts_isr_handler(registers_t *regs) {
 
 // Initializes interrupts.
 void interrupts_init() {
+    // Initialize PIC.
+    pic_init();
+
     // Check if an APIC is present.
-    if (lapic_supported())
+    if (lapic_supported()) {
         kprintf("APIC supported!\n");
 
-    // Enable PIC.
-    pic_init();
+        // Initialize local APIC.
+        //lapic_init();
+    }
 
     // Add each of the 32 exception ISRs to the IDT.
     idt_set_gate(0, (uint32_t)_isr0, 0x08, 0x8E);
