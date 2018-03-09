@@ -23,6 +23,7 @@
 #include "driver/speaker.h"
 #include "driver/ps2/ps2.h"
 #include "driver/rtc.h"
+#include <driver/pci.h>
 
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
@@ -165,6 +166,8 @@ void kernel_late() {
 	rtc_init();
 	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
+
+	pci_check_busses();
 
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	kprintf("root@sydos ~: ");
