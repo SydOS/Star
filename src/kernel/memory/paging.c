@@ -145,7 +145,7 @@ static void paging_map_pae(page_t virtual, page_t physical) {
     }
     
     // Add address to table.
-    table[entryIndex] = physical == 0 ? 0 : (physical | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
+    table[entryIndex] = physical == 0 ? 0 : (MASK_PAGE_PAE_4K(physical) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
 }
 
 void paging_map_virtual_to_phys(page_t virtual, page_t physical) {

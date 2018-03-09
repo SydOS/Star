@@ -84,6 +84,8 @@ void kernel_main(multiboot_info_t* mboot_info) {
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
+	acpi_init();
+
 	kprintf("Initializing IDT...\n");
 	idt_init();
 
