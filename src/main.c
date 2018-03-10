@@ -7,6 +7,8 @@
 #include <arch/i386/kernel/gdt.h>
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/interrupts.h>
+#include <arch/i386/kernel/acpi.h>
+#include <arch/i386/kernel/lapic.h>
 #include "kernel/nmi.h"
 #include "kernel/pit.h"
 #include <kernel/pmm.h>
@@ -87,14 +89,14 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Initializing IDT...\n");
 	idt_init();
 
+	kprintf("Initializing ACPI...\n");
+	bool acpi = acpi_init();
+
 	kprintf("Initializing interrupts...\n");
-	interrupts_init();
+	interrupts_init(acpi && lapic_supported());
 
 	kprintf("Enabling NMI...\n");
 	NMI_enable();
-
-	kprintf("Initializing ACPI...\n");
-	acpi_init();
     
     // Enable interrupts.
 	asm volatile("sti");

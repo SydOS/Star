@@ -4,6 +4,7 @@
 #include <kernel/main.h>
 #include <kernel/tasking.h>
 #include <arch/i386/kernel/interrupts.h>
+#include <arch/i386/kernel/lapic.h>
 
 extern void _isr_exit();
 
@@ -122,14 +123,20 @@ void tasking_tick(registers_t *regs) {
 	c->regs = regs;
 	c = c->next;
 
-	// Send EOI to PIC and change out stack.
-	pic_eoi(0);
+	// Send EOI  and change out stack.
+	if (lapic_enabled())
+        lapic_eoi();
+    else
+        pic_eoi(0);
 	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
 	asm volatile ("jmp _isr_exit");
 }
 
 void tasking_exec() {
-	pic_eoi(0);
+	if (lapic_enabled())
+        lapic_eoi();
+    else
+        pic_eoi(0);
 	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
 	asm volatile ("jmp _isr_exit");
 }

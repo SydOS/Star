@@ -157,22 +157,36 @@ void interrupts_isr_handler(registers_t *regs) {
         }   
     }
 
-    // Send EOI to PIC if IRQ.
-    if (intNum >= IRQ_OFFSET)
-        pic_eoi(intNum);
+    // Send EOI if IRQ.
+    if (intNum >= IRQ_OFFSET) {
+        if (lapic_enabled())
+            lapic_eoi();
+        else
+            pic_eoi(intNum);
+    }
 }
 
 // Initializes interrupts.
-void interrupts_init() {
+void interrupts_init(bool useApic) {
     // Initialize PIC.
     pic_init();
 
-    // Check if an APIC is present.
-    if (lapic_supported()) {
-        kprintf("APIC supported!\n");
+    if (useApic) {
+        // Disable PIC.
+        pic_disable();
 
         // Initialize local APIC.
-        //lapic_init();
+        lapic_init();
+
+        // Enable all 15 IRQs on the I/O APIC, except for 2.
+        for (uint8_t i = 0; i < IRQ_COUNT; i++) {
+            // IRQ 2 is not used.
+            if (i == 2)
+                continue;
+            
+            // Enable IRQ.
+            ioapic_enable_interrupt(acpi_remap_interrupt(i), IRQ_OFFSET + i);
+        }     
     }
 
     // Add each of the 32 exception ISRs to the IDT.

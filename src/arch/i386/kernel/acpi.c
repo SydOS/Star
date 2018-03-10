@@ -2,12 +2,34 @@
 #include <kprint.h>
 #include <string.h>
 #include <arch/i386/kernel/acpi.h>
+#include <arch/i386/kernel/ioapic.h>
 #include <kernel/paging.h>
+#include <arch/i386/kernel/interrupts.h>
 
 // RSDP.
 static acpi_rsdp_t *acpi_rsdp;
 static acpi_rsdt_t *acpi_rsdt;
 static acpi_fadt_t *acpi_fadt;
+
+#define ACPI_INTERRUPT_MAP_MAGIC    0xDEADBEEF
+static uint32_t acpi_interrupt_redirections[IRQ_COUNT] = {
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC,
+    ACPI_INTERRUPT_MAP_MAGIC
+};
 
 static acpi_rsdp_t *acpi_get_rsdp() {
     // Search the BIOS area of low memory for the RSDP.
@@ -122,6 +144,9 @@ static void acpi_parse_madt(acpi_madt_t* madt) {
                 // Get I/O APIC entry.
                 acpi_madt_entry_io_apic_t* ioapic = (acpi_madt_entry_io_apic_t*)header;
                 kprintf("ACPI: Found I/O APIC %u at 0x%X.\n", ioapic->ioApicId, ioapic->ioApicAddress);
+
+                // Initialize I/O APIC.
+                ioapic_init(ioapic->ioApicAddress);
                 break;
             }
 
@@ -130,6 +155,9 @@ static void acpi_parse_madt(acpi_madt_t* madt) {
                 acpi_madt_entry_interrupt_override_t* isro = (acpi_madt_entry_interrupt_override_t*)header;
                 kprintf("ACPI: Found Interrupt Source Override.\n");
                 kprintf("ACPI:   Bus: %u Source: %u Interrupt: %u Flags: 0x%X\n", isro->bus, isro->source, isro->globalSystemInterrupt, isro->flags);
+
+                // Add interrupt to list of mapped interrupts.
+                acpi_interrupt_redirections[isro->source] = isro->globalSystemInterrupt;
                 break;
             }
 
@@ -229,6 +257,13 @@ static bool acpi_parse_rsdt(acpi_rsdt_t* rsdt) {
         // Parse table.
         acpi_parse_table(header);
     }
+}
+
+uint32_t acpi_remap_interrupt(uint32_t interrupt) {
+    // Does a mapping exist for the interrupt?
+    if (acpi_interrupt_redirections[interrupt] != ACPI_INTERRUPT_MAP_MAGIC)
+        return acpi_interrupt_redirections[interrupt];
+    return interrupt;
 }
 
 bool acpi_init() {
