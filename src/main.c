@@ -84,9 +84,6 @@ void kernel_main(multiboot_info_t* mboot_info) {
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	kprintf("Initializing ACPI...\n");
-	acpi_init();
-
 	kprintf("Initializing IDT...\n");
 	idt_init();
 
@@ -95,6 +92,9 @@ void kernel_main(multiboot_info_t* mboot_info) {
 
 	kprintf("Enabling NMI...\n");
 	NMI_enable();
+
+	kprintf("Initializing ACPI...\n");
+	acpi_init();
     
     // Enable interrupts.
 	asm volatile("sti");

@@ -5,9 +5,9 @@
 #include <kernel/paging.h>
 
 // RSDP.
-static acpi_rsdp_t *rsdp;
-static acpi_rsdt_t *rsdt;
-static acpi_fadt_t *fadt;
+static acpi_rsdp_t *acpi_rsdp;
+static acpi_rsdt_t *acpi_rsdt;
+static acpi_fadt_t *acpi_fadt;
 
 static acpi_rsdp_t *acpi_get_rsdp() {
     // Search the BIOS area of low memory for the RSDP.
@@ -56,153 +56,211 @@ static uint32_t acpi_map_address(uint32_t address) {
     panic("ACPI out of virtual addresses!\n");
 }
 
-static bool acpi_checksum_sdt(acpi_sdt_header_t header) {
+static bool acpi_checksum_sdt(acpi_sdt_header_t *header) {
     // Add bytes of entire table. Checksum dicates the lowest byte must be zero.
     uint8_t sum = 0;
-    for (uint32_t i = 0; i < header.length; i++)
-        sum += ((uint8_t*)&header)[i];
+    for (uint32_t i = 0; i < header->length; i++)
+        sum += ((uint8_t*)header)[i];
     return sum == 0;
 }
+
 
 static acpi_sdt_header_t *acpi_get_table(uint32_t address, const char *signature) {
     // Get pointer to table.
     acpi_sdt_header_t* table = (acpi_sdt_header_t*)address;
 
     // Ensure table is valid.
-    if (memcmp(table->signature, signature, 4) || acpi_checksum_sdt(*table))
+    if (!(memcmp(table->signature, signature, 4) || acpi_checksum_sdt(table)))
         return NULL;
 
     // Return the table pointer.
     return table;
 }
 
-static uint8_t acpi_get_madt_entry(uint8_t *entry) {
-    // Get type.
-    uint8_t type = entry[0];
-    uint8_t length = entry[1];
+static void acpi_parse_fadt(acpi_fadt_t *fadt) {
+    // Save FADT.
+    acpi_fadt = fadt;
 
-    // Determine type.
-    switch (type) {
-        case ACPI_MADT_STRUCT_LOCAL_APIC:
-            if (length == 8)
-                return length;
-
-        case ACPI_MADT_STRUCT_IO_APIC:
-            if (length == 12)
-                return length;
-
-        case ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE:
-            if (length == 10)
-                return length;
-
-        case ACPI_MADT_STRUCT_NMI:
-            if (length == 8)
-                return length;
-
-        case ACPI_MADT_STRUCT_LAPIC_NMI:
-            if (length == 6)
-                return length;
-
-        case ACPI_MADT_STRUCT_LAPIC_ADDR_OVERRIDE:
-            if (length == 12)
-                return length;
-
-        case ACPI_MADT_STRUCT_IO_SAPIC:
-            if (length == 16)
-                return length;
-
-        case ACPI_MADT_STRUCT_PLATFORM_INTERRUPT:
-            if (length == 16)
-                return length;
-
-        case ACPI_MADT_STRUCT_LOCAL_X2APIC:
-            if (length == 16)
-                return length;
-
-        case ACPI_MADT_STRUCT_LOCAL_X2APIC_NMI:
-            if (length == 12)
-                return length;
-
-        case ACPI_MADT_STRUCT_GIC:
-            if (length == 40)
-                return length;
-
-        case ACPI_MADT_STRUCT_GICD:
-            if (length == 24)
-                return length;
+    // If the SMI port is zero, or the ACPI enable/disable commands are zero, ACPI is already enabled.
+    if (fadt->smiCommand == 0 || (fadt->acpiEnable == 0 && fadt->acpiDisable == 0)) {
+        kprintf("ACPI: ACPI is already enabled.\n");
+        return;
     }
 
-    return 0;
+    // Enable ACPI.
+    outb(fadt->smiCommand, fadt->acpiEnable);
+    kprintf("ACPI: ACPI should now be active.\n");
 }
 
-bool acpi_init() {
-    // Get RSDP table.
-    rsdp = acpi_get_rsdp();
-    if (rsdp == NULL) {
-        kprintf("A valid RSDP for ACPI couldn't be found! Aborting.\n");
+static void acpi_parse_madt(acpi_madt_t* madt) {
+    // Print LAPIC address.
+    kprintf("ACPI: Local APIC is located at 0x%X.\n", madt->localAddress);
+
+    // Parse entries.
+    uint32_t addr = madt->entries;
+    while (addr < madt->entries + (madt->header.length - sizeof(acpi_madt_entry_header_t))) {
+        // Get entry.
+        acpi_madt_entry_header_t *header = (acpi_madt_entry_header_t*)addr;
+        
+        // If entry is zero bytes in length, abort.
+        uint8_t length = header->length;
+        if (length == 0) {
+            kprintf("ACPI: Zero-length entry found in MADT! Aborting.\n");
+            return;
+        }
+
+        // Determine type of entry.
+        switch (header->type) {
+            case ACPI_MADT_STRUCT_LOCAL_APIC: {
+                // Get LAPIC entry.
+                acpi_madt_entry_local_apic_t *lapic = (acpi_madt_entry_local_apic_t*)header;
+                kprintf("ACPI: Found processor %u (%s).\n", lapic->acpiProcessorId, (lapic->flags & ACPI_MADT_ENTRY_LOCAL_APIC_ENABLED) ? "enabled" : "disabled");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_IO_APIC: {
+                // Get I/O APIC entry.
+                acpi_madt_entry_io_apic_t* ioapic = (acpi_madt_entry_io_apic_t*)header;
+                kprintf("ACPI: Found I/O APIC %u at 0x%X.\n", ioapic->ioApicId, ioapic->ioApicAddress);
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE: {
+                // Get interrupt source override entry.
+                acpi_madt_entry_interrupt_override_t* isro = (acpi_madt_entry_interrupt_override_t*)header;
+                kprintf("ACPI: Found Interrupt Source Override.\n");
+                kprintf("ACPI:   Bus: %u Source: %u Interrupt: %u Flags: 0x%X\n", isro->bus, isro->source, isro->globalSystemInterrupt, isro->flags);
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_NMI: {
+                kprintf("ACPI: Found Non-maskable Interrupt Source.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_LAPIC_NMI: {
+                kprintf("ACPI: Found Local APIC NMI.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_LAPIC_ADDR_OVERRIDE: {
+                kprintf("ACPI: Found Local APIC Address Override.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_IO_SAPIC: {
+                kprintf("ACPI: Found I/O SAPIC.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_LOCAL_SAPIC: {
+                kprintf("ACPI: Found Local SAPIC.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_PLATFORM_INTERRUPT: {
+                kprintf("ACPI: Found Platform Interrupt Sources.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_LOCAL_X2APIC: {
+                kprintf("ACPI: Found Local x2 APIC.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_LOCAL_X2APIC_NMI: {
+                kprintf("ACPI: Found Local x2 APIC NMI.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_GIC: {
+                kprintf("ACPI: Found GIC.\n");
+                break;
+            }
+
+            case ACPI_MADT_STRUCT_GICD: {
+                kprintf("ACPI: Found GICD.\n");
+                break;
+            }
+
+            default:
+                kprintf("ACPI: Unknown MADT entry found at 0x%X.\n", addr);
+                length = 1;
+                break;
+        }
+
+        // Move to next entry.
+        addr += length;
+    }
+}
+
+static bool acpi_parse_table(acpi_sdt_header_t *table) {
+    // Checksum table.
+    if (!acpi_checksum_sdt(table))
         return false;
+
+    if (memcmp(table->signature, ACPI_SIGNATURE_FADT, 4) == 0) {
+        kprintf("ACPI: Found Fixed ACPI Description Table at 0x%X!\n", (uint32_t)table);
+        acpi_parse_fadt((acpi_fadt_t*)table);
+        return true;
+    }
+    else if (memcmp(table->signature, ACPI_SIGNATURE_MADT, 4) == 0) {
+        kprintf("ACPI: Found Multiple APIC Description Table at 0x%X!\n", (uint32_t)table);
+        acpi_parse_madt((acpi_madt_t*)table);
+        return true;
     }
 
-    // Print address.
-    kprintf("ACPI RSDP table found at 0x%X!\n", (uint32_t)rsdp);
+    return false;
+}
 
-    // Print OEM ID.
-    char oemId[7];
-    strncpy(oemId, rsdp->oemId, 6);
-    oemId[6] = '\0';
-    kprintf("OEM ID: \"%s\"\n", oemId);
-    kprintf("Revision: 0x%X\n", rsdp->revision);
-
-    // Get RSDT.
-    uint32_t addr = acpi_map_address(rsdp->rsdtAddress);
-    rsdt = (acpi_rsdt_t*)acpi_get_table(addr, ACPI_RSDT_SIGNATURE);
-    if (rsdt == NULL) {
-        kprintf("Couldn't get RSDT! Aborting.\n");
-        return false;
-    }
-    kprintf("Mapped RSDT at 0x%X to 0x%X, size: %u bytes\n", rsdp->rsdtAddress, addr, rsdt->header.length);
-
+static bool acpi_parse_rsdt(acpi_rsdt_t* rsdt) {
     // Loop through entries.
     for (uint32_t i = 0; i < (rsdt->header.length - sizeof(acpi_sdt_header_t)) / sizeof(uint32_t); i++)
     {
         // Get address of table.
-        addr = acpi_map_address(rsdt->entries[i]);
+        uint32_t addr = acpi_map_address(rsdt->entries[i]);
 
         acpi_sdt_header_t* header = (acpi_sdt_header_t*)addr;
         char sig[5];
         strncpy(sig, header->signature, 4);
         sig[4] = '\0';
-        kprintf("Mapped %s at 0x%X to 0x%X, size: %u bytes\n", sig, rsdt->entries[i], addr, header->length);
+        kprintf("ACPI: Mapped %s at 0x%X to 0x%X, size: %u bytes\n", sig, rsdt->entries[i], addr, header->length);
 
-        // Is it a FADT?
-        if (memcmp(header->signature, ACPI_FADT_SIGNATURE, 4) == 0)
-        {
-            fadt = (acpi_fadt_t*)acpi_get_table(addr, ACPI_FADT_SIGNATURE);
-            kprintf("Got FADT at 0x%X, size: %u bytes\n", addr, fadt->header.length);
-        }
-        else if (memcmp(header->signature, ACPI_MADT_SIGNATURE, 4) == 0)
-        {
-            acpi_madt_t *madt = (acpi_madt_t*)acpi_get_table(addr, ACPI_MADT_SIGNATURE);
-            kprintf("Got MADT at 0x%X, size: %u bytes\n", addr, madt->header.length);
+        // Parse table.
+        acpi_parse_table(header);
+    }
+}
 
-            // Iterate through MADT strucutres.
-            uint32_t a = 0;
-            while (a < (madt->header.length - sizeof(acpi_madt_entry_header_t)) / sizeof(uint8_t)) {
-                if (acpi_get_madt_entry((madt->entries)+a) != 0) {
-                    // Determine type.
-                    //switch (entries[a+1]) {
-                    //    case ACPI_MADT_STRUCT_LOCAL_APIC:
-                            
-                  //          break;
-                 //   }
-                    kprintf("Got MADT entry %u at 0x%X, length: %u bytes\n", madt->entries[a], madt->entries+a, madt->entries[a+1]);
-                    a += madt->entries[a+1];
-                }
-                else {
-                    a++;
-                }
-            }
-        }
+bool acpi_init() {
+    // Get RSDP table.
+    acpi_rsdp = acpi_get_rsdp();
+    if (acpi_rsdp == NULL) {
+        kprintf("A valid RSDP for ACPI couldn't be found! Aborting.\n");
+        return false;
+    }
+
+    // Print address.
+    kprintf("ACPI RSDP table found at 0x%X!\n", (uint32_t)acpi_rsdp);
+
+    // Print OEM ID.
+    char oemId[7];
+    strncpy(oemId, acpi_rsdp->oemId, 6);
+    oemId[6] = '\0';
+    kprintf("OEM ID: \"%s\"\n", oemId);
+    kprintf("Revision: 0x%X\n", acpi_rsdp->revision);
+
+    // Get RSDT.
+    uint32_t addr = acpi_map_address(acpi_rsdp->rsdtAddress);
+    acpi_rsdt = (acpi_rsdt_t*)acpi_get_table(addr, ACPI_SIGNATURE_RSDT);
+    if (acpi_rsdt == NULL) {
+        kprintf("Couldn't get RSDT! Aborting.\n");
+        return false;
+    }
+    kprintf("Mapped RSDT at 0x%X to 0x%X, size: %u bytes\n", acpi_rsdp->rsdtAddress, addr, acpi_rsdt->header.length);
+
+    // Parse RSDT.
+    if (acpi_parse_rsdt(acpi_rsdt)) {
+
     }
 
     kprintf("ACPI initialized!\n");
