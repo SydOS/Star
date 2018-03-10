@@ -61,6 +61,7 @@ typedef struct registers registers_t;
 
 typedef void (*isr_handler)(registers_t *regs);
 
+extern void interrupts_eoi(uint32_t intNo);
 extern void interrupts_isr_install_handler(uint8_t isr, isr_handler handler);
 extern void interrupts_isr_remove_handler(uint8_t isr);
 extern void interrupts_irq_install_handler(uint8_t irq, isr_handler handler);

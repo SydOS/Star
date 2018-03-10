@@ -2,8 +2,11 @@
 #include <kprint.h>
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/interrupts.h>
-#include <arch/i386/kernel/pic.h>
+
+#include <arch/i386/kernel/acpi.h>
+#include <arch/i386/kernel/ioapic.h>
 #include <arch/i386/kernel/lapic.h>
+#include <arch/i386/kernel/pic.h>
 
 // Functions defined by Intel for service extensions.
 extern void _isr0();
@@ -106,6 +109,14 @@ static char *exception_messages[] = {
     "Reserved"
 };
 
+void interrupts_eoi(uint32_t intNo) {
+    // Send EOI to LAPIC or PIC.
+    if (lapic_enabled())
+        lapic_eoi();
+    else
+        pic_eoi(intNo);
+}
+
 // Installs an ISR handler.
 void interrupts_isr_install_handler(uint8_t isr, isr_handler handler) {
     // Add handler for ISR to array.
@@ -158,12 +169,8 @@ void interrupts_isr_handler(registers_t *regs) {
     }
 
     // Send EOI if IRQ.
-    if (intNum >= IRQ_OFFSET) {
-        if (lapic_enabled())
-            lapic_eoi();
-        else
-            pic_eoi(intNum);
-    }
+    if (intNum >= IRQ_OFFSET)
+        interrupts_eoi(intNum);
 }
 
 // Initializes interrupts.

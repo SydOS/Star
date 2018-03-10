@@ -44,6 +44,7 @@ typedef struct ioapic_redirection_entry ioapic_redirection_entry_t;
 extern uint8_t ioapic_id();
 extern uint8_t ioapic_version();
 extern uint8_t ioapic_max_interrupts();
+extern void ioapic_enable_interrupt(uint8_t interrupt, uint8_t vector);
 extern void ioapic_init(uintptr_t base);
 
 #endif

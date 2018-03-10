@@ -349,7 +349,7 @@ struct acpi_madt {
 } __attribute__((packed));
 typedef struct acpi_madt acpi_madt_t;
 
-
+extern uint32_t acpi_remap_interrupt(uint32_t interrupt);
 extern bool acpi_init();
 
 #endif
