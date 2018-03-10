@@ -61,7 +61,7 @@ void ioapic_enable_interrupt(uint8_t interrupt, uint8_t vector) {
     // Set entry fields.
     entry.interruptVector = vector;
     entry.deliveryMode = IOAPIC_DELIVERY_FIXED;
-    entry.destinationLogical = false;
+    entry.destinationMode = IOAPIC_DEST_MODE_PHYSICAL;
     entry.interruptMask = false;
     entry.destinationField = 0;
 

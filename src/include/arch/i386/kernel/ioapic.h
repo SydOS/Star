@@ -26,17 +26,51 @@ enum IOAPIC_DELIVERY_MODE {
     IOAPIC_DELIVERY_EXT_INT = 0x7
 };
 
+// Destination mode.
+enum IOAPIC_DEST_MODE {
+    IOAPIC_DEST_MODE_PHYSICAL   = 0,
+    IOAPIC_DEST_MODE_LOGICAL    = 1
+};
+
+// Delivery status.
+enum IOAPIC_DELIVERY_STATUS {
+    IOAPIC_DELIVERY_STATUS_IDLE         = 0,
+    IOAPIC_DELIVERY_STATUS_SEND_PENDING = 1
+};
+
 // I/O APIC redirection entry.
 struct ioapic_redirection_entry {
+    // The vector field is an 8 bit field containing the interrupt vector for this interrupt.
     uint8_t interruptVector         : 8;
+
+    // The Delivery Mode is a 3 bit field that specifies how the APICs listed in the
+    // destination field should act upon reception of this signal.
     uint8_t deliveryMode            : 3;
-    bool destinationLogical         : 1; // Destination Mode. False = physical; true = logical.
+
+    // This field determines the interpretation of the Destination field.
+    // 0=Physical, 1=Logical.
+    uint8_t destinationMode         : 1;
+
+    // The Delivery Status bit contains the current status of the delivery of this interrupt.
     uint8_t deliveryStatus          : 1;
+
+    // This bit specifies the polarity of the interrupt signal.
+    // 0=High active, 1=Low active.
     uint8_t interruptInputPolarity  : 1;
+
+    // This bit is used for level triggered interrupts.
     uint8_t remoteIrr               : 1;
+
+    // The trigger mode field indicates the type of signal on the interrupt pin that triggers an interrupt.
+    // 1=Level sensitive, 0=Edge sensitive.
     uint8_t triggerMode             : 1;
+
+    // When this bit is 1, the interrupt signal is masked.
     bool interruptMask              : 1;
     uint64_t reserved               : 39;
+
+    // If the Destination Mode of this entry is Physical Mode (bit 11=0), bits contain an APIC ID.
+    // If Logical Mode is selected (bit 11=1), the Destination Field potentially defines a set of processors.
     uint8_t destinationField        : 8;
 } __attribute__((packed));
 typedef struct ioapic_redirection_entry ioapic_redirection_entry_t;
