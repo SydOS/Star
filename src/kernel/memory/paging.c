@@ -145,7 +145,7 @@ static void paging_map_pae(page_t virtual, page_t physical) {
     }
     
     // Add address to table.
-    table[entryIndex] = physical == 0 ? 0 : (physical | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
+    table[entryIndex] = physical == 0 ? 0 : (MASK_PAGE_PAE_4K(physical) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
 }
 
 void paging_map_virtual_to_phys(page_t virtual, page_t physical) {
@@ -168,6 +168,71 @@ void paging_unmap_virtual(page_t virtual) {
 
     // Flush TLB
     paging_flush_tlb_address(virtual);
+}
+
+bool paging_get_phys_std(page_t virtual, uint32_t *physOut) {
+    // Get pointer to page directory.
+    uint32_t *directory = (uint32_t*)(PAGE_DIR_ADDRESS);
+
+    // Calculate table and entry of virtual address.
+    uint32_t tableIndex = paging_calculate_table(virtual);
+    uint32_t entryIndex = paging_calculate_entry(virtual);
+
+    // Get address of table from directory.
+    // If there isn't one, no virtual to physical mapping exists.
+    // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.
+    if (MASK_PAGE_4K(directory[tableIndex]) == 0) {
+        return false;
+    }
+    uint32_t *table = (uint32_t*)(PAGE_TABLES_ADDRESS + (tableIndex * PAGE_SIZE_4K));
+
+    // Is page present?
+    if (!(table[entryIndex] & PAGING_PAGE_PRESENT))
+        return false;
+
+    // Get address from table.
+    *physOut = MASK_PAGE_4K(table[entryIndex]);
+    return true;
+}
+
+bool paging_get_phys_pae(page_t virtual, uint64_t *physOut) {
+    // Get pointer to PDPT.
+    uint64_t *directoryPointerTable = (uint64_t*)(PAGE_PAE_PDPT_ADDRESS);
+
+    // Calculate directory, table, entry of virtual address.
+    uint32_t dirIndex   = paging_pae_calculate_directory(virtual);
+    uint32_t tableIndex = paging_pae_calculate_table(virtual);
+    uint32_t entryIndex = paging_pae_calculate_entry(virtual);
+
+    // Get address of directory from PDPT.
+    // If there isn't one, no mapping exists.
+    // Pages will never be located at 0x0, so its safe to assume a value of 0 = no directory defined.
+    uint64_t* directory = (uint64_t*)paging_get_pae_directory_address(dirIndex);
+    if (MASK_DIRECTORY_PAE(directoryPointerTable[dirIndex]) == 0)
+        return false;
+
+    // Get address of table from directory.
+    // If there isn't one, no mapping exists.
+    // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.
+    uint64_t *table = (uint64_t*)(paging_get_pae_tables_address(dirIndex) + (tableIndex * PAGE_SIZE_4K)); 
+    if (MASK_PAGE_PAE_4K(directory[tableIndex]) == 0)
+        return false;
+
+    // Is page present?
+    if (!(table[entryIndex] & PAGING_PAGE_PRESENT))
+        return false;
+    
+    // Get address from table.
+    *physOut = MASK_PAGE_PAE_4K(table[entryIndex]);
+    return true;
+}
+
+bool paging_get_phys(page_t virtual, uint64_t *physOut) {
+    // Are we in PAE mode?
+    if (memInfo.paeEnabled)
+        return paging_get_phys_pae(virtual, physOut);
+    else
+        return paging_get_phys_std(virtual, (uint32_t*)physOut);
 }
 
 void paging_map_region(page_t *directory, page_t startAddress, page_t endAddress, bool kernel, bool writeable) {

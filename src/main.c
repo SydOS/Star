@@ -92,6 +92,9 @@ void kernel_main(multiboot_info_t* mboot_info) {
 
 	kprintf("Enabling NMI...\n");
 	NMI_enable();
+
+	kprintf("Initializing ACPI...\n");
+	acpi_init();
     
     // Enable interrupts.
 	asm volatile("sti");
