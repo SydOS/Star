@@ -122,14 +122,14 @@ void tasking_tick(registers_t *regs) {
 	c->regs = regs;
 	c = c->next;
 
-	// Send EOI to PIC and change out stack.
-	pic_eoi(0);
+	// Send EOI and change out stack.
+	interrupts_eoi(0);
 	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
 	asm volatile ("jmp _isr_exit");
 }
 
 void tasking_exec() {
-	pic_eoi(0);
+	interrupts_eoi(0);
 	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
 	asm volatile ("jmp _isr_exit");
 }

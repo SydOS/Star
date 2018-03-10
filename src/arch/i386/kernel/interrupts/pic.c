@@ -62,7 +62,7 @@ void pic_enable() {
     io_wait();
     outb(PIC2_DATA, 0x0);
     io_wait();
-    kprintf("PIC enabled!\n");
+    kprintf("PIC: Enabled!\n");
 }
 
 // Disables the PIC.
@@ -78,7 +78,7 @@ void pic_disable() {
 
     // Ensure any pending interrupts are clear.
     pic_eoi(40);
-    kprintf("PIC disabled!\n");
+    kprintf("PIC: Disabled!\n");
 }
 
 void pic_init() {

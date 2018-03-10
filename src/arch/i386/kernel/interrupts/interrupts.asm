@@ -412,3 +412,7 @@ _isr_exit:
     popad
     add esp, 8
     iret
+
+global _isr_empty
+_isr_empty:
+    iret
