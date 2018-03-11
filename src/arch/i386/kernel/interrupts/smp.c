@@ -5,6 +5,7 @@
 #include <arch/i386/kernel/smp.h>
 
 #include <arch/i386/kernel/acpi.h>
+#include <arch/i386/kernel/gdt.h>
 #include <arch/i386/kernel/lapic.h>
 #include <kernel/pmm.h>
 #include <kernel/paging.h>
@@ -14,6 +15,11 @@
 
 extern uintptr_t _ap_bootstrap_init;
 extern uintptr_t _ap_bootstrap_end;
+extern gdt_ptr_t gdtPtr;
+
+void ap_main() {
+    kprintf("Hi from a core!\n");
+}
 
 void smp_setup_apboot() {
     // Get start and end of the AP bootstrap code.
@@ -27,9 +33,24 @@ void smp_setup_apboot() {
     // Ensure AP bootstrap is within a page.
     if (apSize > PAGE_SIZE_4K)
         panic("SMP: AP bootstrap code bigger than a 4KB page.\n");
+    
+    // Identity map low memory and kernel.
+    for (page_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
+        paging_map_virtual_to_phys(page, page);
+    
+    // Copy root paging structure and GDT into low memory.
+    memcpy(memInfo.kernelVirtualOffset + SMP_PAGING_ADDRESS, &memInfo.kernelPageDirectory, sizeof(memInfo.kernelPageDirectory));
+    memset(memInfo.kernelVirtualOffset + SMP_PAGING_PAE_ADDRESS, memInfo.paeEnabled ? 1 : 0, sizeof(uint32_t));
+    memcpy(memInfo.kernelVirtualOffset + SMP_GDT_ADDRESS, &gdtPtr, sizeof(gdt_ptr_t));
 
-    // Copy AP bootstrap code to the bootstrap address in low memory.
+    // Copy AP bootstrap code into low memory.
     memcpy(memInfo.kernelVirtualOffset + SMP_AP_BOOTSTRAP_ADDRESS, (void*)apStart, apSize);
+}
+
+void smp_destroy_apboot() {
+    // Remove identity mapping.
+    for (page_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
+        paging_map_virtual_to_phys(page, 0);
 }
 
 void smp_init() {
@@ -56,4 +77,8 @@ void smp_init() {
         lapic_send_startup(cpu, SMP_AP_BOOTSTRAP_ADDRESS / PAGE_SIZE_4K);
         while(true);
     }
+
+    // Destroy AP boot code.
+    smp_destroy_apboot();
+    kprintf("SMP: Initialized!\n");
 }

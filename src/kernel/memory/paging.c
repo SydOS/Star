@@ -82,7 +82,7 @@ static uint64_t paging_get_pae_tables_address(uint32_t directoryIndex) {
     }
 }
 
-static void paging_map_std(page_t virtual, page_t physical) {
+static void paging_map_std(page_t virtual, page_t physical, bool unmap) {
     // Get pointer to page directory.
     uint32_t *directory = (uint32_t*)( PAGE_DIR_ADDRESS );
 
@@ -100,10 +100,10 @@ static void paging_map_std(page_t virtual, page_t physical) {
     uint32_t *table = (uint32_t*)(PAGE_TABLES_ADDRESS + (tableIndex * PAGE_SIZE_4K));
 
     // Add address to table.
-    table[entryIndex] = physical == 0 ? 0 : (physical | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
+    table[entryIndex] = unmap ? 0 : (physical | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
 }
 
-static void paging_map_pae(page_t virtual, page_t physical) {
+static void paging_map_pae(page_t virtual, page_t physical, bool unmap) {
     // Get pointer to PDPT.
     uint64_t *directoryPointerTable = (uint64_t*)(PAGE_PAE_PDPT_ADDRESS);
 
@@ -145,15 +145,15 @@ static void paging_map_pae(page_t virtual, page_t physical) {
     }
     
     // Add address to table.
-    table[entryIndex] = physical == 0 ? 0 : (MASK_PAGE_PAE_4K(physical) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
+    table[entryIndex] = unmap ? 0 : (MASK_PAGE_PAE_4K(physical) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
 }
 
 void paging_map_virtual_to_phys(page_t virtual, page_t physical) {
     // Are we in PAE mode?
     if (memInfo.paeEnabled)
-        paging_map_pae(virtual, physical);
+        paging_map_pae(virtual, physical, false);
     else
-        paging_map_std(virtual, physical);
+        paging_map_std(virtual, physical, false);
 
     // Flush TLB
     paging_flush_tlb_address(virtual);
@@ -162,9 +162,9 @@ void paging_map_virtual_to_phys(page_t virtual, page_t physical) {
 void paging_unmap_virtual(page_t virtual) {
     // Are we in PAE mode?
     if (memInfo.paeEnabled)
-        paging_map_pae(virtual, 0);
+        paging_map_pae(virtual, 0, true);
     else
-        paging_map_std(virtual, 0);
+        paging_map_std(virtual, 0, true);
 
     // Flush TLB
     paging_flush_tlb_address(virtual);
