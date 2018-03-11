@@ -7,6 +7,8 @@
 
 // https://wiki.osdev.org/IOAPIC
 
+static bool ioApicInitialized = false;
+
 static void ioapic_write(uint8_t offset, uint32_t value) {
     // Fill the I/O APIC's register selection memory area with our requested register offset.
     *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOREGSL) = offset;
@@ -80,9 +82,14 @@ void ioapic_disable_interrupt(uint8_t interrupt) {
 }
 
 void ioapic_init(uintptr_t base) {
-    kprintf("IOAPIC: Initializing I/O APIC at 0x%X...\n", base);
+    // Only support the first I/O APIC initialized.
+    if (ioApicInitialized) {
+        kprintf("IOAPIC: Ignoring I/O APIC at 0x%X\n", base);
+        return;
+    }
 
     // Map I/O APIC to virtual memory.
+    kprintf("IOAPIC: Initializing I/O APIC at 0x%X...\n", base);
     paging_map_virtual_to_phys(IOAPIC_ADDRESS, base);
 
     // Get info about I/O APIC.
@@ -95,5 +102,6 @@ void ioapic_init(uintptr_t base) {
     // Disable all interrupts.
     for (uint8_t i = 0; i < maxInterrupts; i++)
         ioapic_disable_interrupt(i);
+    ioApicInitialized = true;
     kprintf("I/O APIC initialized!\n");
 }

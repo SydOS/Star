@@ -7,7 +7,7 @@
 
 // Based on code from https://github.com/CCareaga/heap_allocator. Licensed under the MIT.
 
-static page_t currentKernelHeapSize;
+static size_t currentKernelHeapSize;
 static kheap_bin_t bins[KHEAP_BIN_COUNT];
 
 static void kheap_add_node(uint32_t binIndex, kheap_node_t *node) {
@@ -82,16 +82,29 @@ static void kheap_remove_node(uint32_t binIndex, kheap_node_t *node) {
 }
 
 static kheap_node_t *kheap_get_best_fit(uint32_t binIndex, size_t size) {
+    // If requested bin is beyond the max, return nothing.
+    if (binIndex >= KHEAP_BIN_COUNT)
+        return NULL;
+
     // Ensure list is not empty.
     if (bins[binIndex].header == NULL)
         return NULL;
 
     // Attempt to find a fit.
     kheap_node_t *tempNode = bins[binIndex].header;
+
+    // If node is at 0x0, it's not possible to find a fit.
+    if (tempNode == NULL)
+        return NULL;
+
     while (tempNode != NULL) {
         // Did we find a fit?
         if (tempNode->size >= size)
             return tempNode;
+
+        // If next node is at 0x0, don't bother continuing a search.
+        if (tempNode->nextNode == NULL)
+            break;
         tempNode = tempNode->nextNode;
     }
 
@@ -116,7 +129,7 @@ static void kheap_dump_bin(uint32_t binIndex) {
     }
 }
 
-static void kheap_dump_all_bins() {
+void kheap_dump_all_bins() {
     for (uint8_t i = 0; i < 9; i++) {
         kprintf("Bin %u:\n", i);
         kheap_dump_bin(i);
@@ -156,14 +169,20 @@ static void kheap_create_footer(kheap_node_t *header) {
     footer->header = header;
 }
 
-static bool kheap_expand() {
-    // Pop another page and increase size of heap.
-    paging_map_virtual_to_phys(KHEAP_START + currentKernelHeapSize, pmm_pop_frame());
-    
-    // Increase wilderness size.
-    kheap_node_t *wildNode = kheap_get_wilderness();
-    wildNode->size += PAGE_SIZE_4K;
-    currentKernelHeapSize += PAGE_SIZE_4K;
+static bool kheap_expand(size_t size) {
+    size_t newSize = currentKernelHeapSize + size;
+
+    for (page_t page = currentKernelHeapSize; page < ALIGN_4K(newSize) - PAGE_SIZE_4K; page += PAGE_SIZE_4K) {
+        // Pop another page and increase size of heap.
+        paging_map_virtual_to_phys(KHEAP_START + page, pmm_pop_frame());
+
+        // Increase wilderness size.
+        kheap_node_t *wildNode = kheap_get_wilderness();
+
+        wildNode->size += PAGE_SIZE_4K;
+        kheap_create_footer(wildNode);   
+        currentKernelHeapSize += PAGE_SIZE_4K;
+    }
 
     kprintf("Heap expanded by 4KB to %u!\n", currentKernelHeapSize);
     return true;
@@ -181,8 +200,24 @@ void *kheap_alloc(size_t size) {
     kheap_node_t *node = kheap_get_best_fit(binIndex, size);
 
     // If a chunk wasn't found, iterate through the bins until we find one.
-    while (node == NULL)
+    while (node == NULL && binIndex < KHEAP_BIN_COUNT)
         node = kheap_get_best_fit(++binIndex, size);
+
+    // If a chunk still couldn't be found, expand heap.
+    if (node == NULL) {
+        if (!kheap_expand(size))
+            return NULL;
+
+        // Get bin index that the chunk should be in
+        binIndex = kheap_get_bin_index(size);
+
+        // Try to find a good fitting chunk.
+        node = kheap_get_best_fit(binIndex, size);
+
+        // If a chunk wasn't found, iterate through the bins until we find one.
+        while (node == NULL && binIndex < KHEAP_BIN_COUNT)
+            node = kheap_get_best_fit(++binIndex, size);
+    }
 
     // If the difference between the found and requested chunks is bigger than overhead, then split the chunk.
     if ((node->size - size) > (KHEAP_OVERHEAD + 4)) {
@@ -210,7 +245,7 @@ void *kheap_alloc(size_t size) {
     // Check if heap needs to be expanded or contracted.
     kheap_node_t *wildNode = kheap_get_wilderness();
     if (wildNode->size < KHEAP_MIN_WILDERNESS) {
-        if (!kheap_expand())
+        if (!kheap_expand(PAGE_SIZE_4K))
             return NULL;
     }
     else if (wildNode->size > KHEAP_MAX_WILDERNESS) {
@@ -236,7 +271,8 @@ void kheap_free(void *ptr) {
 
     // Get next and previous nodes of heap.
     kheap_node_t *nextNode = (kheap_node_t*)((uint8_t*)kheap_get_footer(header) + sizeof(kheap_footer_t));
-    kheap_node_t *previousNode = (kheap_node_t*) * ((uint32_t*)((uint8_t*)header - sizeof(kheap_footer_t)));
+    kheap_footer_t *footer = (kheap_footer_t*)((uint8_t*)header - sizeof(kheap_footer_t));
+    kheap_node_t *previousNode = footer->header;
 
     // Is the previous node a hole?
     if (previousNode->hole) {

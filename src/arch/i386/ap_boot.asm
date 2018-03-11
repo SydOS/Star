@@ -1,16 +1,19 @@
-; Constants
+; List of stacks from smp.c.
+extern apStacks
+
+; Constants. These should match the ones in smp.h.
 SMP_PAGING_ADDRESS equ 0x500
 SMP_PAGING_PAE_ADDRESS equ 0x510
 SMP_GDT_ADDRESS equ 0x600
 
 _ap_bootstrap_protected_real equ _ap_bootstrap_protected - 0xC0000000
+ap_bootstrap_stack_end equ 0x1000 + ap_bootstrap_stack
 
 ; Allocate stack
 section .bss
 	align 32
 ap_bootstrap_stack:
 	resb 4096
-ap_bootstrap_stack_end:
 
 section .text
 
@@ -27,7 +30,6 @@ _ap_bootstrap_init:
     call _check_a20
 
     ; Enable A20 gate if needed.
-    xchg bx, bx
     cmp eax, 1
     je _ap_bootstrap_a20_enabled
 
@@ -150,7 +152,6 @@ _ap_bootstrap_protected:
 
     ; Set up paging using the root paging structure
     ; thats already set up.
-    xchg bx, bx
     mov eax, [SMP_PAGING_ADDRESS]
     mov cr3, eax
 
@@ -186,8 +187,11 @@ _ap_bootstrap_higherhalf:
     call lapic_id
 
     ; Load up stack for this processor.
-
-    
+        xchg bx, bx
+    mov ebx, [apStacks]
+    mov esp, [ebx + eax * 4]
+    add esp, 0x4000
+    ;mov ebp, esp
 
     ; Pop into C code.
     extern ap_main

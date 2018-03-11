@@ -109,9 +109,11 @@ static char *exception_messages[] = {
     "Reserved"
 };
 
+static bool useLapic = false;
+
 void interrupts_eoi(uint32_t intNo) {
     // Send EOI to LAPIC or PIC.
-    if (lapic_enabled())
+    if (useLapic)
         lapic_eoi();
     else
         pic_eoi(intNo);
@@ -159,13 +161,19 @@ void interrupts_isr_handler(registers_t *regs) {
     }
     else {
         // If we have an exception, print default message.
-        if (intNum < IRQ_OFFSET)
+        if (intNum == 2)
         {
-            uint32_t addr;
-	asm volatile ("mov %%cr2, %0" : "=r"(addr));
-            panic("Exception: %s\n", exception_messages[intNum]);
+            uint8_t a = inb(0x92);
+            uint8_t b = inb(0x61);
+            kprintf("");
+        }
 
-        }   
+        if (intNum < IRQ_OFFSET) {
+            kprintf("Exception: %s\n", exception_messages[intNum]);
+
+        if (intNum != 2)
+            panic("");
+        }
     }
 
     // Send EOI if IRQ.
@@ -194,6 +202,8 @@ void interrupts_init(bool useApic) {
             // Enable IRQ.
             ioapic_enable_interrupt(acpi_remap_interrupt(i), IRQ_OFFSET + i);
         }     
+
+        useLapic = true;
     }
 
     // Add each of the 32 exception ISRs to the IDT.

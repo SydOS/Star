@@ -9,6 +9,7 @@
 #include <arch/i386/kernel/lapic.h>
 #include <kernel/pmm.h>
 #include <kernel/paging.h>
+#include <kernel/kheap.h>
 
 // https://wiki.osdev.org/SMP
 // http://ethv.net/workshops/osdev/notes/notes-5
@@ -17,8 +18,48 @@ extern uintptr_t _ap_bootstrap_init;
 extern uintptr_t _ap_bootstrap_end;
 extern gdt_ptr_t gdtPtr;
 
+// Array holding the address of stack for each AP.
+uintptr_t *apStacks;
+
+// Bitmap for indicating which processors are initialized, used during initial startup.
+static volatile uint64_t ap_map;
+
 void ap_main() {
+    // Set stack.
+    uintptr_t stack = 0;
+    asm volatile ("movl %%ebp, %0" : "=r"(stack));
+
     kprintf("Hi from a core!\n");
+    kprintf("I should be core %u\n", lapic_id());
+
+    // Processor is initialized.
+    ap_map |= (1 << lapic_id());
+}
+
+void smp_setup_stacks() {
+    // Get processor count.
+    uint32_t cpus = acpi_get_cpu_count();
+
+    // Allocate space for stack list.
+    apStacks = kheap_alloc(sizeof(uintptr_t*) * cpus);
+
+    // Allocate space for each processor's stack.
+    for (uint32_t cpu = 0; cpu < cpus; cpu++) {
+        // Don't need a stack for the BSP.
+        if (cpu == lapic_id()) {
+            apStacks[cpu] = 0;
+            continue;
+        }
+
+        // Allocate space for stack.
+        kheap_dump_all_bins();
+        apStacks[cpu] = kheap_alloc(SMP_AP_STACK_SIZE);
+
+        // Ensure its a valid address.
+        if (apStacks[cpu] == 0)
+            panic("SMP: Failed to allocate stack for processor %u\n", cpu);
+        kprintf("SMP: Allocated stack for processor %u at 0x%X\n", cpu, apStacks[cpu]);
+    }
 }
 
 void smp_setup_apboot() {
@@ -61,6 +102,9 @@ void smp_init() {
     // Initialize AP boot code.
     smp_setup_apboot();
 
+    // Allocate stacks for APs.
+    smp_setup_stacks();
+
     // Initialize each processor.
     for (uint32_t cpu = 0; cpu < cpus; cpu++) {
         // Don't need to initialize the boot processor (BSP).
@@ -73,12 +117,16 @@ void smp_init() {
 
         for (int i = 0; i < 1000000; i++);
 
+        // Send STARTUP command to processor (AP).
         kprintf("SMP: Sending STARTUP to LAPIC on processor %u\n", cpu);
         lapic_send_startup(cpu, SMP_AP_BOOTSTRAP_ADDRESS / PAGE_SIZE_4K);
-        while(true);
+        
+        // Wait for processor to come up.
+        while (!(ap_map & (1 << cpu)));
     }
 
     // Destroy AP boot code.
     smp_destroy_apboot();
     kprintf("SMP: Initialized!\n");
+    //while(true);
 }

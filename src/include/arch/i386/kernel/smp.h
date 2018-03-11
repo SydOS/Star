@@ -8,6 +8,8 @@
 #define SMP_GDT_ADDRESS             0x600
 #define SMP_AP_BOOTSTRAP_ADDRESS    0x7000
 
+#define SMP_AP_STACK_SIZE           0x4000
+
 extern void smp_init();
 
 #endif

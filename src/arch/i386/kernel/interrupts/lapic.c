@@ -41,6 +41,7 @@ static uint32_t lapic_read(uint16_t offset) {
 static void lapic_write(uint16_t offset, uint32_t value) {
     // Send data to LAPIC.
     *(volatile uint32_t*)(LAPIC_ADDRESS + offset) = value;
+    (void)lapic_read(LAPIC_REG_ID);
 }
 
 static lapic_icr_t create_empty_icr() {
@@ -49,6 +50,7 @@ static lapic_icr_t create_empty_icr() {
     icr.vector = 0;
     icr.deliveryMode = 0;
     icr.destinationMode = 0;
+    icr.deliveryStatus = 0;
     icr.reserved1 = 0;
     icr.level = 0;
     icr.triggerMode = 0;
@@ -70,7 +72,7 @@ static void lapic_send_icr(lapic_icr_t icr) {
     lapic_write(LAPIC_REG_INTERRUPT_CMD_LOW, data[0]);
 
     // Wait for signal from LAPIC.
-    while (lapic_read(LAPIC_REG_INTERRUPT_CMD_LOW) & LAPIC_DELIVERY_STATUS_SEND_PENDING);
+    while (lapic_read(LAPIC_REG_INTERRUPT_CMD_LOW) & (LAPIC_DELIVERY_STATUS_SEND_PENDING << 12));
 }
 
 void lapic_send_init(uint8_t apic) {
@@ -102,7 +104,7 @@ void lapic_send_startup(uint8_t apic, uint8_t vector) {
 
 uint32_t lapic_id() {
     // Get ID.
-    return lapic_read(LAPIC_REG_ID);
+    return lapic_read(LAPIC_REG_ID) >> 24;
 }
 
 uint8_t lapic_version() {
