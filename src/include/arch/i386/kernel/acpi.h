@@ -350,6 +350,7 @@ struct acpi_madt {
 typedef struct acpi_madt acpi_madt_t;
 
 extern uint32_t acpi_remap_interrupt(uint32_t interrupt);
+extern uint32_t acpi_get_cpu_count();
 extern bool acpi_init();
 
 #endif

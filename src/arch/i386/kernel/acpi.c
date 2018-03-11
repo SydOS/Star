@@ -11,6 +11,9 @@ static acpi_rsdp_t *acpi_rsdp;
 static acpi_rsdt_t *acpi_rsdt;
 static acpi_fadt_t *acpi_fadt;
 
+// CPU count.
+static uint32_t acpi_cpu_count;
+
 #define ACPI_INTERRUPT_MAP_MAGIC    0xDEADBEEF
 static uint32_t acpi_interrupt_redirections[IRQ_COUNT] = {
     ACPI_INTERRUPT_MAP_MAGIC,
@@ -137,6 +140,7 @@ static void acpi_parse_madt(acpi_madt_t* madt) {
                 // Get LAPIC entry.
                 acpi_madt_entry_local_apic_t *lapic = (acpi_madt_entry_local_apic_t*)header;
                 kprintf("ACPI: Found processor %u (%s).\n", lapic->acpiProcessorId, (lapic->flags & ACPI_MADT_ENTRY_LOCAL_APIC_ENABLED) ? "enabled" : "disabled");
+                acpi_cpu_count++;
                 break;
             }
 
@@ -266,7 +270,13 @@ uint32_t acpi_remap_interrupt(uint32_t interrupt) {
     return interrupt;
 }
 
+uint32_t acpi_get_cpu_count() {
+    return acpi_cpu_count;
+}
+
 bool acpi_init() {
+    kprintf("ACPI: Initializing...\n");
+
     // Get RSDP table.
     acpi_rsdp = acpi_get_rsdp();
     if (acpi_rsdp == NULL) {

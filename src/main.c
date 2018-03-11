@@ -89,11 +89,14 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Initializing IDT...\n");
 	idt_init();
 
-	kprintf("Initializing ACPI...\n");
 	bool acpi = acpi_init();
 
 	kprintf("Initializing interrupts...\n");
 	interrupts_init(acpi && lapic_supported());
+
+	// Initialize SMP.
+	if (acpi && lapic_supported())
+		smp_init();
 
 	kprintf("Enabling NMI...\n");
 	NMI_enable();

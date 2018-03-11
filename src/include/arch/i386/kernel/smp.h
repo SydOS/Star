@@ -3,6 +3,8 @@
 
 #include <main.h>
 
+#define SMP_AP_BOOTSTRAP_ADDRESS 0x7000
+
 extern void smp_init();
 
 #endif
