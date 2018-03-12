@@ -7,7 +7,7 @@
 #include <arch/i386/kernel/interrupts.h>
 
 /**
- * Thread to update the RTC every 500ms, and print out the time for debugging
+ * Thread to update the RTC every 500ms
  */
 void rtc_thread() {
 	while(true) {
@@ -18,8 +18,8 @@ void rtc_thread() {
 
 /**
  * Reads from a specific register for RTC
- * @param  reg [description]
- * @return     [description]
+ * @param  reg RTC register to read from
+ * @return     Output from RTC read register
  */
 uint8_t rtc_read(uint16_t reg) {
 	// (0 << 7) sets the NMI disable bit to false
@@ -30,7 +30,6 @@ uint8_t rtc_read(uint16_t reg) {
 /**
  * Converts BCD to human readable and comprehendable integers.
  * BCD is the time, written in hex. Like 0x32, 0x54, etc.
- * @param  time An RTCTime struct to read from
  */
 void rtc_bcd_to_int() {
 	rtc_time->seconds = (rtc_time->seconds & 0x0F) + ((rtc_time->seconds / 16) * 10);
@@ -43,7 +42,6 @@ void rtc_bcd_to_int() {
 
 /**
  * Gets the current time from the RTC
- * @return An RTCTime struct with all values filled
  */
 void rtc_get_time() {
 	rtc_time->seconds = rtc_read(0x00);
