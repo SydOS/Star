@@ -24,6 +24,7 @@ typedef struct idt_ptr idt_ptr_t;
 #define IDT_ENTRIES 256
 
 extern void idt_set_gate(uint8_t gate, uint32_t base, uint16_t selector, uint8_t flags);
+extern void idt_load();
 extern void idt_init();
 
 #endif

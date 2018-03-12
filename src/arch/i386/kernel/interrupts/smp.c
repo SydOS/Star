@@ -6,6 +6,7 @@
 
 #include <arch/i386/kernel/acpi.h>
 #include <arch/i386/kernel/gdt.h>
+#include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/lapic.h>
 #include <kernel/pmm.h>
 #include <kernel/paging.h>
@@ -34,6 +35,10 @@ void ap_main() {
 
     // Processor is initialized.
     ap_map |= (1 << lapic_id());
+
+    // Load existing GDT and IDT into processor.
+    gdt_load();
+    idt_load();
 }
 
 void smp_setup_stacks() {

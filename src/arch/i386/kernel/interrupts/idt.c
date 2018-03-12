@@ -19,6 +19,12 @@ void idt_set_gate(uint8_t gate, uint32_t base, uint16_t selector, uint8_t flags)
     idt[gate].flags = flags;
 }
 
+void idt_load() {
+    // Load the IDT into the processor.
+    asm volatile ("lidt %0" : : "g"(idtPtr));
+    kprintf("IDT: Loaded at 0x%X.\n", &idtPtr);
+}
+
 // Initializes the IDT.
 void idt_init() {
     // Set up the IDT pointer and limit.
@@ -28,7 +34,7 @@ void idt_init() {
     // Clear out the IDT with zeros.
     memset(&idt, 0, sizeof(idt_entry_t) * IDT_ENTRIES);
 
-    // Load the IDT into the processor.
-    asm volatile ("lidt %0" : : "g"(idtPtr));
-    kprintf("IDT initialized at 0x%X!\n", &idtPtr);
+    // Load the IDT.
+    idt_load();
+    kprintf("IDT: Initialized!\n");
 }

@@ -27,6 +27,7 @@ typedef struct gdt_ptr gdt_ptr_t;
 
 #define GDT_ENTRIES 5
 
+extern void gdt_load();
 extern void gdt_init();
 
 #endif

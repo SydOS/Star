@@ -23,7 +23,14 @@ static void gdt_set_descriptor(int32_t num, uint32_t base, uint32_t limit, uint8
 	// Set up granularity and access flags.
   	gdt[num].granularity |= gran & 0xF0;
    	gdt[num].access = access;
-} 
+}
+
+// Loads the GDT.
+void gdt_load() {
+	// Load the GDT into the processor.
+   	_gdt_load((uint32_t)&gdtPtr);
+	kprintf("GDT: Loaded at 0x%X.\n", &gdtPtr);
+}
 
 // Initializes the GDT.
 void gdt_init() {
@@ -37,7 +44,7 @@ void gdt_init() {
 	gdt_set_descriptor(3, 0, 0xFFFFFFFF, 0xFA, 0xCF); // User mode code segment.
 	gdt_set_descriptor(4, 0, 0xFFFFFFFF, 0xF2, 0xCF); // User mode data segment.
 
-	// Load the GDT into the processor.
-   	_gdt_load((uint32_t)&gdtPtr);
-	kprintf("GDT initialized at 0x%X!\n", &gdtPtr);
+	// Load the GDT.
+   	gdt_load();
+	kprintf("GDT: Initialized!\n");
 }

@@ -1,6 +1,7 @@
 #include <main.h>
 #include <kprint.h>
 #include <string.h>
+#include <math.h>
 #include <arch/i386/kernel/acpi.h>
 #include <arch/i386/kernel/ioapic.h>
 #include <kernel/paging.h>
@@ -58,27 +59,44 @@ static acpi_rsdp_t *acpi_get_rsdp() {
     return NULL;
 }
 
-static uint32_t acpi_map_address(uint32_t address) {
-    // Is the address base already mapped?
-    uint32_t base = MASK_PAGE_4K(address);
-    for (uint32_t page = ACPI_FIRST_ADDRESS; page <= ACPI_LAST_ADDRESS; page += PAGE_SIZE_4K) {
-        // Get physical mapping for virtual address.
-        uint64_t physicalAddress = 0;
-        if (paging_get_phys(page, &physicalAddress)) {
-            // Does the address passed fit into the same 4KB space as the
-            // physical address belonging to the current virtual one?
-            if ((uint32_t)physicalAddress == base)
-                return page + MASK_PAGEFLAGS_4K(address);
-        }
+static page_t acpi_map_table(uint32_t address) {
+    // Map header to temp page.
+    paging_map_virtual_to_phys(ACPI_TEMP_ADDRESS, address);
+    acpi_sdt_header_t *header = (acpi_sdt_header_t*)(ACPI_TEMP_ADDRESS + MASK_PAGEFLAGS_4K(address));
+
+    // Get number of pages to map.
+    uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K(address) + header->length - 1, PAGE_SIZE_4K);
+
+    // Get next available virtual range.
+    page_t page = ACPI_FIRST_ADDRESS;
+    uint32_t currentCount = 0;
+    uint64_t phys;
+    while (currentCount < pageCount) {     
+        // Check if page is free.
+        if (!paging_get_phys(page, &phys))
+            currentCount++;
         else {
-            // Map address block to virtual memory.
-            paging_map_virtual_to_phys(page, base);
-            return page + MASK_PAGEFLAGS_4K(address);
+            // Move to next page.
+            page += PAGE_SIZE_4K;
+            if (page > ACPI_LAST_ADDRESS)
+                panic("ACPI out of virtual addresses!\n");
+
+            // Start back at zero.
+            currentCount = 0;
         }
     }
 
-    // No address could be found!
-    panic("ACPI out of virtual addresses!\n");
+    // Check if last page is outside bounds.
+    if (page + ((pageCount - 1) * PAGE_SIZE_4K) > ACPI_LAST_ADDRESS)
+        panic("ACPI out of virtual addresses!\n");
+
+    // Map range.
+    for (uint32_t p = 0; p < pageCount; p++)
+        paging_map_virtual_to_phys(page + (p * PAGE_SIZE_4K), MASK_PAGE_4K(address) + (p * PAGE_SIZE_4K));
+
+    // Return address.
+    paging_unmap_virtual(ACPI_TEMP_ADDRESS);
+    return page + MASK_PAGEFLAGS_4K(address);
 }
 
 static bool acpi_checksum_sdt(acpi_sdt_header_t *header) {
@@ -250,7 +268,8 @@ static bool acpi_parse_rsdt(acpi_rsdt_t* rsdt) {
     for (uint32_t i = 0; i < (rsdt->header.length - sizeof(acpi_sdt_header_t)) / sizeof(uint32_t); i++)
     {
         // Get address of table.
-        uint32_t addr = acpi_map_address(rsdt->entries[i]);
+        uint32_t addr = acpi_map_table(rsdt->entries[i]);
+        
 
         acpi_sdt_header_t* header = (acpi_sdt_header_t*)addr;
         char sig[5];
@@ -295,7 +314,7 @@ bool acpi_init() {
     kprintf("Revision: 0x%X\n", acpi_rsdp->revision);
 
     // Get RSDT.
-    uint32_t addr = acpi_map_address(acpi_rsdp->rsdtAddress);
+    uint32_t addr = acpi_map_table(acpi_rsdp->rsdtAddress);
     acpi_rsdt = (acpi_rsdt_t*)acpi_get_table(addr, ACPI_SIGNATURE_RSDT);
     if (acpi_rsdt == NULL) {
         kprintf("Couldn't get RSDT! Aborting.\n");
