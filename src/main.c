@@ -26,7 +26,7 @@
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
 	// Disable interrupts.
-	asm volatile("cli");
+	asm volatile ("cli");
 
     // Get args.
     va_list args;
@@ -37,7 +37,11 @@ void panic(const char *format, ...) {
 	kprintf_va(format, args);
 	kprintf("\n\nHalted.");
 
+	// Halt other processors.
+	lapic_send_nmi_all();
+
 	// Halt forever.
+	asm volatile ("hlt");
 	while (true);
 }
 

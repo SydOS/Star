@@ -26,12 +26,11 @@ uintptr_t *apStacks;
 static volatile uint64_t ap_map;
 
 void ap_main() {
-    // Set stack.
-    uintptr_t stack = 0;
-    asm volatile ("movl %%ebp, %0" : "=r"(stack));
+    // Get processor ID.
+    uint32_t cpu = lapic_id();
 
     kprintf("Hi from a core!\n");
-    kprintf("I should be core %u\n", lapic_id());
+    kprintf("I should be core %u\n", cpu);
 
     // Processor is initialized.
     ap_map |= (1 << lapic_id());
@@ -39,6 +38,16 @@ void ap_main() {
     // Load existing GDT and IDT into processor.
     gdt_load();
     idt_load();
+    lapic_setup();
+
+    // Enable interrupts.
+    asm volatile ("sti");
+    kprintf("CPU%u: INTERRUPTS ENABLED.\n", cpu);
+    //uint32_t d = 5 /0;
+    while (true) {
+        sleep(2000);
+        kprintf("Tick tock, I'm CPU%d!\n", cpu);
+    }
 }
 
 void smp_setup_stacks() {
@@ -57,7 +66,6 @@ void smp_setup_stacks() {
         }
 
         // Allocate space for stack.
-        kheap_dump_all_bins();
         apStacks[cpu] = kheap_alloc(SMP_AP_STACK_SIZE);
 
         // Ensure its a valid address.

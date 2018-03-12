@@ -161,18 +161,8 @@ void interrupts_isr_handler(registers_t *regs) {
     }
     else {
         // If we have an exception, print default message.
-        if (intNum == 2)
-        {
-            uint8_t a = inb(0x92);
-            uint8_t b = inb(0x61);
-            kprintf("");
-        }
-
         if (intNum < IRQ_OFFSET) {
-            kprintf("Exception: %s\n", exception_messages[intNum]);
-
-        if (intNum != 2)
-            panic("");
+            panic("CPU%d: Exception: %s\n", lapic_id(), exception_messages[intNum]);
         }
     }
 

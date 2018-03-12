@@ -102,6 +102,18 @@ void lapic_send_startup(uint8_t apic, uint8_t vector) {
     lapic_send_icr(icr);
 }
 
+void lapic_send_nmi_all() {
+    // Send NMI to all LAPICs but ourself.
+    lapic_icr_t icr = create_empty_icr();
+    icr.deliveryMode = LAPIC_DELIVERY_NMI;
+    icr.triggerMode = LAPIC_TRIGGER_EDGE;
+    icr.destinationShorthand = LAPIC_DEST_SHORTHAND_ALL_BUT_SELF;
+    icr.level = LAPIC_LEVEL_ASSERT;
+
+    // Send ICR.
+    lapic_send_icr(icr);
+}
+
 uint32_t lapic_id() {
     // Get ID.
     return lapic_read(LAPIC_REG_ID) >> 24;
@@ -127,13 +139,8 @@ void lapic_create_spurious_interrupt(uint8_t interrupt) {
     lapic_write(LAPIC_REG_SPURIOUS_INT_VECTOR, interrupt | 0x100);
 }
 
-void lapic_init() {
-    // Get the base address of the local APIC.  
-    uint32_t base = lapic_get_base();
-    kprintf("LAPIC: Initializing LAPIC at 0x%X...\n", base);
-
+void lapic_setup() {
     // Map LAPIC and get info.
-    paging_map_virtual_to_phys(LAPIC_ADDRESS, base);
     kprintf("LAPIC: Mapped to 0x%X\n", LAPIC_ADDRESS);
     kprintf("LAPIC: x2 APIC: %s\n", lapic_x2apic() ? "yes" : "no");
     kprintf("LAPIC: ID: %u\n", lapic_id());
@@ -144,9 +151,20 @@ void lapic_init() {
     lapic_write(LAPIC_REG_TASK_PRIORITY, 0x00);
     lapic_write(LAPIC_REG_DEST_FORMAT, 0xFFFFFFFF);
     lapic_write(LAPIC_REG_LOGICAL_DEST, 1 << 24);
+    lapic_create_spurious_interrupt(0xFF);
+}
+
+void lapic_init() {
+    // Get the base address of the local APIC and map it.
+    uint32_t base = lapic_get_base();
+    paging_map_virtual_to_phys(LAPIC_ADDRESS, base);
+    kprintf("LAPIC: Initializing LAPIC at 0x%X...\n", base);
+    idt_set_gate(0xFF, (uint32_t)_isr_empty, 0x08, 0x8E);
+
+    lapic_setup();
 
     // Create spurious interrupt.
-    idt_set_gate(0xFF, (uint32_t)_isr_empty, 0x08, 0x8E);
-    lapic_create_spurious_interrupt(0xFF);
+    
+    
     kprintf("LAPIC: Initialized!\n");
 }
