@@ -58,7 +58,7 @@ page_t acpi_map_table(uint32_t address) {
             // Move to next page.
             page += PAGE_SIZE_4K;
             if (page > ACPI_LAST_ADDRESS)
-                panic("ACPI out of virtual addresses!\n");
+                panic("ACPI: Out of virtual addresses!\n");
 
             // Start back at zero.
             currentCount = 0;
@@ -67,7 +67,7 @@ page_t acpi_map_table(uint32_t address) {
 
     // Check if last page is outside bounds.
     if (page + ((pageCount - 1) * PAGE_SIZE_4K) > ACPI_LAST_ADDRESS)
-        panic("ACPI out of virtual addresses!\n");
+        panic("ACPI: Out of virtual addresses!\n");
 
     // Map range.
     for (uint32_t p = 0; p < pageCount; p++)
@@ -87,16 +87,24 @@ void acpi_unmap_table(acpi_sdt_header_t *table) {
 }
 
 static bool acpi_checksum_sdt(acpi_sdt_header_t *header) {
+    kprintf("ACPI: Getting checksum for table 0x%X...", (uint32_t)header);
+
     // Add bytes of entire table. Checksum dicates the lowest byte must be zero.
     uint8_t sum = 0;
     for (uint32_t i = 0; i < header->length; i++)
         sum += ((uint8_t*)header)[i];
+
+    kprintf("%s\n", sum == 0 ? "passed!" : "failed!");
     return sum == 0;
 }
 
 acpi_sdt_header_t *acpi_get_table(uint32_t address, const char *signature) {
     // Get pointer to table.
     acpi_sdt_header_t* table = (acpi_sdt_header_t*)address;
+    char sig[5];
+    strncpy(sig, table->signature, 4);
+    sig[4] = '\0';
+    kprintf("ACPI: Getting table %s, address: 0x%X, length: %u\n", sig, address, table->length);
 
     // Ensure table is valid.
     if (((memcmp(table->signature, signature, 4) != 0) || !acpi_checksum_sdt(table)))

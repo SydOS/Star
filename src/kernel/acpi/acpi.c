@@ -86,6 +86,8 @@ void acpi_init() {
     oemId[6] = '\0';
     kprintf("ACPI:    OEM: \"%s\"\n", oemId);
     kprintf("ACPI:    Revision: %u\n", rsdp->revision);
+    kprintf("ACPI:    RSDT: 0x%X\n", rsdp->rsdtAddress);
+    kprintf("ACPI:    XSDT: 0x%X\n", rsdp->xsdtAddress);
 
     // Get Root System Description Table (RSDT).
     kprintf("ACPI: Getting Root System Description Table (RSDT) at 0x%X...\n", rsdp->rsdtAddress);
