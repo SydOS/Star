@@ -77,6 +77,7 @@ void rtc_init() {
 	struct RTCTime *time = (struct RTCTime*)kheap_alloc(sizeof(struct RTCTime));
 	rtc_time = time;
 	rtc_settings = rtc_get_settings();
+	rtc_get_time();
 
 	tasking_add_process(tasking_create_process("rtc", (uint32_t)rtc_thread));
 }
