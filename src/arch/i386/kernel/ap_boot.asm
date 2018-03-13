@@ -182,12 +182,16 @@ _ap_bootstrap_higherhalf:
     ; Set up temporary stack.
     mov esp, ap_bootstrap_stack_end
 
-    ; Get the ID for this processor's LAPIC.
+    ; Get the ID for this processor's LAPIC. ID is placed in eax.
     extern lapic_id
     call lapic_id
 
+    ; Get index of stack. Index is placed in eax.
+    push eax
+    extern ap_get_stack_index
+    call ap_get_stack_index
+
     ; Load up stack for this processor.
-        xchg bx, bx
     mov ebx, [apStacks]
     mov esp, [ebx + eax * 4]
     add esp, 0x4000

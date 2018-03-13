@@ -32,6 +32,16 @@ uintptr_t *apStacks;
 // Bitmap for indicating which processors are initialized, used during initial startup.
 static volatile uint64_t ap_map;
 
+uint32_t ap_get_stack_index(uint8_t apicId) {
+    uint32_t index = 0;
+    while (index < cpuCount && cpus[index] != apicId)
+        index++;
+
+    if (index >= cpuCount)
+        panic("SMP: Failed to find stack for processor LAPIC %u!\n", apicId);
+    return index;
+}
+
 void ap_main() {
     // Get processor ID.
     uint32_t cpu = lapic_id();
@@ -170,7 +180,7 @@ void smp_init() {
         sleep(10);
 
         // Send STARTUP command to processor (AP).
-        kprintf("SMP: Sending STARTUP to LAPIC %u on processor %u\n", cpus[cpu], cpu); // IMPORTANT TODO: fix stack array somehow when processor ID doesn't match LAPIC ID.
+        kprintf("SMP: Sending STARTUP to LAPIC %u on processor %u\n", cpus[cpu], cpu);
         lapic_send_startup(cpus[cpu], SMP_AP_BOOTSTRAP_ADDRESS / PAGE_SIZE_4K);
 
         // Wait for processor to come up.
