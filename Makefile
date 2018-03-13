@@ -1,4 +1,4 @@
-CFLAGS?=-std=gnu99 -ffreestanding -ggdb -gdwarf-2 -Wall -Wextra -I./src/include
+CFLAGS?=-std=gnu99 -ffreestanding -ggdb -gdwarf-2 -Wall -Wextra -I./src/include -Wall -Wextra -Wno-unused
 ARCH?=i686
 TIME?=$(shell date +%s)
 
