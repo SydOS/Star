@@ -1,6 +1,7 @@
 #include <main.h>
 #include <kprint.h>
 #include <string.h>
+#include <io.h>
 #include <arch/i386/kernel/acpi.h>
 #include <arch/i386/kernel/ioapic.h>
 #include <kernel/paging.h>

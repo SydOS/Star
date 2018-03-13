@@ -61,6 +61,7 @@ enum {
 };
 
 extern void paging_map_virtual_to_phys(page_t virt, page_t phys);
+extern bool paging_get_phys(page_t virtual, uint64_t *physOut);
 extern void paging_init();
 
 #endif

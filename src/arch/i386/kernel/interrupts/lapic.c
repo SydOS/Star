@@ -4,6 +4,7 @@
 #include <arch/i386/kernel/lapic.h>
 #include <arch/i386/kernel/cpuid.h>
 #include <arch/i386/kernel/pic.h>
+#include <arch/i386/kernel/idt.h>
 #include <kernel/paging.h>
 
 extern void _isr_empty();
