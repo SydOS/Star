@@ -44,9 +44,11 @@ void __notified(int sig) {
 		case SIG_TERM:
 			kprintf("Received SIGTERM, terminating!\n");
 			_kill();
+			break;
 		case SIG_SEGV:
 			kprintf("Received SIGSEGV, terminating!\n");
 			_kill();
+			break;
 		default:
 			kprintf("Received unknown SIG!\n");
 			return;
