@@ -152,6 +152,7 @@ extern uint8_t lapic_version();
 extern uint8_t lapic_max_lvt();
 extern void lapic_eoi();
 extern void lapic_create_spurious_interrupt(uint8_t interrupt);
+extern void lapic_setup();
 extern void lapic_init();
 
 #endif

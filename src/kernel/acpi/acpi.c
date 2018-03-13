@@ -3,7 +3,6 @@
 #include <string.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/acpi/acpi_tables.h>
-#include <kernel/paging.h>
 #include <arch/i386/kernel/interrupts.h>
 
 static bool acpiInitialized;
@@ -11,8 +10,6 @@ static acpi_rsdp_t *rsdp;
 static acpi_rsdt_t *rsdt;
 static acpi_fadt_t *fadt;
 static acpi_madt_t *madt;
-
-
 
 inline bool acpi_supported() {
     return acpiInitialized;
@@ -44,28 +41,23 @@ static acpi_sdt_header_t *acpi_search_rsdt(const char *signature, uint32_t index
     return NULL;
 }
 
-acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uintptr_t start) {
+acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start) {
     // If MADT is null, we cannot search for entries.
     if (madt == NULL)
         return NULL;
 
     // Search for the first matched entry after the start specified.
-    uintptr_t address = start == 0 ? madt->entries : start;
-    while (address >= madt->entries && address < (madt->entries + (madt->header.length - sizeof(acpi_madt_entry_header_t)))) {
+    uintptr_t address = start == 0 ? (uintptr_t)madt->entries : (uintptr_t)start;
+    while (address >= (uintptr_t)madt->entries && address < (uintptr_t)((uintptr_t)madt->entries + (madt->header.length - sizeof(acpi_madt_entry_header_t)))) {
         // Get entry.
         acpi_madt_entry_header_t *header = (acpi_madt_entry_header_t*)address;
         
-        // Ensure entry is not zero bytes.
+        // Ensure entry matches length and type.
         uint8_t length = header->length;
-        if (length != 0) {
-            // Does the type match?
-            if (header->type == type)
-                return header;
-        }
-        else {
-            // Setting length to 1 will move to the next byte.
-            length = 1;
-        }
+        if (length == requiredLength && header->type == type)
+            return header;
+        else 
+            length = 1; // Setting length to 1 will move to the next byte.
 
         // Move to next entry.
         address += length;
@@ -122,9 +114,6 @@ void acpi_init() {
         kprintf("ACPI: Mapped MADT to 0x%X, size: %u bytes\n", (uint32_t)madt, madt->header.length);
     else
         kprintf("ACPI: No MADT found. APICs and SMP will not be available.\n");
-
-    // Find IOAPIC.
-    acpi_madt_entry_io_apic_t *apic = (acpi_madt_entry_io_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_IO_APIC, 0);
 
     kprintf("ACPI: Initialized!\n");
     acpiInitialized = true;

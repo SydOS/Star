@@ -76,7 +76,7 @@ struct ioapic_redirection_entry {
 typedef struct ioapic_redirection_entry ioapic_redirection_entry_t;
 
 extern uint32_t ioapic_remap_interrupt(uint32_t interrupt);
-extern inline bool ioapic_supported();
+extern bool ioapic_supported();
 extern uint8_t ioapic_id();
 extern uint8_t ioapic_version();
 extern uint8_t ioapic_max_interrupts();

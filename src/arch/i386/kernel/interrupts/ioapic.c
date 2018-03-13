@@ -119,7 +119,7 @@ void ioapic_init() {
         panic("IOAPIC: Attempting to initialize multiple times.\n");
 
     // Search for I/O APIC entry in ACPI.
-    acpi_madt_entry_io_apic_t *ioApicMadt = (acpi_madt_entry_io_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_IO_APIC, 0);
+    acpi_madt_entry_io_apic_t *ioApicMadt = (acpi_madt_entry_io_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_IO_APIC, 12, 0);
     if (ioApicMadt == NULL) {
         kprintf("IOAPIC: No I/O APIC found or ACPI is disabled. Aborting.\n");
         ioApicInitialized = false;
@@ -142,11 +142,12 @@ void ioapic_init() {
         ioapic_disable_interrupt(i);
 
     // Search for any interrupt remappings.
-    acpi_madt_entry_interrupt_override_t *override = acpi_search_madt(ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE, 0);
+    acpi_madt_entry_interrupt_override_t *override = (acpi_madt_entry_interrupt_override_t*)acpi_search_madt(ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE, 10, 0);
     while (override != NULL) {
         // Add override.
+        kprintf("IOAPIC: Mapping interrupt %u to interrupt %u.\n", override->source, override->globalSystemInterrupt);
         interrupt_redirections[override->source] = override->globalSystemInterrupt;
-        override = acpi_search_madt(ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE, ((uintptr_t)override) + 1);
+        override = (acpi_madt_entry_interrupt_override_t*)acpi_search_madt(ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE, 10, ((uintptr_t)override) + 1);
     }
 
     kprintf("IOAPIC: Initialized!\n");

@@ -8,8 +8,8 @@
 #define ACPI_FIRST_ADDRESS  0xFEF01000
 #define ACPI_LAST_ADDRESS   0xFEFFF000
 
-extern inline bool acpi_supported();
-extern acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uintptr_t start);
+extern bool acpi_supported();
+acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start);
 extern void acpi_init();
 
 #endif

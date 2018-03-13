@@ -1,6 +1,7 @@
 #include <main.h>
 #include <kprint.h>
 #include <io.h>
+#include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/lapic.h>
 #include <arch/i386/kernel/cpuid.h>
 #include <arch/i386/kernel/pic.h>
@@ -65,7 +66,6 @@ static lapic_icr_t create_empty_icr() {
 static void lapic_send_icr(lapic_icr_t icr) {
     // Get ICR into two 32-bit values.
     uint32_t *data = (uint32_t*)&icr;
-    uint64_t *test = (uint64_t*)&icr;
 
     // Send ICR to LAPICs.
     lapic_write(LAPIC_REG_INTERRUPT_CMD_HIGH, data[1]);
@@ -151,6 +151,8 @@ void lapic_setup() {
     lapic_write(LAPIC_REG_TASK_PRIORITY, 0x00);
     lapic_write(LAPIC_REG_DEST_FORMAT, 0xFFFFFFFF);
     lapic_write(LAPIC_REG_LOGICAL_DEST, 1 << 24);
+
+    // Create spurious interrupt.
     lapic_create_spurious_interrupt(0xFF);
 }
 
@@ -162,9 +164,5 @@ void lapic_init() {
     idt_set_gate(0xFF, (uint32_t)_isr_empty, 0x08, 0x8E);
 
     lapic_setup();
-
-    // Create spurious interrupt.
-    
-    
     kprintf("LAPIC: Initialized!\n");
 }

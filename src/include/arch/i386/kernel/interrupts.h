@@ -66,8 +66,8 @@ extern void interrupts_isr_install_handler(uint8_t isr, isr_handler handler);
 extern void interrupts_isr_remove_handler(uint8_t isr);
 extern void interrupts_irq_install_handler(uint8_t irq, isr_handler handler);
 extern void interrupts_irq_remove_handler(uint8_t irq);
-extern inline void interrupts_enable();
-extern inline void interrupts_disable();
+extern void interrupts_enable();
+extern void interrupts_disable();
 extern void interrupts_init();
 
 #endif

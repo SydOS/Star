@@ -105,13 +105,12 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	kprintf("Setting up PIT...\n");
     pit_init();
 
-		sleep(5000);
-
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
 
 	// Initialize SMP.
-	//smp_init();
+	smp_init();
+	sleep(2000);
 
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");
