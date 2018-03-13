@@ -27,6 +27,8 @@ void idt_load() {
 
 // Initializes the IDT.
 void idt_init() {
+    kprintf("IDT: Initializing...\n");
+
     // Set up the IDT pointer and limit.
     idtPtr.limit = (sizeof(idt_entry_t) * IDT_ENTRIES) - 1;
     idtPtr.base = (uint32_t)&idt;

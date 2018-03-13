@@ -4,7 +4,7 @@
 #include <string.h>
 #include <arch/i386/kernel/smp.h>
 
-#include <arch/i386/kernel/acpi.h>
+#include <kernel/acpi/acpi.h>
 #include <arch/i386/kernel/gdt.h>
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/lapic.h>
@@ -52,7 +52,7 @@ void ap_main() {
 
 void smp_setup_stacks() {
     // Get processor count.
-    uint32_t cpus = acpi_get_cpu_count();
+    uint32_t cpus = 1;//acpi_get_cpu_count();
 
     // Allocate space for stack list.
     apStacks = kheap_alloc(sizeof(uintptr_t*) * cpus);
@@ -109,7 +109,7 @@ void smp_destroy_apboot() {
 
 void smp_init() {
     // Get processor count.
-    uint32_t cpus = acpi_get_cpu_count();
+    uint32_t cpus = 0;//acpi_get_cpu_count();
     kprintf("SMP: Initializing %u processors...\n", cpus);
 
     // Initialize AP boot code.

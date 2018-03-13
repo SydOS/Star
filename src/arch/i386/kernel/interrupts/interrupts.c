@@ -3,7 +3,7 @@
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/interrupts.h>
 
-#include <arch/i386/kernel/acpi.h>
+#include <kernel/acpi/acpi.h>
 #include <arch/i386/kernel/ioapic.h>
 #include <arch/i386/kernel/lapic.h>
 #include <arch/i386/kernel/pic.h>
@@ -109,6 +109,7 @@ static char *exception_messages[] = {
     "Reserved"
 };
 
+// Do we send EOIs to the LAPIC instead of the PIC?
 static bool useLapic = false;
 
 void interrupts_eoi(uint32_t intNo) {
@@ -171,12 +172,23 @@ void interrupts_isr_handler(registers_t *regs) {
         interrupts_eoi(intNum);
 }
 
-// Initializes interrupts.
-void interrupts_init(bool useApic) {
-    // Initialize PIC.
-    pic_init();
+inline void interrupts_enable() {
+    asm volatile ("sti");
+}
 
-    if (useApic) {
+inline void interrupts_disable() {
+    asm volatile ("cli");
+}
+
+// Initializes interrupts.
+void interrupts_init() {
+    kprintf("INTERRUPTS: Initializing...\n");
+
+    // Initialize PIC and I/O APIC.
+    pic_init();
+    ioapic_init();
+
+    if (acpi_supported() && ioapic_supported()) {
         // Disable PIC.
         pic_disable();
 
@@ -190,13 +202,13 @@ void interrupts_init(bool useApic) {
                 continue;
             
             // Enable IRQ.
-            ioapic_enable_interrupt(acpi_remap_interrupt(i), IRQ_OFFSET + i);
-        }     
-
+            ioapic_enable_interrupt(ioapic_remap_interrupt(i), IRQ_OFFSET + i);
+        }
         useLapic = true;
     }
 
     // Add each of the 32 exception ISRs to the IDT.
+    kprintf("INTERRUPTS: Mapping exceptions...\n");
     idt_set_gate(0, (uint32_t)_isr0, 0x08, 0x8E);
     idt_set_gate(1, (uint32_t)_isr1, 0x08, 0x8E);
     idt_set_gate(2, (uint32_t)_isr2, 0x08, 0x8E);
@@ -234,6 +246,7 @@ void interrupts_init(bool useApic) {
     idt_set_gate(31, (uint32_t)_isr31, 0x08, 0x8E);
 
     // Add the 16 IRQ ISRs to the IDT.
+    kprintf("INTERRUPTS: Mapping IRQs...\n");
     idt_set_gate(32, (uint32_t)_irq0, 0x08, 0x8E);
     idt_set_gate(33, (uint32_t)_irq1, 0x08, 0x8E);
     idt_set_gate(34, (uint32_t)_irq2, 0x08, 0x8E);
@@ -251,5 +264,5 @@ void interrupts_init(bool useApic) {
     idt_set_gate(46, (uint32_t)_irq14, 0x08, 0x8E);
     idt_set_gate(47, (uint32_t)_irq15, 0x08, 0x8E);
 
-    kprintf("Interrupts initialized!\n");
+    kprintf("INTERRUPTS: Initialized!\n");
 }

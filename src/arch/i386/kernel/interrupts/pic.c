@@ -83,5 +83,7 @@ void pic_disable() {
 
 void pic_init() {
     // Enable the PIC.
+    kprintf("PIC: Initializing...\n");
     pic_enable();
+    kprintf("PIC: Initialized!\n");
 }

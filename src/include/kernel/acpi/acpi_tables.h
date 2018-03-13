@@ -1,15 +1,14 @@
-#ifndef ACPI_H
-#define ACPI_H
+#ifndef ACPI_TABLES_H
+#define ACPI_TABLES_H
 
 #include <main.h>
+#include <kernel/paging.h>
 
-#define ACPI_TEMP_ADDRESS   0xFEF00000
-#define ACPI_FIRST_ADDRESS  0xFEF01000
-#define ACPI_LAST_ADDRESS   0xFEFFF000
+// ACPI RDSP signature.
+#define ACPI_RSDP_PATTERN1  "RSD "
+#define ACPI_RSDP_PATTERN2  "PTR "
 
-#define ACPI_RSDP_PATTERN1  0x20445352 // "RSD "
-#define ACPI_RSDP_PATTERN2  0x20525450 // "PTR "
-
+// ACPI table signatures.
 #define ACPI_SIGNATURE_MADT "APIC"
 #define ACPI_SIGNATURE_BERT "BERT"
 #define ACPI_SIGNATURE_BGRT "BGRT"
@@ -350,8 +349,13 @@ struct acpi_madt {
 } __attribute__((packed));
 typedef struct acpi_madt acpi_madt_t;
 
-extern uint32_t acpi_remap_interrupt(uint32_t interrupt);
-extern uint32_t acpi_get_cpu_count();
-extern bool acpi_init();
+// Functions.
+extern acpi_rsdp_t *acpi_get_rsdp();
+extern acpi_sdt_header_t *acpi_map_header_temp(uint32_t address);
+extern void acpi_unmap_header_temp();
+extern page_t acpi_map_table(uint32_t address);
+extern void acpi_unmap_table(acpi_sdt_header_t *table);
+extern acpi_sdt_header_t *acpi_get_table(uint32_t address, const char *signature);
+extern acpi_rsdt_t *acpi_get_rsdt(uint32_t address);
 
 #endif
