@@ -60,7 +60,7 @@ enum {
     PAGING_PAGE_GLOBAL          = 0x80
 };
 
-extern void paging_map_kernel_virtual_to_phys(page_t virt, page_t phys);
+extern void paging_map_virtual_to_phys(page_t virt, page_t phys);
 extern void paging_init();
 
 #endif

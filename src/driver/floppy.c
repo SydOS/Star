@@ -2,6 +2,7 @@
 #include <tools.h>
 #include <io.h>
 #include <kprint.h>
+#include <string.h>
 #include <driver/floppy.h>
 #include <arch/i386/kernel/interrupts.h>
 

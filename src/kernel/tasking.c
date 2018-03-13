@@ -1,5 +1,6 @@
 #include <main.h>
 #include <kprint.h>
+#include <string.h>
 #include <kernel/kheap.h>
 #include <kernel/main.h>
 #include <kernel/tasking.h>

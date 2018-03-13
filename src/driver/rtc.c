@@ -1,20 +1,11 @@
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
+#include <tools.h>
 #include <driver/rtc.h>
 #include <kernel/kheap.h>
 #include <kernel/tasking.h>
 #include <arch/i386/kernel/interrupts.h>
-
-/**
- * Thread to update the RTC every 500ms
- */
-void rtc_thread() {
-	while(true) {
-		rtc_get_time();
-		sleep(500);
-	}
-}
 
 /**
  * Reads from a specific register for RTC
@@ -68,6 +59,16 @@ struct RTC_Status_Register_B* rtc_get_settings() {
 	settings->binary_input = (data & ( 1 << 2 )) >> 2;
 
 	return settings;
+}
+
+/**
+ * Thread to update the RTC every 500ms
+ */
+void rtc_thread() {
+	while(true) {
+		rtc_get_time();
+		sleep(500);
+	}
 }
 
 /**

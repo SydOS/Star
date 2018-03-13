@@ -2,6 +2,7 @@
 #include <tools.h>
 #include <kprint.h>
 #include <string.h>
+#include <io.h>
 #include <kernel/paging.h>
 #include <kernel/pmm.h>
 #include <arch/i386/kernel/cpuid.h>
