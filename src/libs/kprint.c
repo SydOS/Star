@@ -127,7 +127,7 @@ void kprint_hex(uint64_t num, bool capital, bool pad)
 }
 
 void kprintf(const char* format, ...) {
-    spinlock_lock(&kprintf_mutex);
+    //spinlock_lock(&kprintf_mutex);
 
     // Get args.
     va_list args;
@@ -136,7 +136,7 @@ void kprintf(const char* format, ...) {
     // Call va_list kprintf.
     kprintf_va(format, args);
 
-    spinlock_release(&kprintf_mutex);
+    //spinlock_release(&kprintf_mutex);
 }
 
 // https://en.wikipedia.org/wiki/Printf_format_string

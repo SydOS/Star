@@ -169,7 +169,7 @@ void interrupts_isr_handler(registers_t *regs) {
 
     // Send EOI if IRQ.
     if (intNum >= IRQ_OFFSET)
-        interrupts_eoi(intNum);
+        interrupts_eoi(intNum - IRQ_OFFSET);
 }
 
 inline void interrupts_enable() {
@@ -187,12 +187,13 @@ void interrupts_init() {
     // Initialize PIC and I/O APIC.
     pic_init();
     ioapic_init();
+    useLapic = false;
 
     if (acpi_supported() && ioapic_supported()) {
-        // Disable PIC.
-        pic_disable();
+        kprintf("INTERRUPTS: Using APICs for interrupts.\n");
 
-        // Initialize local APIC.
+        // Disable PIC and initialize LAPIC.
+        pic_disable();
         lapic_init();
 
         // Enable all 15 IRQs on the I/O APIC, except for 2.

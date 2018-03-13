@@ -41,10 +41,10 @@ static void pic_remap(uint8_t offset1, uint8_t offset2) {
 }
 
 // Sends an EOI to the PICs.
-void pic_eoi(uint32_t interrupt) {
+void pic_eoi(uint32_t irq) {
     // If the IDT entry was greater than 40 (IRQ 8 to 15),
     // we need to send an EOI to the slave PCI too.
-    if (interrupt >= 40)
+    if (irq >= 8)
         outb(PIC2_CMD, PIC_CMD_EOI);
 
     // Send EOI to master PIC.

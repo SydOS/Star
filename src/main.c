@@ -67,7 +67,6 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
 
 	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-	kprintf("Initializing GDT...\n");
 	gdt_init();
 
 	// -------------------------------------------------------------------------

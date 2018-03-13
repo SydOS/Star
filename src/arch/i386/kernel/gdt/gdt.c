@@ -34,6 +34,8 @@ void gdt_load() {
 
 // Initializes the GDT.
 void gdt_init() {
+	kprintf("GDT: Initializing...\n");
+
 	// Set up the GDT pointer and limit.
 	gdtPtr.limit = (sizeof(gdt_entry_t) * GDT_ENTRIES) - 1;
 	gdtPtr.base = (uint32_t)&gdt;
