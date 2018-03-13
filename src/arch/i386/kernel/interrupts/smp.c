@@ -161,6 +161,9 @@ void smp_init() {
         cpu = (acpi_madt_entry_local_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_LOCAL_APIC, 8, ((uintptr_t)cpu) + 1);
     }
 
+    kprintf("SMP: Waiting two seconds for verification...\n");
+    sleep(2000);
+
     // Initialize boot code and stacks for APs.
     kprintf("SMP: Initializing %u processors...\n", cpuCount);
     smp_setup_apboot();

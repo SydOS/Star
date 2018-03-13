@@ -110,7 +110,6 @@ void kernel_main(multiboot_info_t* mboot_info) {
 
 	// Initialize SMP.
 	smp_init();
-	sleep(2000);
 
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");
