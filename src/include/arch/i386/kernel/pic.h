@@ -13,9 +13,7 @@
 #define PIC_CMD_DISABLE 0xFF
 #define PIC_CMD_8086    0x01
 
-
-
-extern void pic_eoi(uint32_t interrupt);
+extern void pic_eoi(uint32_t irq);
 extern void pic_init();
 extern void pic_disable();
 

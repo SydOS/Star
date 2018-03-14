@@ -99,17 +99,17 @@ __attribute__((section(".init"))) static void setup_pae_paging() {
     // Identity map low memory + ".init" section of kernel.
     for (uint32_t page = 0; page <= (uint32_t)&KERNEL_INIT_END; page += PAGE_SIZE_4K)
         pageTableLow[page / PAGE_SIZE_4K] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-    pageDirectoryLow[0] = (uint64_t)pageTableLow | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    pageDirectoryLow[0] = (uint32_t)pageTableLow | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Create our kernel page directory (0xC0000000 to 0xFFFFFFFF).
     uint64_t *pageDirectoryKernel = (uint64_t*)ALIGN_4K((uint32_t)pageTableLow);
     memset(pageDirectoryKernel, 0, PAGE_SIZE_4K);
-    pageDirectoryPointerTable[3] = (uint64_t)pageDirectoryKernel | PAGING_PAGE_PRESENT;
+    pageDirectoryPointerTable[3] = (uint32_t)pageDirectoryKernel | PAGING_PAGE_PRESENT;
 
     // Create first table and add it to directory.
     uint64_t *pageTableKernel = (uint64_t*)ALIGN_4K((uint32_t)pageDirectoryKernel);
     memset(pageTableKernel, 0, PAGE_SIZE_4K);
-    pageDirectoryKernel[0] = (uint64_t)pageTableKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    pageDirectoryKernel[0] = (uint32_t)pageTableKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Map low memory and kernel to higher-half virtual space.
     uint32_t offset = 0;
@@ -123,15 +123,15 @@ __attribute__((section(".init"))) static void setup_pae_paging() {
 
             // Increase offset and add new table to directory.
             offset++;
-            pageDirectoryKernel[offset] = (uint64_t)pageTableKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+            pageDirectoryKernel[offset] = (uint32_t)pageTableKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         }
         pageTableKernel[(page / PAGE_SIZE_4K) - (offset * PAGE_PAE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     }
 
     // Recursively map PDPT and both page directories.
-    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 1] = (uint64_t)pageDirectoryKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 3GB directory.
-    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 4] = (uint64_t)pageDirectoryLow | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 0GB directory.
-    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 5] = (uint64_t)pageDirectoryPointerTable | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // PDPT.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 1] = (uint32_t)pageDirectoryKernel | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 3GB directory.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 4] = (uint32_t)pageDirectoryLow | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // 0GB directory.
+    pageDirectoryKernel[PAGE_PAE_DIRECTORY_SIZE - 5] = (uint32_t)pageDirectoryPointerTable | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT; // PDPT.
 
     // Set end of temporary reserved pages.
     EARLY_PAGES_LAST = (uint32_t)pageTableKernel;

@@ -3,7 +3,7 @@
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/interrupts.h>
 
-#include <arch/i386/kernel/acpi.h>
+#include <kernel/acpi/acpi.h>
 #include <arch/i386/kernel/ioapic.h>
 #include <arch/i386/kernel/lapic.h>
 #include <arch/i386/kernel/pic.h>
@@ -109,9 +109,12 @@ static char *exception_messages[] = {
     "Reserved"
 };
 
+// Do we send EOIs to the LAPIC instead of the PIC?
+static bool useLapic = false;
+
 void interrupts_eoi(uint32_t intNo) {
     // Send EOI to LAPIC or PIC.
-    if (lapic_enabled())
+    if (useLapic)
         lapic_eoi();
     else
         pic_eoi(intNo);
@@ -159,30 +162,38 @@ void interrupts_isr_handler(registers_t *regs) {
     }
     else {
         // If we have an exception, print default message.
-        if (intNum < IRQ_OFFSET)
-        {
-            uint32_t addr;
-	asm volatile ("mov %%cr2, %0" : "=r"(addr));
-            panic("Exception: %s\n", exception_messages[intNum]);
-
-        }   
+        if (intNum < IRQ_OFFSET) {
+            panic("CPU%d: Exception: %s\n", lapic_id(), exception_messages[intNum]);
+        }
     }
 
     // Send EOI if IRQ.
     if (intNum >= IRQ_OFFSET)
-        interrupts_eoi(intNum);
+        interrupts_eoi(intNum - IRQ_OFFSET);
+}
+
+inline void interrupts_enable() {
+    asm volatile ("sti");
+}
+
+inline void interrupts_disable() {
+    asm volatile ("cli");
 }
 
 // Initializes interrupts.
-void interrupts_init(bool useApic) {
-    // Initialize PIC.
+void interrupts_init() {
+    kprintf("INTERRUPTS: Initializing...\n");
+
+    // Initialize PIC and I/O APIC.
     pic_init();
+    ioapic_init();
+    useLapic = false;
 
-    if (useApic) {
-        // Disable PIC.
+    if (acpi_supported() && ioapic_supported()) {
+        kprintf("INTERRUPTS: Using APICs for interrupts.\n");
+
+        // Disable PIC and initialize LAPIC.
         pic_disable();
-
-        // Initialize local APIC.
         lapic_init();
 
         // Enable all 15 IRQs on the I/O APIC, except for 2.
@@ -192,11 +203,13 @@ void interrupts_init(bool useApic) {
                 continue;
             
             // Enable IRQ.
-            ioapic_enable_interrupt(acpi_remap_interrupt(i), IRQ_OFFSET + i);
-        }     
+            ioapic_enable_interrupt(ioapic_remap_interrupt(i), IRQ_OFFSET + i);
+        }
+        useLapic = true;
     }
 
     // Add each of the 32 exception ISRs to the IDT.
+    kprintf("INTERRUPTS: Mapping exceptions...\n");
     idt_set_gate(0, (uint32_t)_isr0, 0x08, 0x8E);
     idt_set_gate(1, (uint32_t)_isr1, 0x08, 0x8E);
     idt_set_gate(2, (uint32_t)_isr2, 0x08, 0x8E);
@@ -234,6 +247,7 @@ void interrupts_init(bool useApic) {
     idt_set_gate(31, (uint32_t)_isr31, 0x08, 0x8E);
 
     // Add the 16 IRQ ISRs to the IDT.
+    kprintf("INTERRUPTS: Mapping IRQs...\n");
     idt_set_gate(32, (uint32_t)_irq0, 0x08, 0x8E);
     idt_set_gate(33, (uint32_t)_irq1, 0x08, 0x8E);
     idt_set_gate(34, (uint32_t)_irq2, 0x08, 0x8E);
@@ -251,5 +265,5 @@ void interrupts_init(bool useApic) {
     idt_set_gate(46, (uint32_t)_irq14, 0x08, 0x8E);
     idt_set_gate(47, (uint32_t)_irq15, 0x08, 0x8E);
 
-    kprintf("Interrupts initialized!\n");
+    kprintf("INTERRUPTS: Initialized!\n");
 }

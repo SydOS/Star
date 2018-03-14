@@ -145,7 +145,6 @@ typedef struct lapic_icr lapic_icr_t;
 extern bool lapic_supported();
 extern bool lapic_x2apic();
 extern bool lapic_enabled();
-extern void lapic_send_icr(lapic_icr_t icr);
 extern void lapic_send_init(uint8_t apic);
 extern void lapic_send_startup(uint8_t apic, uint8_t vector);
 extern uint32_t lapic_id();
@@ -153,6 +152,7 @@ extern uint8_t lapic_version();
 extern uint8_t lapic_max_lvt();
 extern void lapic_eoi();
 extern void lapic_create_spurious_interrupt(uint8_t interrupt);
+extern void lapic_setup();
 extern void lapic_init();
 
 #endif
