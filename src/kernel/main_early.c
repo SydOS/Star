@@ -1,8 +1,9 @@
 #include <main.h>
 #include <multiboot.h>
+
 #include <arch/i386/kernel/cpuid.h>
-#include <kernel/pmm.h>
-#include <kernel/paging.h>
+#include <kernel/memory/pmm.h>
+#include <kernel/memory/paging.h>
 
 // Constants in linker file.
 extern uint32_t KERNEL_VIRTUAL_OFFSET;
@@ -11,6 +12,8 @@ extern uint32_t KERNEL_PHYSICAL_END;
 extern uint32_t KERNEL_INIT_END;
 
 // Used in late memory initialization.
+uint32_t DMA_FRAMES_FIRST __attribute__((section(".inittables")));
+uint32_t DMA_FRAMES_LAST __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_START __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_END __attribute__((section(".inittables")));
 uint32_t EARLY_PAGES_LAST __attribute__((section(".inittables")));
@@ -182,9 +185,6 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
         }
     }
 
-    // Force PAE off for now.
-    //PAE_ENABLED = false;
-
     // Count up memory in bytes.
     uint64_t memory = 0;
     uintptr_t base = mbootInfo->mmap_addr;
@@ -195,11 +195,16 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
 			memory += entry->len;
 	}
 
-    // Determine DMA bitmap offset and size. TODO
+    // Determine DMA start and last frame (64 total frames).
+    DMA_FRAMES_FIRST = ALIGN_64K((uint32_t)&KERNEL_VIRTUAL_END);
+    DMA_FRAMES_LAST = DMA_FRAMES_FIRST + (PAGE_SIZE_64K * 64);
 
-    // Determine stack offset and size. This is placed after the DMA bitmap and all of its 64KB pages.
-    PAGE_FRAME_STACK_START = ALIGN_4K((uint32_t)&KERNEL_VIRTUAL_END);
+    // Determine stack offset and size. This is placed after the DMA pages.
+    PAGE_FRAME_STACK_START = ALIGN_4K(DMA_FRAMES_LAST);
     PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + ((memory / PAGE_SIZE_4K) * sizeof(uint32_t)); // Space for 32-bit addresses.
+
+    // Force PAE off for now.
+    //PAE_ENABLED = false;
 
     // Is PAE enabled?
     if (PAE_ENABLED)

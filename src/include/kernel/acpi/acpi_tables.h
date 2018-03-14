@@ -2,7 +2,7 @@
 #define ACPI_TABLES_H
 
 #include <main.h>
-#include <kernel/paging.h>
+#include <kernel/memory/paging.h>
 
 // ACPI RDSP signature.
 #define ACPI_RSDP_PATTERN1  "RSD "

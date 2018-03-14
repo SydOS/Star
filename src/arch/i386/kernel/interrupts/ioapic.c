@@ -4,7 +4,7 @@
 #include <kernel/acpi/acpi.h>
 #include <arch/i386/kernel/ioapic.h>
 #include <arch/i386/kernel/interrupts.h>
-#include <kernel/paging.h>
+#include <kernel/memory/paging.h>
 
 // https://wiki.osdev.org/IOAPIC
 

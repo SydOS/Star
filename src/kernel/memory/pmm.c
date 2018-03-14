@@ -2,8 +2,9 @@
 #include <kprint.h>
 #include <string.h>
 #include <multiboot.h>
-#include <kernel/pmm.h>
-#include <kernel/paging.h>
+
+#include <kernel/memory/pmm.h>
+#include <kernel/memory/paging.h>
 
 // Kernel's starting and ending addresses in RAM.
 extern uint32_t KERNEL_VIRTUAL_OFFSET;

@@ -4,8 +4,6 @@
 #include <main.h>
 #include <multiboot.h>
 
-#define ALIGN_4K(size)          	(((uint32_t)(size) + 0x1000) & 0xFFFFF000)
-
 // Type for page frames.
 typedef uintptr_t page_t;
 

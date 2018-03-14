@@ -2,7 +2,7 @@
 #define PAGING_H
 
 #include <main.h>
-#include <kernel/pmm.h>
+#include <kernel/memory/pmm.h>
 
 // Refer to Chapter 4: Paging of volume 3 of the Intel SDM for more info.
 
@@ -38,6 +38,10 @@
 #define PAGE_PAE_DIR_1GB_ADDRESS        ((uint32_t)PAGE_PAE_TABLES_2GB_ADDRESS + ((uint32_t)PAGE_SIZE_4K * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 2)))
 #define PAGE_PAE_DIR_0GB_ADDRESS        ((uint32_t)PAGE_PAE_TABLES_2GB_ADDRESS + ((uint32_t)PAGE_SIZE_4K * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 3)))
 #define PAGE_PAE_PDPT_ADDRESS           ((uint32_t)PAGE_PAE_TABLES_2GB_ADDRESS + ((uint32_t)PAGE_SIZE_4K * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 4)))
+
+// Alignments.
+#define ALIGN_4K(size)          	(((uint32_t)(size) + (uint32_t)PAGE_SIZE_4K) & 0xFFFFF000)
+#define ALIGN_64K(size)             (((uint32_t)(size) + (uint32_t)PAGE_SIZE_64K) & 0xFFFF0000)
 
 // Masks.
 #define MASK_DIRECTORY_PAE(addr)        ((uint64_t)(addr) & 0xFFFFFFF0)     // Get only the PDPT address.

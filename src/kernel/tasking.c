@@ -1,9 +1,10 @@
 #include <main.h>
 #include <kprint.h>
 #include <string.h>
-#include <kernel/kheap.h>
-#include <kernel/main.h>
+
 #include <kernel/tasking.h>
+#include <kernel/memory/kheap.h>
+#include <kernel/main.h>
 #include <arch/i386/kernel/interrupts.h>
 
 extern void _isr_exit();

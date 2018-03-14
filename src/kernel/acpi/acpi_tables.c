@@ -4,7 +4,7 @@
 #include <math.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/acpi/acpi_tables.h>
-#include <kernel/paging.h>
+#include <kernel/memory/paging.h>
 
 acpi_rsdp_t *acpi_get_rsdp() {
     // Search the BIOS area of low memory for the RSDP.

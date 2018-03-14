@@ -11,9 +11,9 @@
 #include <arch/i386/kernel/lapic.h>
 #include <kernel/nmi.h>
 #include <kernel/pit.h>
-#include <kernel/pmm.h>
-#include <kernel/paging.h>
-#include <kernel/kheap.h>
+#include <kernel/memory/pmm.h>
+#include <kernel/memory/paging.h>
+#include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
 #include <arch/i386/kernel/smp.h>
 #include <arch/i386/kernel/cpuid.h>

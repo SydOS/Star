@@ -9,9 +9,9 @@
 #include <arch/i386/kernel/gdt.h>
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/lapic.h>
-#include <kernel/pmm.h>
-#include <kernel/paging.h>
-#include <kernel/kheap.h>
+#include <kernel/memory/kheap.h>
+#include <kernel/memory/pmm.h>
+#include <kernel/memory/paging.h>
 
 // https://wiki.osdev.org/SMP
 // http://ethv.net/workshops/osdev/notes/notes-5
