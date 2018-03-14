@@ -142,7 +142,7 @@ void smp_init() {
 
     // If none or only one CPU was found in ACPI, no need to further intialize SMP.
     if (cpuCount <= 1) {
-        kprintf("SMP: More than one processor was not found in the ACPI. Aborting.\n");
+        kprintf("SMP: More than one usable processor was not found in the ACPI. Aborting.\n");
         smpInitialized = false;
         return;
     }
