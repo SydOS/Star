@@ -57,7 +57,11 @@ void pmm_dma_set_frame(uint32_t frame, bool status) {
 		panic("PMM: Invalid DMA frame 0x%X specified!\n", frame);
 
 	// Change status of frame.
-	dmaFrames[frame / PAGE_SIZE_64K] = status;
+	dmaFrames[(memInfo.dmaPageFrameFirst - frame) / PAGE_SIZE_64K] = status;
+}
+
+uint32_t pmm_dma_get_phys(uint32_t frame) {
+	return frame - memInfo.kernelVirtualOffset;
 }
 
 /**
@@ -77,7 +81,7 @@ static void pmm_dma_build_bitmap() {
 		panic("PMM: Couldn't get DMA frame!\n");
 
 	// Test memory.
-	kprintf("PMM: Testing %uKB of memory at 0x%X...", PAGE_SIZE_64K / 1024, frame1);
+	kprintf("PMM: Testing %uKB of memory at 0x%X (0x%X)...", PAGE_SIZE_64K / 1024, frame1, pmm_dma_get_phys(frame1));
 	uint32_t *framePtr = (uint32_t*)frame1;
 	for (uint32_t i = 0; i < PAGE_SIZE_64K / sizeof(uint32_t); i++)
 		framePtr[i] = i;
@@ -96,7 +100,7 @@ static void pmm_dma_build_bitmap() {
 		panic("PMM: Couldn't get DMA frame!\n");
 
 	// Test memory.
-	kprintf("PMM: Testing %uKB of memory at 0x%X...", PAGE_SIZE_64K / 1024, frame2);
+	kprintf("PMM: Testing %uKB of memory at 0x%X (0x%X)...", PAGE_SIZE_64K / 1024, frame2, pmm_dma_get_phys(frame2));
 	framePtr = (uint32_t*)frame2;
 	for (uint32_t i = 0; i < PAGE_SIZE_64K / sizeof(uint32_t); i++)
 		framePtr[i] = i;
