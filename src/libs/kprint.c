@@ -2,6 +2,9 @@
 #include <kprint.h>
 #include <driver/serial.h>
 #include <driver/vga.h>
+#include <kernel/lock.h>
+
+lock_t kprintf_mutex = 0;
 
 // Print a single character.
 void kputchar(char c)
@@ -124,12 +127,16 @@ void kprint_hex(uint64_t num, bool capital, bool pad)
 }
 
 void kprintf(const char* format, ...) {
+    //spinlock_lock(&kprintf_mutex);
+
     // Get args.
     va_list args;
     va_start(args, format);
 
     // Call va_list kprintf.
     kprintf_va(format, args);
+
+    //spinlock_release(&kprintf_mutex);
 }
 
 // https://en.wikipedia.org/wiki/Printf_format_string

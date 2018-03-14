@@ -111,7 +111,7 @@ static void pmm_build_stack() {
         // Add frame to stack.
         uint32_t pageFrameBase = ALIGN_4K(entry->addr);	
         kprintf("Adding pages in 0x%X!\n", pageFrameBase);			
-		for (uint32_t i = 0; i < entry->len / PAGE_SIZE_4K; i++) {
+		for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
 			uint32_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
 
 			// If the address is in conventional memory (low memory), or is reserved by
@@ -127,6 +127,7 @@ static void pmm_build_stack() {
 		}       
 	}
     kprintf("Added %u page frames!\n", pageFramesAvailable);
+	kprintf("First page on stack: 0x%X\n", *pageFrameStack);
 }
 
 // Initializes the physical memory manager.

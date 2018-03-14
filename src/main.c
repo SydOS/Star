@@ -7,7 +7,7 @@
 #include <arch/i386/kernel/gdt.h>
 #include <arch/i386/kernel/idt.h>
 #include <arch/i386/kernel/interrupts.h>
-#include <arch/i386/kernel/acpi.h>
+#include <kernel/acpi/acpi.h>
 #include <arch/i386/kernel/lapic.h>
 #include <kernel/nmi.h>
 #include <kernel/pit.h>
@@ -15,6 +15,7 @@
 #include <kernel/paging.h>
 #include <kernel/kheap.h>
 #include <kernel/tasking.h>
+#include <arch/i386/kernel/smp.h>
 #include <arch/i386/kernel/cpuid.h>
 #include <driver/vga.h>
 #include <driver/floppy.h>
@@ -26,7 +27,7 @@
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
 	// Disable interrupts.
-	asm volatile("cli");
+	interrupts_disable();
 
     // Get args.
     va_list args;
@@ -37,7 +38,11 @@ void panic(const char *format, ...) {
 	kprintf_va(format, args);
 	kprintf("\n\nHalted.");
 
+	// Halt other processors.
+	lapic_send_nmi_all();
+
 	// Halt forever.
+	asm volatile ("hlt");
 	while (true);
 }
 
@@ -45,8 +50,6 @@ void panic(const char *format, ...) {
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main(multiboot_info_t* mboot_info) {
-	// Ensure interrupts are disabled.
-	asm volatile("cli");
 	vga_disable_cursor();
 	
 	// Initialize serial for logging.
@@ -65,7 +68,6 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
 
 	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-	kprintf("Initializing GDT...\n");
 	gdt_init();
 
 	// -------------------------------------------------------------------------
@@ -86,26 +88,28 @@ void kernel_main(multiboot_info_t* mboot_info) {
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	kprintf("Initializing IDT...\n");
+	// Initialize IDT, ACPI, and interrupts.
 	idt_init();
-
-	kprintf("Initializing ACPI...\n");
-	bool acpi = acpi_init();
-
-	kprintf("Initializing interrupts...\n");
-	interrupts_init(acpi && lapic_supported());
-
+	acpi_init();
+	interrupts_init();
 	kprintf("Enabling NMI...\n");
 	NMI_enable();
     
     // Enable interrupts.
-	asm volatile("sti");
+	interrupts_enable();
     vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
     kprintf("INTERRUPTS ARE ENABLED\n");
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
+
 	kprintf("Setting up PIT...\n");
     pit_init();
+
+	kprintf("Initializing PS/2...\n");
+	ps2_init();
+
+	// Initialize SMP.
+	smp_init();
 
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");
@@ -129,8 +133,7 @@ void kernel_late() {
 
 	// Initialize PS/2.
 	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	
-	kprintf("Initializing PS/2...\n");
-	ps2_init();
+
 	
 	// Initialize floppy.
 	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
