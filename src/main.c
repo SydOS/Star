@@ -169,6 +169,8 @@ void kernel_late() {
 
 	pci_check_busses();
 
+	pci_check_busses();
+
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	kprintf("root@sydos ~: ");
 	serial_writes("root@sydos ~: ");
