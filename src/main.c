@@ -15,6 +15,7 @@
 #include <kernel/paging.h>
 #include <kernel/kheap.h>
 #include <kernel/tasking.h>
+#include <arch/i386/kernel/smp.h>
 #include <arch/i386/kernel/cpuid.h>
 #include "driver/vga.h"
 #include "driver/floppy.h"
@@ -26,7 +27,7 @@
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
 	// Disable interrupts.
-	asm volatile ("cli");
+	interrupts_disable();
 
     // Get args.
     va_list args;

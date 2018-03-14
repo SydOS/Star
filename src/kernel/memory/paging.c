@@ -2,6 +2,7 @@
 #include <tools.h>
 #include <kprint.h>
 #include <string.h>
+#include <io.h>
 #include <kernel/paging.h>
 #include <kernel/pmm.h>
 #include <arch/i386/kernel/cpuid.h>
@@ -52,33 +53,35 @@ void paging_flush_tlb_address(uintptr_t address) {
     asm volatile ("invlpg (%0)" : : "b"(address) : "memory");
 }
 
-static uint64_t paging_get_pae_directory_address(uint32_t directoryIndex) {
+static uint32_t paging_get_pae_directory_address(uint32_t directoryIndex) {
     switch (directoryIndex) {
         case 0:
-            return (uint64_t)PAGE_PAE_DIR_0GB_ADDRESS;
+            return (uint32_t)PAGE_PAE_DIR_0GB_ADDRESS;
         case 1:
-            return (uint64_t)PAGE_PAE_DIR_1GB_ADDRESS;
+            return (uint32_t)PAGE_PAE_DIR_1GB_ADDRESS;
         case 2:
-            return (uint64_t)PAGE_PAE_DIR_2GB_ADDRESS;
+            return (uint32_t)PAGE_PAE_DIR_2GB_ADDRESS;
         case 3:
-            return (uint64_t)PAGE_PAE_DIR_3GB_ADDRESS;
+            return (uint32_t)PAGE_PAE_DIR_3GB_ADDRESS;
         default:
             panic("Invalid PAE page directory index specified.\n");
+            return 0;
     }
 }
 
-static uint64_t paging_get_pae_tables_address(uint32_t directoryIndex) {
+static uint32_t paging_get_pae_tables_address(uint32_t directoryIndex) {
     switch (directoryIndex) {
         case 0:
-            return (uint64_t)PAGE_PAE_TABLES_0GB_ADDRESS;
+            return (uint32_t)PAGE_PAE_TABLES_0GB_ADDRESS;
         case 1:
-            return (uint64_t)PAGE_PAE_TABLES_1GB_ADDRESS;
+            return (uint32_t)PAGE_PAE_TABLES_1GB_ADDRESS;
         case 2:
-            return (uint64_t)PAGE_PAE_TABLES_2GB_ADDRESS;
+            return (uint32_t)PAGE_PAE_TABLES_2GB_ADDRESS;
         case 3:
-            return (uint64_t)PAGE_PAE_TABLES_3GB_ADDRESS;
+            return (uint32_t)PAGE_PAE_TABLES_3GB_ADDRESS;
         default:
             panic("Invalid PAE page directory index specified.\n");
+            return 0;
     }
 }
 
@@ -235,14 +238,14 @@ bool paging_get_phys(page_t virtual, uint64_t *physOut) {
         return paging_get_phys_std(virtual, (uint32_t*)physOut);
 }
 
-void paging_map_region(page_t *directory, page_t startAddress, page_t endAddress, bool kernel, bool writeable) {
+/*void paging_map_region(page_t *directory, page_t startAddress, page_t endAddress, bool kernel, bool writeable) {
     // Ensure addresses are on 4KB boundaries.
     startAddress = MASK_PAGE_4K(startAddress);
     endAddress = MASK_PAGE_4K(endAddress);
 
     // Map space.
     
-}
+}*/
 
 static void paging_pagefault_handler(registers_t *regs) {
     page_t addr;
@@ -309,7 +312,7 @@ static void paging_pae_late() {
     kprintf("Initializing PAE paging!\n");
 
     // Get pointer to the early-paging page table for 0x0.
-    uint64_t *earlyPageTableLow = (uint64_t*)(PAGE_SIZE_1G * 3 + (PAGE_SIZE_2M * (PAGE_PAE_DIRECTORY_SIZE - 4)));
+    uint64_t *earlyPageTableLow = (uint64_t*)((uint32_t)PAGE_SIZE_1G * 3 + ((uint32_t)PAGE_SIZE_2M * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 4)));
 
     // Pop a new page frame for the PDPT, and map it to 0x0 in the current virtual space.
     memInfo.kernelPageDirectory = pmm_pop_frame();
