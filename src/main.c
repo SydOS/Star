@@ -75,7 +75,6 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 	
 	// Initialize physical memory manager.
-	kprintf("Initializing Physical memory manager...\n");
 	pmm_init(mboot_info);
 
 	// Initialize paging.

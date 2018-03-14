@@ -7,6 +7,8 @@
 // Type for page frames.
 typedef uintptr_t page_t;
 
+#define PMM_NO_OF_DMA_FRAMES	64
+
 struct mem_info {
 	// Multiboot header.
 	multiboot_info_t *mbootInfo;
@@ -25,6 +27,10 @@ struct mem_info {
 	page_t kernelPageDirectory;
 	bool paeEnabled;
 	bool nxEnabled;
+
+	// DMA frames.
+	uint32_t dmaPageFrameFirst;
+	uint32_t dmaPageFrameLast;
 
 	// Page frame stack.
     uint32_t pageFrameStackStart;
