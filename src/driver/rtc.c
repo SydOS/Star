@@ -8,25 +8,6 @@
 #include <arch/i386/kernel/interrupts.h>
 
 /**
-<<<<<<< HEAD
-=======
- * Thread to update the RTC every 500ms, and print out the time for debugging
- */
-void rtc_thread() {
-	uint8_t last_second = 0;
-	while(true) {
-		rtc_time = rtc_get_time();
-		/*if (rtc_time->seconds != last_second) {
-			last_second = rtc_time->seconds;
-			kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, 
-				rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
-		}*/
-		sleep(500);
-	}
-}
-
-/**
->>>>>>> c9e210dc7e12d64e5cde8e7050be0dbfaa917d47
  * Reads from a specific register for RTC
  * @param  reg RTC register to read from
  * @return     Output from RTC read register
