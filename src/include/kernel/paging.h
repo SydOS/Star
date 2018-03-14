@@ -8,6 +8,7 @@
 
 // Sizes.
 #define PAGE_SIZE_4K                    0x1000
+#define PAGE_SIZE_64K                   0x10000
 #define PAGE_SIZE_2M		            0x200000
 #define PAGE_SIZE_4M		            0x400000
 #define PAGE_SIZE_1G		            0x40000000

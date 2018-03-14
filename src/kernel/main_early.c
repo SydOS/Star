@@ -4,16 +4,19 @@
 #include <kernel/pmm.h>
 #include <kernel/paging.h>
 
+// Constants in linker file.
 extern uint32_t KERNEL_VIRTUAL_OFFSET;
 extern uint32_t KERNEL_VIRTUAL_END;
 extern uint32_t KERNEL_PHYSICAL_END;
 extern uint32_t KERNEL_INIT_END;
 
+// Used in late memory initialization.
 uint32_t PAGE_FRAME_STACK_START __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_END __attribute__((section(".inittables")));
 uint32_t EARLY_PAGES_LAST __attribute__((section(".inittables")));
 bool PAE_ENABLED __attribute__((section(".inittables"))) = false;
 
+// CPUID detection function in .init section, in cpuid.asm.
 extern uint32_t _cpuid_detect_early();
 
 __attribute__((section(".init"))) static void memset(void *str, int32_t c, size_t n) {
@@ -24,7 +27,11 @@ __attribute__((section(".init"))) static void memset(void *str, int32_t c, size_
 		s[i] = (uint8_t)c;
 }
 
-__attribute__((section(".init"))) static void setup_paging() {
+/**
+ * Sets up standard paging.
+ * This function must not call code outside of this file.
+ */
+__attribute__((section(".init"))) static void setup_paging_std() {
     // Get kernel virtual offset.
     uint32_t virtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
 
@@ -79,7 +86,11 @@ __attribute__((section(".init"))) static void setup_paging() {
     asm volatile ("mov %eax, %cr0");
 }
 
-__attribute__((section(".init"))) static void setup_pae_paging() {
+/**
+ * Sets up PAE paging.
+ * This function must not call code outside of this file.
+ */
+__attribute__((section(".init"))) static void setup_paging_pae() {
     // Get kernel virtual offset.
     uint32_t virtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
 
@@ -148,7 +159,10 @@ __attribute__((section(".init"))) static void setup_pae_paging() {
     asm volatile ("mov %eax, %cr0");
 }
 
-// Performs pre-boot tasks. This function must not call code in other files.
+/**
+ * Performs pre-boot tasks such as enabling paging and setting up physical locations for memory management.
+ * This function must not call code outside of this file.
+ */
 __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, multiboot_info_t* mbootInfo) {
 	// Ensure multiboot magic value is good and a memory map is present.
 	if ((mbootMagic != MULTIBOOT_BOOTLOADER_MAGIC) || ((mbootInfo->flags & MULTIBOOT_INFO_MEM_MAP) == 0))
@@ -181,13 +195,15 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
 			memory += entry->len;
 	}
 
-    // Determine stack offset and size.
+    // Determine DMA bitmap offset and size. TODO
+
+    // Determine stack offset and size. This is placed after the DMA bitmap and all of its 64KB pages.
     PAGE_FRAME_STACK_START = ALIGN_4K((uint32_t)&KERNEL_VIRTUAL_END);
     PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + ((memory / PAGE_SIZE_4K) * sizeof(uint32_t)); // Space for 32-bit addresses.
 
     // Is PAE enabled?
     if (PAE_ENABLED)
-        setup_pae_paging(); // Set up PAE paging.
+        setup_paging_pae(); // Set up PAE paging.
     else
-        setup_paging(); // Set up non-PAE paging.
+        setup_paging_std(); // Set up non-PAE paging.
 }
