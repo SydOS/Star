@@ -9,19 +9,19 @@
 #include <arch/i386/kernel/interrupts.h>
 #include <arch/i386/kernel/acpi.h>
 #include <arch/i386/kernel/lapic.h>
-#include "kernel/nmi.h"
-#include "kernel/pit.h"
+#include <kernel/nmi.h>
+#include <kernel/pit.h>
 #include <kernel/pmm.h>
 #include <kernel/paging.h>
 #include <kernel/kheap.h>
 #include <kernel/tasking.h>
 #include <arch/i386/kernel/cpuid.h>
-#include "driver/vga.h"
-#include "driver/floppy.h"
+#include <driver/vga.h>
+#include <driver/floppy.h>
 #include <driver/serial.h>
-#include "driver/speaker.h"
-#include "driver/ps2/ps2.h"
-#include "driver/rtc.h"
+#include <driver/speaker.h>
+#include <driver/ps2/ps2.h>
+#include <driver/rtc.h>
 
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
