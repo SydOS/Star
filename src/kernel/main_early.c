@@ -14,6 +14,8 @@ extern uint32_t KERNEL_INIT_END;
 // Used in late memory initialization.
 uint32_t DMA_FRAMES_FIRST __attribute__((section(".inittables")));
 uint32_t DMA_FRAMES_LAST __attribute__((section(".inittables")));
+uint32_t PAGE_FRAME_STACK_PAE_START __attribute__((section(".inittables")));
+uint32_t PAGE_FRAME_STACK_PAE_END __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_START __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_END __attribute__((section(".inittables")));
 uint32_t EARLY_PAGES_LAST __attribute__((section(".inittables")));
@@ -186,21 +188,38 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     }
 
     // Count up memory in bytes.
-    uint64_t memory = 0;
+    uint64_t memory = 0; // Count in bytes of memory below 4GB (32-bit addresses).
+    uint64_t memoryHigh = 0; // Count in bytes of memory above 4GB (64-bit addresses).
     uintptr_t base = mbootInfo->mmap_addr;
 	uintptr_t end = base + mbootInfo->mmap_length;
 	for(multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base; base < end; base += entry->size + sizeof(uintptr_t)) {
 		entry = (multiboot_memory_map_t*)base;
-		if(entry->type == 1 && ((uint32_t)entry->addr) > 0)
-			memory += entry->len;
+		if(entry->type == 1) {
+            // Is the entry's address below the 4GB mark?
+            if (((page_t)entry->addr) > 0)
+			    memory += entry->len;
+            // Or is it above?
+            else if (PAE_ENABLED && (entry->addr & 0xF00000000))
+                memoryHigh += entry->len;
+        }
 	}
 
     // Determine DMA start and last frame (64 total frames).
     DMA_FRAMES_FIRST = ALIGN_64K((uint32_t)&KERNEL_VIRTUAL_END);
     DMA_FRAMES_LAST = DMA_FRAMES_FIRST + (PAGE_SIZE_64K * 64);
 
-    // Determine stack offset and size. This is placed after the DMA pages.
-    PAGE_FRAME_STACK_START = ALIGN_4K(DMA_FRAMES_LAST);
+    // Determine PAE page frame stack offset and size. This is only created if PAE is enabled and more than 4GB of RAM exist.
+    if (memoryHigh > 0) {
+        PAGE_FRAME_STACK_PAE_START = ALIGN_4K(DMA_FRAMES_LAST);
+        PAGE_FRAME_STACK_PAE_END = PAGE_FRAME_STACK_PAE_START + ((memoryHigh / PAGE_SIZE_4K) * sizeof(uint64_t)); // Space for 64-bit addresses.
+    }
+    else {
+        PAGE_FRAME_STACK_PAE_START = 0;
+        PAGE_FRAME_STACK_PAE_END = 0;
+    }
+
+    // Determine page frame stack offset and size. This is placed after the DMA pages.
+    PAGE_FRAME_STACK_START = ALIGN_4K((PAGE_FRAME_STACK_PAE_END == 0) ? DMA_FRAMES_LAST : PAGE_FRAME_STACK_PAE_END);
     PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + ((memory / PAGE_SIZE_4K) * sizeof(uint32_t)); // Space for 32-bit addresses.
 
     // Force PAE off for now.

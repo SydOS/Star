@@ -13,8 +13,6 @@
 // https://forum.osdev.org/viewtopic.php?f=15&t=19387
 // https://medium.com/@connorstack/recursive-page-tables-ad1e03b20a85
 
-extern bool PAE_ENABLED;
-
 static uint32_t paging_calculate_table(page_t virtAddr) {
     return virtAddr / PAGE_SIZE_4M;
 }
@@ -257,7 +255,7 @@ static void paging_pagefault_handler(registers_t *regs) {
     panic("Page fault at 0x%X!\n", addr);
 }
 
-static void paging_late() {
+static void paging_late_std() {
     kprintf("Initializing standard 32-bit paging!\n");
 
     // Get pointer to the early-paging page table for 0x0.
@@ -309,7 +307,7 @@ static void paging_late() {
     pageDirectory[PAGE_DIRECTORY_SIZE - 1] = memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 }
 
-static void paging_pae_late() {
+static void paging_late_pae() {
     kprintf("Initializing PAE paging!\n");
 
     // Get pointer to the early-paging page table for 0x0.
@@ -400,11 +398,10 @@ void paging_init() {
     interrupts_isr_install_handler(ISR_EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
 
     // Is PAE enabled?
-    memInfo.paeEnabled = PAE_ENABLED;
     if (memInfo.paeEnabled)
-        paging_pae_late(); // Use PAE paging.
+        paging_late_pae(); // Use PAE paging.
     else 
-        paging_late(); // No PAE, using standard paging.
+        paging_late_std(); // No PAE, using standard paging.
         
     // Change to use our new page directory.
     paging_change_directory(memInfo.kernelPageDirectory);

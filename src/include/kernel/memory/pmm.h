@@ -32,6 +32,10 @@ struct mem_info {
 	uint32_t dmaPageFrameFirst;
 	uint32_t dmaPageFrameLast;
 
+	// Page frame stack (PAE).
+    uint32_t pageFrameStackPaeStart;
+    uint32_t pageFrameStackPaeEnd;
+
 	// Page frame stack.
     uint32_t pageFrameStackStart;
     uint32_t pageFrameStackEnd;
@@ -44,8 +48,11 @@ extern bool pmm_dma_get_free_frame(uint32_t *frameOut);
 extern void pmm_dma_set_frame(uint32_t frame, bool status);
 extern uint32_t pmm_dma_get_phys(uint32_t frame);
 extern uint32_t pmm_frames_available();
+extern uint32_t pmm_frames_available_pae();
 extern page_t pmm_pop_frame();
+extern uint64_t pmm_pop_frame_pae();
 extern void pmm_push_frame(page_t frame);
+extern void pmm_push_frame_pae(uint64_t frame);
 extern void pmm_init(multiboot_info_t* mbootInfo);
 
 #endif

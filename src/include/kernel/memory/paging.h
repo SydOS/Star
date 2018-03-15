@@ -41,6 +41,7 @@
 
 // Alignments.
 #define ALIGN_4K(size)          	(((uint32_t)(size) + (uint32_t)PAGE_SIZE_4K) & 0xFFFFF000)
+#define ALIGN_4K_64BIT(size)        (((uint64_t)(size) + (uint64_t)PAGE_SIZE_4K) & 0xFFFFFFFFFFFFF000)
 #define ALIGN_64K(size)             (((uint32_t)(size) + (uint32_t)PAGE_SIZE_64K) & 0xFFFF0000)
 
 // Masks.
