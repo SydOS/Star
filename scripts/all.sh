@@ -5,3 +5,4 @@ set -e
 ./toolchain-i486.sh
 ./toolchain-i586.sh
 ./toolchain-x86_64.sh
+./toolchain-nasm.sh
