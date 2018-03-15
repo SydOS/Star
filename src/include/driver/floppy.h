@@ -1,6 +1,9 @@
-// https://wiki.osdev.org/Floppy_Disk_Controller
-// https://github.com/1byte2bytes/SydOS/blob/master/res/82077AA_FloppyControllerDatasheet.pdf
-// https://forum.osdev.org/viewtopic.php?t=13538
+#ifndef FLOPPY_H
+#define FLOPPY_H
+
+#include <main.h>
+
+#define FLOPPY_IRQ  6
 
 // Floppy registers.
 enum {
@@ -135,6 +138,14 @@ enum {
     FLOPPY_GAP3_3_5         = 0x1B
 };
 
+// Floppy data rates.
+enum {
+    FLOPPY_DRATE_1MBPS      = 0x3,
+    FLOPPY_DRATE_500KBPS    = 0x0,
+    FLOPPY_DRATE_300KBPS    = 0x1,
+    FLOPPY_DRATE_250KBPS    = 0x2
+};
+
 #define FLOPPY_CMD_RETRY_COUNT  10
 #define FLOPPY_IRQ_WAIT_TIME    500
 #define FLOPPY_DMALENGTH 0x4800
@@ -142,5 +153,7 @@ enum {
 #define FLOPPY_VERSION_NONE     0xFF
 #define FLOPPY_VERSION_ENHANCED 0x90
 
-extern void floppy_detect();
+extern uint8_t floppy_version();
 extern void floppy_init();
+
+#endif
