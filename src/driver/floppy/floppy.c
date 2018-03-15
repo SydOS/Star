@@ -13,6 +13,8 @@
 static bool irqTriggered = false;
 static bool implied_seeks = false;
 
+extern bool floppy_init_dma();
+
 /**
  * Handles IRQ6 firings
  */
@@ -172,7 +174,7 @@ uint8_t floppy_version() {
  * Resets the floppy controller.
  */
 static void floppy_reset() {
-	kprintf("FLOPPY: Resetting controller...");
+	kprintf("FLOPPY: Resetting controller...\n");
 
 	// Disable and re-enable floppy controller.
 	outb(FLOPPY_REG_DOR, 0x00);
@@ -183,7 +185,6 @@ static void floppy_reset() {
 	uint8_t st0, cyl;
 	for(int i = 0; i < 4; i++)
 		floppy_sense_interrupt(&st0, &cyl);
-	kprintf("done!\n");
 }
 
 // Configure default values.
@@ -292,8 +293,8 @@ void floppy_init() {
 	floppy_recalibrate(0);
 	floppy_set_motor(0, false);
 
-	/*uint8_t *data = kheap_alloc(FLOPPY_DMALENGTH);
-	kprintf("Getting sector 0...\n");
+	uint8_t *data = kheap_alloc(FLOPPY_DMALENGTH);
+	kprintf("Getting track 0...\n");
 	floppy_read_track(0, 0, data, FLOPPY_DMALENGTH);
 	floppy_set_motor(0, false);
 
@@ -306,6 +307,6 @@ void floppy_init() {
 	volumeName[11] = '\0';
 
 	// Print volume name.
-	kprintf("FAT12 volume string: %s\n", volumeName);*/
+	kprintf("FAT12 volume string: %s\n", volumeName);
 	kprintf("FLOPPY: Initialized!\n");
 }

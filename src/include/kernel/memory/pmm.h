@@ -40,6 +40,9 @@ struct mem_info {
 typedef struct mem_info mem_info_t;
 extern mem_info_t memInfo;
 
+extern bool pmm_dma_get_free_frame(uint32_t *frameOut);
+extern void pmm_dma_set_frame(uint32_t frame, bool status);
+extern uint32_t pmm_dma_get_phys(uint32_t frame);
 extern uint32_t pmm_frames_available();
 extern page_t pmm_pop_frame();
 extern void pmm_push_frame(page_t frame);

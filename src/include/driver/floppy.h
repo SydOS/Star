@@ -153,6 +153,13 @@ enum {
 #define FLOPPY_VERSION_NONE     0xFF
 #define FLOPPY_VERSION_ENHANCED 0x90
 
+extern int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize);
+extern int8_t floppy_read_track(uint8_t drive, uint8_t track, uint8_t buffer[], uint16_t bufferSize);
+
+extern void floppy_write_data(uint8_t data);
+extern uint8_t floppy_read_data();
+extern void floppy_sense_interrupt(uint8_t* st0, uint8_t* cyl);
+extern void floppy_set_motor(uint8_t drive, bool on);
 extern uint8_t floppy_version();
 extern void floppy_init();
 

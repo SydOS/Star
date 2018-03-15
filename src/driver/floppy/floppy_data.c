@@ -12,23 +12,27 @@
 // Buffer for DMA transfers.
 static uint8_t *floppyDmaBuffer;
 
+extern bool floppy_wait_for_irq(uint16_t timeout);
+
+/**
+ * Initializes floppy DMA.
+ */
 bool floppy_init_dma() {
     // Allocate space for DMA buffer.
-	if (!pmm_dma_get_free_frame(&floppyDmaBuffer))
+	uint32_t frame = 0;
+	if (!pmm_dma_get_free_frame(&frame))
 		return false;
+	floppyDmaBuffer = (uint8_t*)frame;
 
     // Clear out DMA buffer.
     memset(floppyDmaBuffer, 0, PAGE_SIZE_64K);
-}
 
-// Init DMA. write = true to write, write = false to read.
-static void floppy_dma_init(bool write) {
+	// Determine address and length of buffer.
 	union {
 		uint8_t bytes[4];
 		uint32_t data;
 	} addr, count;
-
-	//addr.data= pmm_dma_get_phys((uint32_t)floppyDmaBuffer);
+	addr.data = pmm_dma_get_phys((uint32_t)floppyDmaBuffer);
 	count.data = PAGE_SIZE_64K - 1;
 
 	// Ensure address is under 24 bits, and count is under 16 bits.
@@ -50,7 +54,14 @@ static void floppy_dma_init(bool write) {
 	outb(0x05, count.bytes[0]);
 	outb(0x05, count.bytes[1]);
 
-	// Send mode and unmask DMA channel 2.
+	// Unmask DMA channel 2.
+	outb(0x0A, 0x02);
+	return true;
+}
+
+static void floppy_set_dma(bool write) {
+	// Mask DMA channel 2, send mode, and unmask DMA channel 2.
+	outb(0x0A, 0x06);
 	outb(0x0B, write ? 0x5A : 0x56);
 	outb(0x0A, 0x02);
 }
@@ -175,7 +186,7 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], u
 		sleep(100);
 
 		// Initialize DMA.
-		floppy_dma_init(false);
+		floppy_set_dma(false);
 
 		// Send read command to disk.
 		kprintf("Attempting to read head %u, track %u, sector %u...\n", head, track, sector);
@@ -232,8 +243,8 @@ int8_t floppy_read_track(uint8_t drive, uint8_t track, uint8_t buffer[], uint16_
 	if (!floppy_seek(drive, track))
 		return -1;
 
-		// Initialize DMA.
-		floppy_dma_init(false);
+	// Initialize DMA.
+	floppy_set_dma(false);
 
 	// Attempt to read sector.
 	floppy_set_motor(drive, true);
