@@ -1,6 +1,8 @@
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
+#include <kernel/kheap.h>
+#include <driver/pci.h>
 
 uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
     uint32_t address;
@@ -46,8 +48,14 @@ void pci_check_device(uint8_t bus, uint8_t device) {
 	uint8_t class = pci_config_read_byte(bus,device,0,PCI_CLASS);
 	uint8_t subclass = pci_config_read_byte(bus,device,0,PCI_SUBCLASS);
 	if (vendorID == 0xFFFF) return;
-    struct PCIDevice device = (struct PCIDevice)malloc(sizeof(struct PCIDevice));
-	kprintf("PCI device: %X:%X | Class %X Sub %X\n", vendorID, deviceID, class, subclass);
+    
+    struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
+    this_device->VendorID = vendorID;
+    this_device->DeviceID = deviceID;
+    this_device->Class = class;
+    this_device->Subclass = subclass;
+	kprintf("PCI device: %X:%X | Class %X Sub %X\n", this_device->VendorID, this_device->DeviceID, this_device->Class, this_device->Subclass);
+    kheap_free(this_device);
 }
 
 void pci_check_busses() {
