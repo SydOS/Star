@@ -10,6 +10,14 @@
  * @param dev PCIDevice struct with PCI device info
  */
 void pci_print_info(struct PCIDevice* dev) {
+    // Print base info
+    vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
+    kprintf("PCI device: %X:%X | Class %X Sub %X | Bus %d Device %d Function %d\n", 
+        dev->VendorID, dev->DeviceID, dev->Class,  dev->Subclass, dev->Bus, 
+        dev->Device, dev->Function);
+    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+    // Print class info
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     kprintf("  - ");
     kprintf(pci_class_descriptions[dev->Class]);
@@ -60,7 +68,10 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
 
     // Define our PCIDevice
     struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
-    
+
+    // Return if vendor is none
+    if (vendorID == 0xFFFF) return this_device;
+
     // Define variables inside our PCIDevice struct
     // Class and Subclass are bytes, but we read a word, so we have to split the
     // two halves
@@ -69,16 +80,11 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     this_device->Class = (classInfo & ~0x00FF) >> 8;
     this_device->Subclass = (classInfo & ~0xFF00);
     this_device->HeaderType = headerType;
+    this_device->Bus = bus;
+    this_device->Device = device;
+    this_device->Function = function;
 
-    // Return if vendor is none
-    if (vendorID == 0xFFFF) return this_device;
-
-    // Print info about the card
-    vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-    kprintf("PCI device: %X:%X | Class %X Sub %X | Bus %d Device %d Function %d\n", 
-        this_device->VendorID, this_device->DeviceID, this_device->Class, 
-        this_device->Subclass, bus, device, function);
-    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    pci_print_info(this_device);
 
     // If the card reports more than one function, let's scan those too
     if((this_device->HeaderType & 0x80) != 0) {
@@ -108,7 +114,6 @@ void pci_check_busses(uint8_t bus) {
         // Scan the very first PCI device, it's the host controller, then print
         // info
         struct PCIDevice *host_device = pci_check_device(0, 0, 0);
-        pci_print_info(host_device);
 
         // If the header states more than 1 function (0 index) we have multiple
         // busses. Otherwise, set to false to skip checking busses
@@ -124,9 +129,6 @@ void pci_check_busses(uint8_t bus) {
     for (; device < 32; device++) {
         // Get info on the device and print info
         struct PCIDevice *this_device = pci_check_device(bus, device, 0);
-        if(this_device->VendorID != 0xFFFF) {
-            pci_print_info(this_device);
-        }
         
         // Check if we have more than one bus
         if(onlyOneBus == false) {
