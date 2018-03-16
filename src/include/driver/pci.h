@@ -29,4 +29,4 @@ struct PCIDevice {
 	uint8_t Subclass;
 };
 
-extern void pci_check_busses();
+extern void pci_check_busses(uint8_t bus);
