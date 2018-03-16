@@ -30,12 +30,12 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device) {
 	uint16_t classInfo = pci_config_read_word(bus,device,0,0xA);
 
     struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
+    if (vendorID == 0xFFFF) return this_device;
+    
     this_device->VendorID = vendorID;
     this_device->DeviceID = deviceID;
     this_device->Class = (classInfo & ~0x00FF) >> 8;
     this_device->Subclass = (classInfo & ~0xFF00);
-
-    if (vendorID == 0xFFFF) return;
 
 	kprintf("PCI device: %X:%X | Class %X Sub %X | Bus %d Device %d\n", 
         this_device->VendorID, this_device->DeviceID, this_device->Class, 
