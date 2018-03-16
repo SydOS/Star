@@ -30,4 +30,7 @@ struct PCIDevice {
 };
 
 
+struct PCIDevice* pci_devices[65536];
+
+
 extern void pci_check_busses();
