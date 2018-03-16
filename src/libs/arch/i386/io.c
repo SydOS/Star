@@ -15,6 +15,26 @@ uint8_t inb(uint16_t port)
     return data;
 }
 
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+
+// Outputs 4 bytes to the specified port.
+void outl(uint16_t port, uint32_t data)
+{
+    asm volatile("outl %%eax, %%dx" : : "dN" (port), "a" (data));
+}
+
+// Gets 4 bytes from the specified port.
+uint32_t inl(uint16_t port)
+{
+    uint32_t rv;
+    asm volatile ("inl %%dx, %%eax" : "=a" (rv) : "dN" (port));
+    return rv;
+}
+
+// -----------------------------------------------------------------------------
+
 void io_wait() {
     asm volatile ("jmp 1f\n\t"
                   "1:jmp 2f\n\t"
@@ -32,3 +52,4 @@ uint64_t cpu_msr_read(uint32_t msr) {
 void cpu_msr_write(uint32_t msr, uint64_t value) {
     asm volatile ("wrmsr" : : "a"((uint32_t)(value & 0xFFFFFFFF)), "d"((uint32_t)(value >> 32)), "c"(msr));
 }
+// -----------------------------------------------------------------------------
