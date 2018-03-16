@@ -52,15 +52,19 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
 }
 
 void pci_check_busses(uint8_t bus) {
+    uint8_t device = 0;
     bool onlyOneBus = true;
-    struct PCIDevice *host_device = pci_check_device(0, 0, 0);
-    if((host_device->HeaderType & 0x80) != 0) {
-        onlyOneBus = false;
+    if(bus == 0) {
+        device = 1;
+        struct PCIDevice *host_device = pci_check_device(0, 0, 0);
+        if((host_device->HeaderType & 0x80) != 0) {
+            onlyOneBus = false;
+        }
+        kheap_free(host_device);
     }
-    kheap_free(host_device);
 
 	// Check each device on bus
-	for (uint8_t device = 0; device < 32; device++) {
+	for (; device < 32; device++) {
 		struct PCIDevice *this_device = pci_check_device(bus, device, 0);
         
         if(onlyOneBus == false) {
