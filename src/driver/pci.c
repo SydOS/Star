@@ -26,17 +26,14 @@ uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t o
 void pci_check_device(uint8_t bus, uint8_t device) {
 	uint16_t vendorID = pci_config_read_word(bus,device,0,PCI_VENDOR_ID);
 	uint16_t deviceID = pci_config_read_word(bus,device,0,PCI_DEVICE_ID);
-	uint16_t class = pci_config_read_word(bus,device,0,0xA);
-    class = (class & ~0x00FF) >> 8;
-	uint16_t subclass = pci_config_read_word(bus,device,0,0xA);
-    subclass = (subclass & ~0xFF00);
+	uint16_t classInfo = pci_config_read_word(bus,device,0,0xA);
 	if (vendorID == 0xFFFF) return;
 
     struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
     this_device->VendorID = vendorID;
     this_device->DeviceID = deviceID;
-    this_device->Class = class;
-    this_device->Subclass = subclass;
+    this_device->Class = (classInfo & ~0x00FF) >> 8;
+    this_device->Subclass = (classInfo & ~0xFF00);
 	kprintf("PCI device: %X:%X | Class %X Sub %X\n", this_device->VendorID, this_device->DeviceID, this_device->Class, this_device->Subclass);
     kheap_free(this_device);
 }
