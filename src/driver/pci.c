@@ -41,9 +41,9 @@ uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t o
  */
 struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function) {
     // Get various bits of info from the PCI card
-	uint16_t vendorID = pci_config_read_word(bus,device,0,PCI_VENDOR_ID);
-	uint16_t deviceID = pci_config_read_word(bus,device,0,PCI_DEVICE_ID);
-	uint16_t classInfo = pci_config_read_word(bus,device,0,PCI_SUBCLASS);
+    uint16_t vendorID = pci_config_read_word(bus,device,0,PCI_VENDOR_ID);
+    uint16_t deviceID = pci_config_read_word(bus,device,0,PCI_DEVICE_ID);
+    uint16_t classInfo = pci_config_read_word(bus,device,0,PCI_SUBCLASS);
     uint16_t headerType = (pci_config_read_word(bus,device,0,PCI_HEADER_TYPE) & ~0x00FF) >> 8;
 
     // Define our PCIDevice and return if the vender is none
@@ -60,7 +60,7 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     this_device->HeaderType = headerType;
 
     // Print info about the card
-	kprintf("PCI device: %X:%X | Class %X Sub %X | Bus %d Device %d Function %d\n", 
+    kprintf("PCI device: %X:%X | Class %X Sub %X | Bus %d Device %d Function %d\n", 
         this_device->VendorID, this_device->DeviceID, this_device->Class, 
         this_device->Subclass, bus, device, function);
 
@@ -99,10 +99,10 @@ void pci_check_busses(uint8_t bus) {
         kheap_free(host_device);
     }
 
-	// Check each device on bus
-	for (; device < 32; device++) {
+    // Check each device on bus
+    for (; device < 32; device++) {
         // Get info on the device
-		struct PCIDevice *this_device = pci_check_device(bus, device, 0);
+        struct PCIDevice *this_device = pci_check_device(bus, device, 0);
         
         // Check if we have more than one bus
         if(onlyOneBus == false) {
@@ -121,5 +121,5 @@ void pci_check_busses(uint8_t bus) {
 
         // Free object
         kheap_free(this_device);
-	}
+    }
 }
