@@ -2,31 +2,6 @@
 #include <io.h>
 #include <kprint.h>
 
-
-#define PCI_VENDOR_ID            0x00 // 2
-#define PCI_DEVICE_ID            0x02 // 2
-#define PCI_COMMAND              0x04 // 2
-#define PCI_STATUS               0x06 // 2
-#define PCI_REVISION_ID          0x08 // 1
-
-#define PCI_PROG_IF              0x09 // 1
-#define PCI_SUBCLASS             0x0A // 1
-#define PCI_CLASS                0x0B // 1
-#define PCI_CACHE_LINE_SIZE      0x0C // 1
-#define PCI_LATENCY_TIMER        0x0D // 1
-#define PCI_HEADER_TYPE          0x0E // 1
-#define PCI_BIST                 0x0F // 1
-#define PCI_BAR0                 0x10 // 4
-#define PCI_BAR1                 0x14 // 4
-#define PCI_BAR2                 0x18 // 4
-#define PCI_BAR3                 0x1C // 4
-#define PCI_BAR4                 0x20 // 4
-#define PCI_BAR5 0x24 // 4
-
-#define PCI_ADDRESS_PORT 0xCF8
-#define PCI_VALUE_PORT 0xCFC
-
-
 uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
     uint32_t address;
     uint32_t lbus  = (uint32_t)bus;
@@ -71,6 +46,7 @@ void pci_check_device(uint8_t bus, uint8_t device) {
 	uint8_t class = pci_config_read_byte(bus,device,0,PCI_CLASS);
 	uint8_t subclass = pci_config_read_byte(bus,device,0,PCI_SUBCLASS);
 	if (vendorID == 0xFFFF) return;
+    struct PCIDevice device = (struct PCIDevice)malloc(sizeof(struct PCIDevice));
 	kprintf("PCI device: %X:%X | Class %X Sub %X\n", vendorID, deviceID, class, subclass);
 }
 
