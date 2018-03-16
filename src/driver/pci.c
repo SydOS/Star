@@ -48,6 +48,7 @@ void pci_check_busses(uint8_t bus) {
 	// Check each device on bus
 	for (uint8_t device = 0; device < 32; device++) {
 		struct PCIDevice *this_device = pci_check_device(bus, device);
+        
         if(this_device->Class == 6 && this_device->Subclass == 4) {
             vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
             kprintf("Detected PCI bridge, but cannot reach it yet\n");
