@@ -27,6 +27,7 @@ struct PCIDevice {
 	uint16_t DeviceID;
 	uint8_t Class;
 	uint8_t Subclass;
+	uint8_t HeaderType;
 };
 
 extern void pci_check_busses(uint8_t bus);

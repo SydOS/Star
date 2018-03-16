@@ -27,7 +27,8 @@ uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t o
 struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device) {
 	uint16_t vendorID = pci_config_read_word(bus,device,0,PCI_VENDOR_ID);
 	uint16_t deviceID = pci_config_read_word(bus,device,0,PCI_DEVICE_ID);
-	uint16_t classInfo = pci_config_read_word(bus,device,0,0xA);
+	uint16_t classInfo = pci_config_read_word(bus,device,0,PCI_SUBCLASS);
+    uint16_t headerType = (pci_config_read_word(bus,device,0,PCI_HEADER_TYPE) & ~0x00FF) >> 8;
 
     struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
     if (vendorID == 0xFFFF) return this_device;
@@ -36,6 +37,7 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device) {
     this_device->DeviceID = deviceID;
     this_device->Class = (classInfo & ~0x00FF) >> 8;
     this_device->Subclass = (classInfo & ~0xFF00);
+    this_device->HeaderType = headerType;
 
 	kprintf("PCI device: %X:%X | Class %X Sub %X | Bus %d Device %d\n", 
         this_device->VendorID, this_device->DeviceID, this_device->Class, 
@@ -45,18 +47,28 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device) {
 }
 
 void pci_check_busses(uint8_t bus) {
+    bool onlyOneBus = true;
+    struct PCIDevice *host_device = pci_check_device(0, 0);
+    if((host_device->HeaderType & 0x80) != 0) {
+        onlyOneBus = false;
+    }
+
 	// Check each device on bus
 	for (uint8_t device = 0; device < 32; device++) {
 		struct PCIDevice *this_device = pci_check_device(bus, device);
         
-        if(this_device->Class == 6 && this_device->Subclass == 4) {
-            vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
-            kprintf("Detected PCI bridge, but cannot reach it yet\n");
-            vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-        } else if(this_device->Class == 6) {
-            vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
-            kprintf("Detected other type of bridge on PCI bus. No other protocols implemented yet...\n");
-            vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+        if(onlyOneBus == false) {
+            if(this_device->Class == 6 && this_device->Subclass == 4) {
+                vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
+                kprintf("Detected PCI bridge, but cannot reach it yet\n");
+                vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+            } else if(this_device->Class == 6) {
+                vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
+                kprintf("Detected other type of bridge on PCI bus. No other protocols implemented yet...\n");
+                vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+            }
         }
+
+        kheap_free(this_device);
 	}
 }
