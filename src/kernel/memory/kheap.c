@@ -1,9 +1,10 @@
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
-#include <kernel/paging.h>
-#include <kernel/pmm.h>
-#include <kernel/kheap.h>
+
+#include <kernel/memory/kheap.h>
+#include <kernel/memory/paging.h>
+#include <kernel/memory/pmm.h>
 
 // Based on code from https://github.com/CCareaga/heap_allocator. Licensed under the MIT.
 

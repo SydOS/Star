@@ -3,7 +3,7 @@
 #include <kprint.h>
 #include <tools.h>
 #include <driver/rtc.h>
-#include <kernel/kheap.h>
+#include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
 #include <arch/i386/kernel/interrupts.h>
 

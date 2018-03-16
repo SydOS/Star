@@ -9,21 +9,21 @@
 #include <arch/i386/kernel/interrupts.h>
 #include <kernel/acpi/acpi.h>
 #include <arch/i386/kernel/lapic.h>
-#include "kernel/nmi.h"
-#include "kernel/pit.h"
-#include <kernel/pmm.h>
-#include <kernel/paging.h>
-#include <kernel/kheap.h>
+#include <kernel/nmi.h>
+#include <kernel/pit.h>
+#include <kernel/memory/pmm.h>
+#include <kernel/memory/paging.h>
+#include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
 #include <arch/i386/kernel/smp.h>
 #include <arch/i386/kernel/cpuid.h>
-#include "driver/vga.h"
-#include "driver/floppy.h"
+#include <driver/vga.h>
+#include <driver/floppy.h>
 #include <driver/serial.h>
-#include "driver/speaker.h"
-#include "driver/ps2/ps2.h"
-#include "driver/rtc.h"
 #include <driver/pci.h>
+#include <driver/speaker.h>
+#include <driver/ps2/ps2.h>
+#include <driver/rtc.h>
 
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
@@ -76,7 +76,6 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 	
 	// Initialize physical memory manager.
-	kprintf("Initializing Physical memory manager...\n");
 	pmm_init(mboot_info);
 
 	// Initialize paging.
@@ -138,8 +137,6 @@ void kernel_late() {
 	
 	// Initialize floppy.
 	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
-	floppy_detect();
-	kprintf("Initialize floppy drives...\n");
 	floppy_init();
 
     vga_enable_cursor();
