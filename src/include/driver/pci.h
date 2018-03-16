@@ -30,4 +30,7 @@ struct PCIDevice {
 	uint8_t HeaderType;
 };
 
+char* pci_class_descriptions[255];
+
 extern void pci_check_busses(uint8_t bus);
+extern void pci_init();
