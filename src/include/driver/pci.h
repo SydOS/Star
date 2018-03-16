@@ -25,9 +25,14 @@
 struct PCIDevice {
 	uint16_t VendorID;
 	uint16_t DeviceID;
+
 	uint8_t Class;
 	uint8_t Subclass;
 	uint8_t HeaderType;
+
+	uint8_t Bus;
+	uint8_t Device;
+	uint8_t Function;
 };
 
 char* pci_class_descriptions[255];
