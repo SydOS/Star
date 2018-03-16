@@ -5,6 +5,10 @@
 #include <driver/vga.h>
 #include <driver/pci.h>
 
+/**
+ * Print the description for a PCI device
+ * @param dev PCIDevice struct with PCI device info
+ */
 void pci_print_info(struct PCIDevice* dev) {
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     kprintf("  - ");
@@ -101,7 +105,8 @@ void pci_check_busses(uint8_t bus) {
         // allover scan
         device = 1;
 
-        // Scan the very first PCI device, it's the host controller
+        // Scan the very first PCI device, it's the host controller, then print
+        // info
         struct PCIDevice *host_device = pci_check_device(0, 0, 0);
         pci_print_info(host_device);
 
@@ -117,7 +122,7 @@ void pci_check_busses(uint8_t bus) {
 
     // Check each device on bus
     for (; device < 32; device++) {
-        // Get info on the device
+        // Get info on the device and print info
         struct PCIDevice *this_device = pci_check_device(bus, device, 0);
         if(this_device->VendorID != 0xFFFF) {
             pci_print_info(this_device);
@@ -144,6 +149,9 @@ void pci_check_busses(uint8_t bus) {
     }
 }
 
+/**
+ * Set various variables the PCI driver uses
+ */
 void pci_init() {
     pci_class_descriptions[0x00] = "Unclassified device";
     pci_class_descriptions[0x01] = "Mass storage controller";
