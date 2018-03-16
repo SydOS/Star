@@ -1,7 +1,7 @@
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
-#include <kernel/kheap.h>
+#include <kernel/memory/kheap.h>
 #include <driver/pci.h>
 
 uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
