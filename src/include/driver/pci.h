@@ -29,8 +29,4 @@ struct PCIDevice {
 	uint8_t Subclass;
 };
 
-
-struct PCIDevice* pci_devices[65536];
-
-
 extern void pci_check_busses();

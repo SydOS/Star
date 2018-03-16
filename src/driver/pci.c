@@ -38,8 +38,7 @@ void pci_check_device(uint8_t bus, uint8_t device) {
 	kprintf("PCI device: %X:%X | Class %X Sub %X | Bus %d Device %d\n", 
         this_device->VendorID, this_device->DeviceID, this_device->Class, 
         this_device->Subclass, bus, device);
-
-    pci_devices[bus*device] = this_device;
+    
     kheap_free(this_device);
 }
 
