@@ -23,32 +23,15 @@ uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t o
     return (tmp);
 }
 
-uint8_t pci_config_read_byte(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
-    uint32_t address;
-    uint32_t lbus  = (uint32_t)bus;
-    uint32_t lslot = (uint32_t)slot;
-    uint32_t lfunc = (uint32_t)func;
-    uint16_t tmp = 0;
- 
-    /* create configuration address as per Figure 1 */
-    address = (uint32_t)((lbus << 16) | (lslot << 11) |
-              (lfunc << 8) | (offset & 0xfc) | ((uint32_t)0x80000000));
- 
-    /* write out the address */
-    outb(PCI_ADDRESS_PORT, address);
-    /* read in the data */
-    /* (offset & 2) * 8) = 0 will choose the first word of the 32 bits register */
-    tmp = inb(PCI_VALUE_PORT + (offset & 3));
-    return (tmp);
-}
-
 void pci_check_device(uint8_t bus, uint8_t device) {
 	uint16_t vendorID = pci_config_read_word(bus,device,0,PCI_VENDOR_ID);
 	uint16_t deviceID = pci_config_read_word(bus,device,0,PCI_DEVICE_ID);
-	uint8_t class = pci_config_read_byte(bus,device,0,PCI_CLASS);
-	uint8_t subclass = pci_config_read_byte(bus,device,0,PCI_SUBCLASS);
+	uint16_t class = pci_config_read_word(bus,device,0,0xA);
+    class = (class & ~0x00FF) >> 8;
+	uint16_t subclass = pci_config_read_word(bus,device,0,0xA);
+    subclass = (subclass & ~0xFF00);
 	if (vendorID == 0xFFFF) return;
-    
+
     struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
     this_device->VendorID = vendorID;
     this_device->DeviceID = deviceID;
