@@ -88,13 +88,16 @@ void pci_check_busses(uint8_t bus) {
         // Set the device to one to skip this device (already being checked) in
         // allover scan
         device = 1;
+
         // Scan the very first PCI device, it's the host controller
         struct PCIDevice *host_device = pci_check_device(0, 0, 0);
+
         // If the header states more than 1 function (0 index) we have multiple
         // busses. Otherwise, set to false to skip checking busses
         if((host_device->HeaderType & 0x80) != 0) {
             onlyOneBus = false;
         }
+
         // Free object
         kheap_free(host_device);
     }
@@ -111,6 +114,7 @@ void pci_check_busses(uint8_t bus) {
                 vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
                 kprintf("Detected PCI bridge, but cannot reach it yet\n");
                 vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+                
             // If device is a different kind of bridge
             } else if(this_device->Class == 6) {
                 vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
