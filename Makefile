@@ -49,8 +49,8 @@ endif
 	rm -rfd build
 
 ifeq ($(ARCH), x86_64)
-	cp Star-x86_64.kernel isofiles/
-	grub-mkrescue -o os.iso isofiles --verbose -d /usr/lib/grub/i386-pc
+	#cp Star-x86_64.kernel isofiles/
+	#grub-mkrescue -o os.iso isofiles --verbose -d /usr/lib/grub/i386-pc
 endif
 
 # Compile assembly source files.
