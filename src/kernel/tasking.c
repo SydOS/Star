@@ -5,7 +5,7 @@
 #include <kernel/tasking.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/main.h>
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/interrupts/interrupts.h>
 
 extern void _isr_exit();
 
@@ -69,7 +69,9 @@ int tasking_add_process(PROCESS* p)
 
 void kernel_main_thread() {
 	taskingEnabled = true;
+#ifndef X86_64
 	kernel_late();
+#endif
 }
 
 /* This adds a process while no others are running! */
@@ -81,7 +83,7 @@ void __addProcess(PROCESS* p)
 	c->next = p;
 }
 
-PROCESS* tasking_create_process(char* name, uint32_t addr) {
+PROCESS* tasking_create_process(char* name, uintptr_t addr) {
 	// Allocate memory for process.
 	kprintf("Allocating memory for process \"%s\"...\n", name);
 	PROCESS* process = (PROCESS*)kheap_alloc(sizeof(PROCESS));
@@ -95,7 +97,7 @@ PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	process->notify = __notified;
 
 	kprintf("Allocating memory for stack\n");
-	process->stack_bottom = (uint32_t)kheap_alloc(4096);
+	process->stack_bottom = (uintptr_t)kheap_alloc(4096);
 	//asm volatile("mov %%cr3, %%eax":"=a"(process->cr3));
 
 	process->stack_top = process->stack_bottom + 4096;
@@ -105,6 +107,13 @@ PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	process->regs = (registers_t*)process->stack_top;
 
 	kprintf("Setting up stack...\n");
+#ifdef X86_64
+	process->regs->rflags = 0x00000202;
+	process->regs->cs = 0x8;
+	process->regs->rip = addr;
+	process->regs->rbp = process->stack_top;
+	process->regs->rsp = process->stack_top;
+#else
 	process->regs->eflags = 0x00000202;
 	process->regs->cs = 0x8;
 	process->regs->eip = addr;
@@ -114,6 +123,7 @@ PROCESS* tasking_create_process(char* name, uint32_t addr) {
 	process->regs->fs = 0x10;
 	process->regs->es = 0x10;
 	process->regs->gs = 0x10;
+#endif
 	return process;
 }
 
@@ -128,13 +138,21 @@ void tasking_tick(registers_t *regs) {
 
 	// Send EOI and change out stack.
 	interrupts_eoi(0);
+#ifdef X86_64
+	asm volatile ("mov %0, %%rsp" : : "r"(c->regs));
+#else
 	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
+#endif
 	asm volatile ("jmp _isr_exit");
 }
 
 void tasking_exec() {
 	interrupts_eoi(0);
+#ifdef X86_64
+	asm volatile ("mov %0, %%rsp" : : "r"(c->regs));
+#else
 	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
+#endif
 	asm volatile ("jmp _isr_exit");
 }
 
@@ -142,7 +160,7 @@ void tasking_init() {
 	// Start up kernel task.
 	asm volatile ("cli");
 	kprintf("Creating kernel task...\n");
-	c = tasking_create_process("kernel", (uint32_t)kernel_main_thread);
+	c = tasking_create_process("kernel", (uintptr_t)kernel_main_thread);
 	c->next = c;
 	c->prev = c;
 	asm volatile ("sti");

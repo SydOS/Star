@@ -12,6 +12,7 @@
 #define PAGE_SIZE_2M		            0x200000
 #define PAGE_SIZE_4M		            0x400000
 #define PAGE_SIZE_1G		            0x40000000
+#define PAGE_SIZE_512G                  0x8000000000
 #define PAGE_DIRECTORY_SIZE             1024
 #define PAGE_TABLE_SIZE                 1024
 #define PAGE_TABLES_ADDRESS             ((uint32_t)PAGE_SIZE_4M * (uint32_t)(PAGE_DIRECTORY_SIZE - 1))
@@ -23,7 +24,6 @@
 #define PAGE_3GB_ADDRESS                ((uint32_t)PAGE_SIZE_1G * 3)
 
 // PAE sizes.
-#ifndef NO_PAE
 #define PAGE_PAE_PDPT_SIZE              4
 #define PAGE_PAE_DIRECTORY_SIZE         512
 #define PAGE_PAE_TABLE_SIZE             512
@@ -39,16 +39,24 @@
 #define PAGE_PAE_DIR_0GB_ADDRESS        ((uint32_t)PAGE_PAE_TABLES_2GB_ADDRESS + ((uint32_t)PAGE_SIZE_4K * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 3)))
 #define PAGE_PAE_PDPT_ADDRESS           ((uint32_t)PAGE_PAE_TABLES_2GB_ADDRESS + ((uint32_t)PAGE_SIZE_4K * ((uint32_t)PAGE_PAE_DIRECTORY_SIZE - 4)))
 
-// Alignments.
-#define ALIGN_4K(size)          	(((uint32_t)(size) + (uint32_t)PAGE_SIZE_4K) & 0xFFFFF000)
-#define ALIGN_4K_64BIT(size)        (((uint64_t)(size) + (uint64_t)PAGE_SIZE_4K) & 0xFFFFFFFFFFFFF000)
-#define ALIGN_64K(size)             (((uint32_t)(size) + (uint32_t)PAGE_SIZE_64K) & 0xFFFF0000)
+// Long mode stuff.
+#define PAGE_LONG_STRUCT_SIZE                                           512
+#define PAGE_LONG_TABLES_ADDRESS                                        (((uint64_t)PAGE_SIZE_512G * (uint64_t)(PAGE_LONG_STRUCT_SIZE - 1)) + 0xFFFF000000000000)
+#define PAGE_LONG_TABLE_ADDRESS(pdptIndex, directoryIndex, tableIndex)  ((uint64_t)PAGE_LONG_TABLES_ADDRESS + ((uint64_t)PAGE_SIZE_1G * (uint64_t)pdptIndex) + ((uint64_t)PAGE_SIZE_2M * (uint64_t)directoryIndex) + ((uint64_t)PAGE_SIZE_4K) * (uint64_t)tableIndex)
+#define PAGE_LONG_DIR_ADDRESS(pdptIndex, directoryIndex)                ((uint64_t)PAGE_LONG_TABLE_ADDRESS(511, pdptIndex, directoryIndex))
+#define PAGE_LONG_PDPT_ADDRESS(pdptIndex)                               ((uint64_t)PAGE_LONG_TABLE_ADDRESS(511, 511, pdptIndex))
+#define PAGE_LONG_PML4_ADDRESS                                          ((uint64_t)PAGE_LONG_PDPT_ADDRESS(511))
 
 // Masks.
 #define MASK_DIRECTORY_PAE(addr)        ((uint64_t)(addr) & 0xFFFFFFF0)     // Get only the PDPT address.
 #define MASK_PAGE_PAE_4K(size)          ((uint64_t)(size) & 0xFFFFF000)     // Get only the page address.
 #define MASK_PAGEFLAGS_PAE_4K(size)     ((uint64_t)(size) & ~0xFFFFF000)    // Get only the page flags.
-#endif
+#define MASK_PAGE_LONG_4K(size)         ((uint64_t)(size) & 0xFFFFFFFFFFFFF000) // Get only the page address.
+
+// Alignments.
+#define ALIGN_4K(size)          	(((uint32_t)(size) + (uint32_t)PAGE_SIZE_4K) & 0xFFFFF000)
+#define ALIGN_4K_64BIT(size)        (((uint64_t)(size) + (uint64_t)PAGE_SIZE_4K) & 0xFFFFFFFFFFFFF000)
+#define ALIGN_64K(size)             (((uint32_t)(size) + (uint32_t)PAGE_SIZE_64K) & 0xFFFF0000)
 
 // Mask macros.
 #define MASK_PAGE_4K(size)          ((uint32_t)(size) & 0xFFFFF000)     // Get only the page address.

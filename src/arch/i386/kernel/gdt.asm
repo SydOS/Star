@@ -1,11 +1,13 @@
 [bits 32]
+extern gdtPtr
 section .text
 
 ; Sets up the new GDT into the processor while flushing out the old one.
 global _gdt_load
 _gdt_load:
-	mov eax, [esp+4] ; Get the pointer to the GDT, passed as a parameter.
-	lgdt [eax]       ; Load the GDT pointer.
+	; Load the GDT.
+	mov eax, gdtPtr
+	lgdt [eax]
 
 	mov ax, 0x10
 	mov ds, ax

@@ -1,12 +1,12 @@
 #include <main.h>
 #include <kprint.h>
 #include <string.h>
-#include <multiboot.h>
 
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 
 // Constants determined by linker and early boot.
+extern uint32_t MULTIBOOT_INFO;
 extern uint32_t KERNEL_VIRTUAL_OFFSET;
 extern uint32_t KERNEL_VIRTUAL_START;
 extern uint32_t KERNEL_VIRTUAL_END;
@@ -222,6 +222,23 @@ void pmm_print_memmap() {
     kprintf("PMM: Physical memory map:\n");
     uint64_t memory = 0;
 
+#ifdef PMM_MULTIBOOT2
+    // Get first tag.
+    multiboot_tag_t *tag = (multiboot_tag_t*)((uint64_t)&memInfo.mbootInfo->firstTag);
+    uint64_t end = &memInfo.mbootInfo + memInfo.mbootInfo->size;
+
+    for (; (tag->type != MULTIBOOT_TAG_TYPE_END) && ((uint64_t)tag < end); tag = (multiboot_tag_t*)((uint8_t*)tag + ((tag->size + 7) & ~7))) {
+        if (tag->type == MULTIBOOT_TAG_TYPE_MMAP) {
+            multiboot_tag_mmap_t* mmap = (multiboot_tag_mmap_t*)tag;
+            for (multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t*)mmap->entries; (uint64_t)entry < (uint64_t)mmap + mmap->size; entry = (uint64_t)entry + mmap->entry_size) {
+                // Print out info.
+                kprintf("PMM:     region start: 0x%llX length: 0x%llX type: 0x%X\n", entry->addr, entry->len, entry->type);
+                if (entry->type == 1)
+                    memory += entry->len;
+            }
+        }  
+    }
+#else
     uint32_t base = memInfo.mbootInfo->mmap_addr;
     uint32_t end = base + memInfo.mbootInfo->mmap_length;
     multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
@@ -234,10 +251,11 @@ void pmm_print_memmap() {
         if (entry->type == 1 && (((uint32_t)entry->addr) > 0 || (memInfo.paeEnabled && (entry->addr & 0xF00000000))))
             memory += entry->len;
     }
+#endif
 
     // Print summary.
     kprintf("PMM: Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
-    kprintf("PMM: Multiboot info start: 0x%X | Multiboot info end: 0x%X\n", memInfo.mbootStart, memInfo.mbootEnd);
+    kprintf("PMM: Multiboot info start: 0x%X\n", (uint32_t)memInfo.mbootInfo);
     kprintf("PMM: Page frame stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageFrameStackStart, memInfo.pageFrameStackEnd);
     if (memInfo.paeEnabled && memInfo.pageFrameStackPaeStart > 0 && memInfo.pageFrameStackPaeEnd > 0)
         kprintf("PMM: PAE page frame stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageFrameStackPaeStart, memInfo.pageFrameStackPaeEnd);
@@ -270,6 +288,7 @@ static void pmm_build_stacks() {
     if (!pass)
         panic("PMM: Memory test of page frame stack area failed.\n");
 
+#ifndef X86_64
     // If PAE is enabled, initialize PAE stack.
     if (memInfo.paeEnabled && memInfo.pageFrameStackPaeStart > 0 && memInfo.pageFrameStackPaeEnd > 0) {
         // Initialize stack pointer.
@@ -292,8 +311,43 @@ static void pmm_build_stacks() {
         if (!pass)
             panic("PMM: Memory test of PAE page frame stack area failed.\n");
     }
+#endif
 
     // Build stack of free page frames.
+#ifdef X86_64
+    // Get first tag.
+    multiboot_tag_t *tag = (multiboot_tag_t*)((uint64_t)&memInfo.mbootInfo->firstTag);
+    uint64_t end = &memInfo.mbootInfo + memInfo.mbootInfo->size;
+
+    for (; (tag->type != MULTIBOOT_TAG_TYPE_END) && ((uint64_t)tag < end); tag = (multiboot_tag_t*)((uint8_t*)tag + ((tag->size + 7) & ~7))) {
+        if (tag->type == MULTIBOOT_TAG_TYPE_MMAP) {
+            multiboot_tag_mmap_t* mmap = (multiboot_tag_mmap_t*)tag;
+            for (multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t*)mmap->entries; (uint64_t)entry < (uint64_t)mmap + mmap->size; entry = (uint64_t)entry + mmap->entry_size) {
+                // If not available memory, skip over.
+                if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
+                    continue;
+
+                if (entry->addr > 0) {
+                    // Add frame to stack.
+                    uint64_t pageFrameBase = ALIGN_4K(entry->addr);	
+                    kprintf("PMM: Adding pages in 0x%X!\n", pageFrameBase);			
+                    for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
+                        uint64_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
+
+                        // If the address is in conventional memory (low memory), or is reserved by
+                        // the kernel or the frame stack, don't mark it free.
+                        if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
+                            addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)) || addr >= entry->addr + entry->len)
+                            continue;
+
+                        // Add frame to stack.
+                        pmm_push_frame(addr);
+                    }
+                }
+            }
+        }  
+    }
+#else
     for (multiboot_memory_map_t *entry = (multiboot_memory_map_t*)memInfo.mbootInfo->mmap_addr; (uint32_t)entry < memInfo.mbootInfo->mmap_addr + memInfo.mbootInfo->mmap_length;
         entry = (multiboot_memory_map_t*)((uint32_t)entry + entry->size + sizeof(entry->size))) {
         
@@ -338,28 +392,28 @@ static void pmm_build_stacks() {
             }
         }
     }
+#endif
 
     // Print out status.
     kprintf("PMM: Added %u page frames!\n", pageFramesAvailable);
     kprintf("PMM: First page on stack: 0x%X\n", *pageFrameStack);
+
+#ifndef X86_64
     if (memInfo.paeEnabled && pageFramesAvailable > 0) {
         kprintf("PMM: Added %u PAE page frames!\n", pageFramesPaeAvailable);
         kprintf("PMM: First page on PAE stack: 0x%llX\n", *pageFrameStackPae);
     }
+#endif
 }
 
 /**
  * Initializes the physical memory manager.
  */
-void pmm_init(multiboot_info_t *mbootInfo) {
+void pmm_init() {
     kprintf("PMM: Initializing physical memory manager...\n");
 
     // Store away Multiboot info.
-    memInfo.mbootInfo = (multiboot_info_t *)((uint32_t)mbootInfo + (uint32_t)&KERNEL_VIRTUAL_OFFSET);
-
-    // Store where the Multiboot info structure actually resides in memory.
-    memInfo.mbootStart = (uint32_t)mbootInfo;
-    memInfo.mbootEnd = (uint32_t)(mbootInfo + sizeof(multiboot_info_t));
+    memInfo.mbootInfo = (multiboot_info_t*)(MULTIBOOT_INFO + (uint32_t)&KERNEL_VIRTUAL_OFFSET);
 
     // Store where the kernel is. These come from the linker.
     memInfo.kernelVirtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
@@ -371,11 +425,18 @@ void pmm_init(multiboot_info_t *mbootInfo) {
     memInfo.dmaPageFrameLast = DMA_FRAMES_LAST;
 
     // Store page frame stack locations. This is determined during early boot in kernel_main_early().
+#ifndef X86_64
     memInfo.pageFrameStackPaeStart = PAGE_FRAME_STACK_PAE_START;
     memInfo.pageFrameStackPaeEnd = PAGE_FRAME_STACK_PAE_END;
+#endif
     memInfo.pageFrameStackStart = PAGE_FRAME_STACK_START;
     memInfo.pageFrameStackEnd = PAGE_FRAME_STACK_END;
+    
+#ifdef X86_64
+    memInfo.paeEnabled = true;
+#else
     memInfo.paeEnabled = PAE_ENABLED;
+#endif
     earlyPagesLast = EARLY_PAGES_LAST;
 
     // Print memory map.

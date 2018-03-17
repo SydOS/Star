@@ -22,12 +22,22 @@ stack_bottom:
 	resb 16384
 stack_top:
 
+section .inittables
+global MULTIBOOT_MAGIC
+MULTIBOOT_MAGIC: resb 4
+global MULTIBOOT_INFO
+MULTIBOOT_INFO: resb 4
+
 ; Start function.
 section .init
 global _start
 _start:
 	; Disable interrupts.
 	cli
+
+    ; Save Multiboot info for later use.
+    mov [MULTIBOOT_MAGIC], eax
+    mov [MULTIBOOT_INFO], ebx
 
 	; Push Multiboot info structure and magic number.
 	push ebx

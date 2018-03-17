@@ -5,7 +5,7 @@
 #include <driver/rtc.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/interrupts/interrupts.h>
 
 /**
  * Reads from a specific register for RTC

@@ -3,7 +3,8 @@
 #include <string.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/acpi/acpi_tables.h>
-#include <arch/i386/kernel/interrupts.h>
+
+#include <kernel/interrupts/interrupts.h>
 
 static bool acpiInitialized;
 static acpi_rsdp_t *rsdp;

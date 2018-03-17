@@ -1,11 +1,11 @@
 #include <main.h>
 #include <kprint.h>
 #include <io.h>
-#include <arch/i386/kernel/idt.h>
-#include <arch/i386/kernel/lapic.h>
-#include <arch/i386/kernel/cpuid.h>
-#include <arch/i386/kernel/pic.h>
-#include <arch/i386/kernel/idt.h>
+#include <kernel/interrupts/lapic.h>
+
+#include <kernel/cpuid.h>
+#include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/pic.h>
 #include <kernel/memory/paging.h>
 
 extern void _isr_empty();

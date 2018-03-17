@@ -2,7 +2,12 @@
 #define PMM_H
 
 #include <main.h>
+#ifdef X86_64
+#define PMM_MULTIBOOT2
+#include <multiboot2.h>
+#else
 #include <multiboot.h>
+#endif
 
 // Type for page frames.
 typedef uintptr_t page_t;
@@ -53,6 +58,6 @@ extern page_t pmm_pop_frame();
 extern uint64_t pmm_pop_frame_pae();
 extern void pmm_push_frame(page_t frame);
 extern void pmm_push_frame_pae(uint64_t frame);
-extern void pmm_init(multiboot_info_t* mbootInfo);
+extern void pmm_init();
 
 #endif

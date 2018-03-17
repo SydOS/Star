@@ -3,12 +3,12 @@
 #include <io.h>
 #include <string.h>
 #include <tools.h>
-#include <arch/i386/kernel/smp.h>
+#include <kernel/interrupts/smp.h>
 
+#include <kernel/gdt.h>
 #include <kernel/acpi/acpi.h>
-#include <arch/i386/kernel/gdt.h>
-#include <arch/i386/kernel/idt.h>
-#include <arch/i386/kernel/lapic.h>
+#include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/lapic.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>

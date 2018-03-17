@@ -1,7 +1,7 @@
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
-#include <arch/i386/kernel/cpuid.h>
+#include <kernel/cpuid.h>
 
 extern uint32_t _cpuid_detect();
 static bool cpuidChecked = false;

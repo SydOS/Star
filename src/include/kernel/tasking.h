@@ -1,7 +1,7 @@
 #ifndef TASKING_H
 #define TASKING_H
 
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/interrupts/interrupts.h>
 
 #define PROCESS_STATE_ALIVE 0
 #define PROCESS_STATE_ZOMBIE 1
@@ -17,11 +17,11 @@ typedef struct _process {
 	uint32_t pid;
 	uint32_t state;
 
-	uint32_t esp;
+	uintptr_t esp;
 	uint32_t *cr3;
 
-	uint32_t stack_bottom;
-	uint32_t stack_top;
+	uintptr_t stack_bottom;
+	uintptr_t stack_top;
 	registers_t *regs;
 	/* open() */
 	uint16_t num_open_files;
@@ -33,7 +33,7 @@ typedef struct _process {
 
 extern void __addProcess(PROCESS* p);
 extern int tasking_add_process(PROCESS* p);
-extern PROCESS* tasking_create_process(char* name, uint32_t addr);
+extern PROCESS* tasking_create_process(char* name, uintptr_t addr);
 extern void tasking_tick(registers_t *regs);
 extern void tasking_init();
 

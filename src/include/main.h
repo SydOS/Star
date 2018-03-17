@@ -16,4 +16,8 @@
 #error "You don't appear to be using the proper cross-compiler toolchain! (Wrong architecture)"
 #endif
 
+#if defined(__x86_64__)
+#define X86_64
+#endif
+
 extern void panic(const char *format, ...);

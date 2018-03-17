@@ -3,20 +3,19 @@
 #include <io.h>
 #include <string.h>
 #include <kprint.h>
-#include <multiboot.h>
-#include <arch/i386/kernel/gdt.h>
-#include <arch/i386/kernel/idt.h>
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/gdt.h>
+#include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/interrupts.h>
 #include <kernel/acpi/acpi.h>
-#include <arch/i386/kernel/lapic.h>
+#include <kernel/interrupts/lapic.h>
 #include <kernel/nmi.h>
 #include <kernel/pit.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
-#include <arch/i386/kernel/smp.h>
-#include <arch/i386/kernel/cpuid.h>
+#include <kernel/interrupts/smp.h>
+#include <kernel/cpuid.h>
 #include <driver/vga.h>
 #include <driver/floppy.h>
 #include <driver/serial.h>
@@ -50,7 +49,7 @@ void panic(const char *format, ...) {
 /**
  * The main function for the kernel, called from boot.asm
  */
-void kernel_main(multiboot_info_t* mboot_info) {
+void kernel_main() {
 	vga_disable_cursor();
 	
 	// Initialize serial for logging.
@@ -75,11 +74,8 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	// MEMORY RELATED STUFF
 	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
 	
-	// Initialize physical memory manager.
-	pmm_init(mboot_info);
-
-	// Initialize paging.
-	kprintf("Initializing paging...\n");
+	// Initialize memory.
+	pmm_init();
     paging_init();
 
 	// Initialize kernel heap.
@@ -90,7 +86,10 @@ void kernel_main(multiboot_info_t* mboot_info) {
 
 	// Initialize IDT, ACPI, and interrupts.
 	idt_init();
+
+#ifndef X86_64 // ACPI broken on x64.
 	acpi_init();
+#endif
 	interrupts_init();
 	kprintf("Enabling NMI...\n");
 	NMI_enable();
@@ -111,6 +110,7 @@ void kernel_main(multiboot_info_t* mboot_info) {
 	// Initialize SMP.
 	smp_init();
 
+#ifndef X86_64 // Tasking broken on x64.
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");
 	tasking_init();
@@ -130,6 +130,7 @@ void kernel_late() {
 	kprintf("Adding second task...\n");
 	__addProcess(tasking_create_process("hmmm", (uint32_t)hmmm_thread));
 	kprintf("Starting tasking...\n");
+#endif
 
 	// Initialize PS/2.
 	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	

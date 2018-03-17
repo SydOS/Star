@@ -1,9 +1,10 @@
 #include <main.h>
 #include <kprint.h>
 #include <io.h>
+#include <kernel/interrupts/ioapic.h>
+
 #include <kernel/acpi/acpi.h>
-#include <arch/i386/kernel/ioapic.h>
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/interrupts/interrupts.h>
 #include <kernel/memory/paging.h>
 
 // https://wiki.osdev.org/IOAPIC
