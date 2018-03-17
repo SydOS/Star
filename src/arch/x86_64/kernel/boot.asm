@@ -188,11 +188,6 @@ multiboot_memory_entry:
     jnz multiboot_next_mem_entry
 
     ; If we get here, the entry is of type available (0x1).
-    ; Ensure entry starts above 0x0.
-    mov ebx, [eax]
-    cmp ebx, 0x0
-    jz multiboot_next_mem_entry
-
     ; Get size of entry. Get high and low half and put them into EBX and ECX.
     mov ebx, [eax+8] ; Low 32 bits
     mov ecx, [eax+12] ; High 32 bits
@@ -239,6 +234,7 @@ _setup_stack:
     ; Determine end location of page frame stack.
     mov eax, [PAGE_FRAME_STACK_START]
     add eax, ebx ; Add start and size.
+    add eax, 8 ; Add extra address.
     mov [PAGE_FRAME_STACK_END], eax
     ret
 

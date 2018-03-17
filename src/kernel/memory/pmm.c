@@ -329,8 +329,8 @@ static void pmm_build_stacks() {
 
                 if (entry->addr > 0) {
                     // Add frame to stack.
-                    uint64_t pageFrameBase = ALIGN_4K(entry->addr);	
-                    kprintf("PMM: Adding pages in 0x%X!\n", pageFrameBase);			
+                    uint64_t pageFrameBase = ALIGN_4K_64BIT(entry->addr);	
+                    kprintf("PMM: Adding pages in 0x%llX!\n", pageFrameBase);			
                     for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
                         uint64_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
 
