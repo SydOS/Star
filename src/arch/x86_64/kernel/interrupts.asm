@@ -386,6 +386,8 @@ _irq15:
 ; ISR common stub. This calls the handler defined in interrupts.c.
 extern interrupts_isr_handler
 isr_common_stub:
+    ; The processor has already pushed SS, RSP, RFLAGS, CS, and RIP to the stack.
+    ; The interrupt-specific handler also pushed the interrupt number, and an empty error code if needed.
     ; Save registers.
     push rbp
     push r15

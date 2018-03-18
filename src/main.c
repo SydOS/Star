@@ -107,7 +107,6 @@ void kernel_main() {
 	// Initialize SMP.
 	smp_init();
 
-#ifndef X86_64 // Tasking broken on x64.
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");
 	tasking_init();
@@ -127,7 +126,6 @@ void kernel_late() {
 	kprintf("Adding second task...\n");
 	__addProcess(tasking_create_process("hmmm", (uint32_t)hmmm_thread));
 	kprintf("Starting tasking...\n");
-#endif
 
 	// Initialize PS/2.
 	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	
@@ -158,9 +156,9 @@ void kernel_late() {
 		kprintf("NX enabled!\n");
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-	//rtc_init();
-	//kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
-	//kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
+	rtc_init();
+	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
+	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
 	pci_check_busses(0);
 

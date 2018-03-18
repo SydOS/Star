@@ -69,9 +69,7 @@ int tasking_add_process(PROCESS* p)
 
 void kernel_main_thread() {
 	taskingEnabled = true;
-#ifndef X86_64
 	kernel_late();
-#endif
 }
 
 /* This adds a process while no others are running! */
@@ -113,6 +111,10 @@ PROCESS* tasking_create_process(char* name, uintptr_t addr) {
 	process->regs->rip = addr;
 	process->regs->rbp = process->stack_top;
 	process->regs->rsp = process->stack_top;
+	process->regs->ds = 0x10;
+	process->regs->fs = 0x10;
+	process->regs->es = 0x10;
+	process->regs->gs = 0x10;
 #else
 	process->regs->eflags = 0x00000202;
 	process->regs->cs = 0x8;
