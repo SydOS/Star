@@ -53,11 +53,12 @@ enum {
 // Defines registers for ISR callbacks.
 struct registers {
 #ifdef X86_64
+    uint64_t gs, fs, es, ds;
     uint64_t rax, rbx, rcx, rdx, rsi, rdi;
     uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
     uint64_t rbp;
     uint32_t intNum, errorCode;
-    uint64_t rip, cs, rflags, rsp, ss;    
+    uint64_t rip, cs, rflags, rsp, ss;
 #else
     uint32_t gs, fs, es, ds;
     uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;

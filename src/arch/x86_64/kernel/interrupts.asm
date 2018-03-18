@@ -403,6 +403,14 @@ isr_common_stub:
     push rbx
     push rax
 
+    ; Save segments.
+    mov rax, ds
+    push rax
+    mov rax, es
+    push rax
+    push fs
+    push gs
+
     ; Restore kernel segments.
     mov ax, 0x10
     mov ds, ax
@@ -416,6 +424,15 @@ isr_common_stub:
 
 global _isr_exit
 _isr_exit:
+    ; Restore segments.
+    pop gs
+    pop fs
+    pop rax
+    mov es, ax
+
+    pop rax
+    mov ds, ax
+
     ; Restore registers.
     pop rax
     pop rbx

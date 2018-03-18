@@ -520,7 +520,7 @@ _start_higherhalf:
     mov gs, ax
  
     ; Ensure stack is 16-bit aligned.
-    ;and esp, -16
+    and esp, -16
 
     ; Call the kernel main function!
     extern kernel_main
