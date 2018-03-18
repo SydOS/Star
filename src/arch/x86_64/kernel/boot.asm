@@ -12,37 +12,36 @@ stack_bottom:
     resb 16384
 stack_top:
 
-section .inittables
+section .init
+; Constants used in later boot.
 global DMA_FRAMES_FIRST
-DMA_FRAMES_FIRST: resb 4
+DMA_FRAMES_FIRST: dd 0
 global DMA_FRAMES_LAST
-DMA_FRAMES_LAST: resb 4
+DMA_FRAMES_LAST: dd 0
 global PAGE_FRAME_STACK_START
-PAGE_FRAME_STACK_START: resb 4
+PAGE_FRAME_STACK_START: dd 0
 global PAGE_FRAME_STACK_END
-PAGE_FRAME_STACK_END: resb 4
+PAGE_FRAME_STACK_END: dd 0
 global EARLY_PAGES_LAST
-EARLY_PAGES_LAST: resb 4
-
+EARLY_PAGES_LAST: dd 0
 global MULTIBOOT_MAGIC
-MULTIBOOT_MAGIC: resb 4
+MULTIBOOT_MAGIC: dd 0
 global MULTIBOOT_INFO
-MULTIBOOT_INFO: resb 4
+MULTIBOOT_INFO: dd 0
 
-memory: resb 8
-memoryEntryEnd: resb 4
+memory: dq 0
+memoryEntryEnd: dd 0
 
 ; Page table variables.
-pagePml4Table: resb 4
-pageDirectoryPointerTableLow: resb 4
-pageDirectoryLow: resb 4
-pageTableLow: resb 4
-pageDirectoryKernel: resb 4
-pageTableKernelFirst: resb 4
-pageTableKernelCurrent: resb 4
+pagePml4Table: dd 0
+pageDirectoryPointerTableLow: dd 0
+pageDirectoryLow: dd 0
+pageTableLow: dd 0
+pageDirectoryKernel: dd 0
+pageTableKernelFirst: dd 0
+pageTableKernelCurrent: dd 0
 
 ; Start function.
-section .init
 global _start
 _start:
     ; Disable interrupts.

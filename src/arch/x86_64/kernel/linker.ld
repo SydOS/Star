@@ -14,7 +14,6 @@ SECTIONS {
 	.init ALIGN(4K) : {
 		*(.multiboot);
 		*(.init);
-		*(.inittables);
 	}
 
 	KERNEL_INIT_END = .;
