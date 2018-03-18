@@ -1,12 +1,12 @@
 [bits 32]
-extern gdtPtr
+extern gdt32Ptr
 section .text
 
 ; Sets up the new GDT into the processor while flushing out the old one.
 global _gdt_load
 _gdt_load:
 	; Load the GDT.
-	mov eax, gdtPtr
+	mov eax, gdt32Ptr
 	lgdt [eax]
 
 	mov ax, 0x10

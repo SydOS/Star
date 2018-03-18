@@ -1,10 +1,7 @@
-; List of stacks from smp.c.
-extern apStacks
-
 ; Constants. These should match the ones in smp.h.
 SMP_PAGING_ADDRESS equ 0x500
 SMP_PAGING_PAE_ADDRESS equ 0x510
-SMP_GDT_ADDRESS equ 0x600
+SMP_GDT32_ADDRESS equ 0x5A0
 
 _ap_bootstrap_protected_real equ _ap_bootstrap_protected - 0xC0000000
 ap_bootstrap_stack_end equ 0x1000 + ap_bootstrap_stack
@@ -38,7 +35,7 @@ _ap_bootstrap_init:
 
 _ap_bootstrap_a20_enabled:
     ; Load GDT that was setup earlier in boot.
-    mov eax, SMP_GDT_ADDRESS
+    mov eax, SMP_GDT32_ADDRESS
     lgdt [eax]
 
     ; Enable protected mode.
@@ -182,18 +179,17 @@ _ap_bootstrap_higherhalf:
     ; Set up temporary stack.
     mov esp, ap_bootstrap_stack_end
 
-    ; Get the ID for this processor's LAPIC. ID is placed in eax.
+    ; Get the ID for this processor's LAPIC. ID is placed in EAX.
     extern lapic_id
     call lapic_id
 
-    ; Get index of stack. Index is placed in eax.
+    ; Get stack address. Address is placed in EAX.
     push eax
-    extern ap_get_stack_index
-    call ap_get_stack_index
+    extern ap_get_stack
+    call ap_get_stack
 
     ; Load up stack for this processor.
-    mov ebx, [apStacks]
-    mov esp, [ebx + eax * 4]
+    mov esp, eax
     add esp, 0x4000
     ;mov ebp, esp
 

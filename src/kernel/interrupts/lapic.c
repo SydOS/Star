@@ -162,7 +162,7 @@ void lapic_init() {
     uint32_t base = lapic_get_base();
     paging_map_virtual_to_phys(LAPIC_ADDRESS, base);
     kprintf("LAPIC: Initializing LAPIC at 0x%X...\n", base);
-    idt_set_gate(0xFF, (uint32_t)_isr_empty, 0x08, 0x8E);
+    idt_set_gate(0xFF, (uintptr_t)_isr_empty, 0x08, 0x8E);
 
     lapic_setup();
     kprintf("LAPIC: Initialized!\n");

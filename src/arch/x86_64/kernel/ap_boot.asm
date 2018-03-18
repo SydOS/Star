@@ -1,10 +1,8 @@
-; List of stacks from smp.c.
-extern apStacks
-
 ; Constants. These should match the ones in smp.h.
 SMP_PAGING_ADDRESS equ 0x500
 SMP_PAGING_PAE_ADDRESS equ 0x510
-SMP_GDT_ADDRESS equ 0x600
+SMP_GDT32_ADDRESS equ 0x5A0
+SMP_GDT64_ADDRESS equ 0x600
 
 _ap_bootstrap_protected_real equ _ap_bootstrap_protected - 0xC0000000
 ap_bootstrap_stack_end equ 0x1000 + ap_bootstrap_stack
@@ -37,8 +35,8 @@ _ap_bootstrap_init:
     call _enable_A20
 
 _ap_bootstrap_a20_enabled:
-    ; Load GDT that was setup earlier in boot.
-    mov eax, SMP_GDT_ADDRESS
+    ; Load 32-bit GDT that was setup earlier in boot.
+    mov eax, SMP_GDT32_ADDRESS
     lgdt [eax]
 
     ; Enable protected mode.
@@ -155,46 +153,57 @@ _ap_bootstrap_protected:
     mov eax, [SMP_PAGING_ADDRESS]
     mov cr3, eax
 
-    ; Should PAE be enabled?
-    mov eax, [SMP_PAGING_PAE_ADDRESS]
-    cmp eax, 0
-    je _ap_bootstrap_pae_done
-
     ; Enable PAE.
     mov eax, cr4
     or eax, 0x00000020
     mov cr4, eax
 
-_ap_bootstrap_pae_done:
+    ; Enable IA-32e mode.
+    mov ecx, 0xC0000080
+    rdmsr
+    or eax, 0x100
+    wrmsr
+
     ; Enable paging.
     mov eax, cr0
     or eax, 0x80000000
     mov cr0, eax
 
-    ; Jump into higher half.
-    lea eax, [_ap_bootstrap_higherhalf]
-    jmp eax
+    ; Load 64-bit GDT that was setup earlier in boot.
+    mov eax, SMP_GDT64_ADDRESS
+    lgdt [eax]
+
+    ; Jump to 64-bit higher half.
+    jmp 0b1000:_ap_bootstrap_higherhalf
 
 _ap_bootstrap_end:
 _ap_bootstrap_size equ $ - _ap_bootstrap_init - 1
 
+[bits 64]
 _ap_bootstrap_higherhalf:
     ; Set up temporary stack.
-    mov esp, ap_bootstrap_stack_end
+    mov rsp, ap_bootstrap_stack_end
 
-    ; Get the ID for this processor's LAPIC. ID is placed in eax.
+    ; load 0x10 into all data segment registers
+    mov ax, 0x10
+    mov ss, ax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    ; Get the ID for this processor's LAPIC. ID is placed in RAX.
     extern lapic_id
     call lapic_id
 
-    ; Get index of stack. Index is placed in eax.
-    push eax
-    extern ap_get_stack_index
-    call ap_get_stack_index
+    ; Get stack address. Address is placed in RAX.
+    mov rdi, rax
+    extern ap_get_stack
+    call ap_get_stack
 
     ; Load up stack for this processor.
-    mov ebx, [apStacks]
-    mov esp, [ebx + eax * 4]
-    add esp, 0x4000
+    mov rsp, rax
+    add rsp, 0x4000
     ;mov ebp, esp
 
     ; Pop into C code.

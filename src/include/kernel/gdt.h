@@ -22,17 +22,11 @@ typedef struct gdt_entry gdt_entry_t;
 struct gdt_ptr {
     uint16_t limit;               // The upper 16 bits of all selector limits.
     uintptr_t base;               // The address of the first gdt_entry_t struct.
-    uint64_t end;
 } __attribute__((packed));
 typedef struct gdt_ptr gdt_ptr_t;
 
-#ifdef X86_64
-#define GDT_CODE_FLAGS 0xAF // 64-bit flag set.
-#else
-#define GDT_CODE_FLAGS 0xCF
-#endif
-
-#define GDT_ENTRIES 5
+#define GDT32_ENTRIES 5
+#define GDT64_ENTRIES 5
 
 extern void gdt_load();
 extern void gdt_init();

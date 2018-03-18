@@ -18,7 +18,11 @@
 
 extern uintptr_t _ap_bootstrap_init;
 extern uintptr_t _ap_bootstrap_end;
-extern gdt_ptr_t gdtPtr;
+extern gdt_ptr_t gdt32Ptr;
+
+#ifdef X86_64
+extern gdt_ptr_t gdt64Ptr;
+#endif
 
 static bool smpInitialized;
 
@@ -32,14 +36,14 @@ uintptr_t *apStacks;
 // Bitmap for indicating which processors are initialized, used during initial startup.
 static volatile uint64_t ap_map;
 
-uint32_t ap_get_stack_index(uint8_t apicId) {
+uint32_t ap_get_stack(uint32_t apicId) {
     uint32_t index = 0;
     while (index < cpuCount && cpus[index] != apicId)
         index++;
 
     if (index >= cpuCount)
         panic("SMP: Failed to find stack for processor LAPIC %u!\n", apicId);
-    return index;
+    return apStacks[index];
 }
 
 void ap_main() {
@@ -108,7 +112,12 @@ void smp_setup_apboot() {
     // Copy root paging structure and GDT into low memory.
     memcpy((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_ADDRESS), (void*)&memInfo.kernelPageDirectory, sizeof(memInfo.kernelPageDirectory));
     memset((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_PAE_ADDRESS), memInfo.paeEnabled ? 1 : 0, sizeof(uint32_t));
-    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT_ADDRESS), (void*)&gdtPtr, sizeof(gdt_ptr_t));
+    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT32_ADDRESS), (void*)&gdt32Ptr, sizeof(gdt_ptr_t));
+
+#ifdef X86_64
+    // Copy 64-bit GDT.
+    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT64_ADDRESS), (void*)&gdt64Ptr, sizeof(gdt_ptr_t));
+#endif
 
     // Copy AP bootstrap code into low memory.
     memcpy((void*)(memInfo.kernelVirtualOffset + SMP_AP_BOOTSTRAP_ADDRESS), (void*)apStart, apSize);

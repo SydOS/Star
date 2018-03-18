@@ -39,7 +39,7 @@ void panic(const char *format, ...) {
 	kprintf("\n\nHalted.");
 
 	// Halt other processors.
-	lapic_send_nmi_all();
+	//lapic_send_nmi_all();
 
 	// Halt forever.
 	asm volatile ("hlt");
@@ -86,10 +86,7 @@ void kernel_main() {
 
 	// Initialize IDT, ACPI, and interrupts.
 	idt_init();
-
-#ifndef X86_64 // ACPI broken on x64.
 	acpi_init();
-#endif
 	interrupts_init();
 	kprintf("Enabling NMI...\n");
 	NMI_enable();
@@ -161,9 +158,9 @@ void kernel_late() {
 		kprintf("NX enabled!\n");
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-	rtc_init();
-	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
-	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
+	//rtc_init();
+	//kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
+	//kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
 	pci_check_busses(0);
 

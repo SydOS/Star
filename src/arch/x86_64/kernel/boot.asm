@@ -479,8 +479,6 @@ _error:
     xchg bx, bx
     hlt
 
-_count_memory:
-
 gdt64:
     dw 0x0000, 0x0000
     db 0x00, 0b00000000, 0b00000000, 0x00
@@ -512,10 +510,10 @@ section .text
 [bits 64]
 _start_higherhalf:
     ; Point stack pointer to top.
-    mov esp, stack_top
+    mov rsp, stack_top
 
     ; load 0 into all data segment registers
-    mov ax, 0
+    mov ax, 0x10
     mov ss, ax
     mov ds, ax
     mov es, ax

@@ -93,7 +93,43 @@ void paging_unmap_virtual(page_t virtual) {
 }
 
 bool paging_get_phys(page_t virtual, uint64_t *physOut) {
+    // Get pointer to PML4.
+    uint64_t *pml4Table = (uint64_t*)PAGE_LONG_PML4_ADDRESS;
 
+    // Calculate PDPT, directory, table, entry of virtual address.
+    uint32_t pdptIndex  = paging_long_calculate_pdpt(virtual);
+    uint32_t dirIndex   = paging_long_calculate_directory(virtual);
+    uint32_t tableIndex = paging_long_calculate_table(virtual);
+    uint32_t entryIndex = paging_long_calculate_entry(virtual);
+
+    // Get address of PDPT from PML4 table.
+    // If there isn't one, no mapping exists.
+    // Pages will never be located at 0x0, so its safe to assume a value of 0 = no directory defined.
+    uint64_t* directoryPointerTable = (uint64_t*)PAGE_LONG_PDPT_ADDRESS(pdptIndex);
+    if (MASK_PAGE_LONG_4K(pml4Table[pdptIndex]) == 0)
+        return false;
+
+    // Get address of directory from PDPT.
+    // If there isn't one, no mapping exists.
+    // Pages will never be located at 0x0, so its safe to assume a value of 0 = no directory defined.
+    uint64_t* directory = (uint64_t*)PAGE_LONG_DIR_ADDRESS(pdptIndex, dirIndex);
+    if (MASK_PAGE_LONG_4K(directoryPointerTable[dirIndex]) == 0)
+        return false;
+
+    // Get address of table from directory.
+    // If there isn't one, no mapping exists.
+    // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.
+    uint64_t *table = (uint64_t*)(PAGE_LONG_TABLE_ADDRESS(pdptIndex, dirIndex, tableIndex)); 
+    if (MASK_PAGE_LONG_4K(directory[tableIndex]) == 0)
+        return false;
+    
+    // Is page present?
+    if (!(table[entryIndex] & PAGING_PAGE_PRESENT))
+        return false;
+
+    // Get address from table.
+    *physOut = MASK_PAGE_LONG_4K(table[entryIndex]);
+    return true;
 }
 
 void paging_late_long() {
