@@ -79,7 +79,7 @@ void acpi_init() {
         acpiInitialized = false;
         return;
     }
-    kprintf("ACPI: RSDP table found at 0x%X!\n", (uint32_t)rsdp);
+    kprintf("ACPI: RSDP table found at 0x%p!\n", rsdp);
 
     // Print OEM ID and revision.
     char oemId[7];
@@ -98,7 +98,7 @@ void acpi_init() {
         acpiInitialized = false;
         return;
     }
-    kprintf("ACPI: Mapped RSDT to 0x%X, size: %u bytes\n", (uint32_t)rsdt, rsdt->header.length);
+    kprintf("ACPI: Mapped RSDT to 0x%p, size: %u bytes\n", rsdt, rsdt->header.length);
 
     // Get Fixed ACPI Description Table (FADT).
     kprintf("ACPI: Searching for Fixed ACPI Description Table (FADT)...\n");
@@ -108,13 +108,13 @@ void acpi_init() {
         acpiInitialized = false;
         return;
     }
-    kprintf("ACPI: Mapped FADT to 0x%X, size: %u bytes\n", (uint32_t)fadt, fadt->header.length);
+    kprintf("ACPI: Mapped FADT to 0x%p, size: %u bytes\n", fadt, fadt->header.length);
 
     // Get Multiple APIC Description Table (MADT).
     kprintf("ACPI: Searching for Multiple APIC Description Table (MADT)...\n");
     madt = (acpi_madt_t*)acpi_search_rsdt(ACPI_SIGNATURE_MADT, 0);
     if (madt != NULL)
-        kprintf("ACPI: Mapped MADT to 0x%X, size: %u bytes\n", (uint32_t)madt, madt->header.length);
+        kprintf("ACPI: Mapped MADT to 0x%p, size: %u bytes\n", madt, madt->header.length);
     else
         kprintf("ACPI: No MADT found. APICs and SMP will not be available.\n");
 

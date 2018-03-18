@@ -351,11 +351,11 @@ typedef struct acpi_madt acpi_madt_t;
 
 // Functions.
 extern acpi_rsdp_t *acpi_get_rsdp();
-extern acpi_sdt_header_t *acpi_map_header_temp(uint32_t address);
+extern acpi_sdt_header_t *acpi_map_header_temp(uintptr_t address);
 extern void acpi_unmap_header_temp();
-extern page_t acpi_map_table(uint32_t address);
+extern page_t acpi_map_table(uintptr_t address);
 extern void acpi_unmap_table(acpi_sdt_header_t *table);
-extern acpi_sdt_header_t *acpi_get_table(uint32_t address, const char *signature);
+extern acpi_sdt_header_t *acpi_get_table(uintptr_t address, const char *signature);
 extern acpi_rsdt_t *acpi_get_rsdt(uint32_t address);
 
 #endif

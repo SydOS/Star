@@ -150,7 +150,7 @@ void kernel_late() {
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
 	
 	vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-	kprintf("Kernel is located at 0x%X!\n", memInfo.kernelStart);
+	kprintf("Kernel is located at 0x%p!\n", memInfo.kernelStart);
 	kprintf("Detected usable RAM: %uMB\n", memInfo.memoryKb / 1024);
 	if (memInfo.paeEnabled)
 		kprintf("PAE enabled!\n");

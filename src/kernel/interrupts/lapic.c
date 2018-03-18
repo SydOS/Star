@@ -142,7 +142,7 @@ void lapic_create_spurious_interrupt(uint8_t interrupt) {
 
 void lapic_setup() {
     // Map LAPIC and get info.
-    kprintf("LAPIC: Mapped to 0x%X\n", LAPIC_ADDRESS);
+    kprintf("LAPIC: Mapped to 0x%p\n", LAPIC_ADDRESS);
     kprintf("LAPIC: x2 APIC: %s\n", lapic_x2apic() ? "yes" : "no");
     kprintf("LAPIC: ID: %u\n", lapic_id());
     kprintf("LAPIC: Version: 0x%x\n", lapic_version());
@@ -161,7 +161,7 @@ void lapic_init() {
     // Get the base address of the local APIC and map it.
     uint32_t base = lapic_get_base();
     paging_map_virtual_to_phys(LAPIC_ADDRESS, base);
-    kprintf("LAPIC: Initializing LAPIC at 0x%X...\n", base);
+    kprintf("LAPIC: Initializing LAPIC at 0x%p...\n", base);
     idt_set_gate(0xFF, (uintptr_t)_isr_empty, 0x08, 0x8E);
 
     lapic_setup();

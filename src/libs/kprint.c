@@ -252,6 +252,12 @@ void kprintf_va(const char* format, va_list args) {
                         kprint_hex((uint32_t)va_arg(args, uint32_t), true, false);
                         break;
 
+                    // Print pointer as hex.
+                    case 'p':
+                    case 'P':
+                        kprint_hex((uintptr_t)va_arg(args, uintptr_t), true, false);
+                        break;
+
                     // Print string.
                     case 's':
                         kputstring((const char*)va_arg(args, const char*));
