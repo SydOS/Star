@@ -101,49 +101,26 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
  * @param bus The bus number to scan
  */
 void pci_check_busses(uint8_t bus) {
-    // Define some initial variables
-    uint8_t device = 0;
-    bool onlyOneBus = true;
-
-    // If our bus is zero, check some things
-    if(bus == 0) {
-        // Set the device to one to skip this device (already being checked) in
-        // allover scan
-        device = 1;
-
-        // Scan the very first PCI device, it's the host controller, then print
-        // info
-        struct PCIDevice *host_device = pci_check_device(0, 0, 0);
-
-        // If the header states more than 1 function (0 index) we have multiple
-        // busses. Otherwise, set to false to skip checking busses
-        if((host_device->HeaderType & 0x80) != 0) {
-            onlyOneBus = false;
-        }
-
-        // Free object
-        kheap_free(host_device);
-    }
-
     // Check each device on bus
-    for (; device < 32; device++) {
+    for (int device = 0; device < 32; device++) {
         // Get info on the device and print info
         struct PCIDevice *this_device = pci_check_device(bus, device, 0);
         
-        // Check if we have more than one bus
-        if(onlyOneBus == false) {
-            // If device is a PCI bridhge
-            if(this_device->Class == 6 && this_device->Subclass == 4) {
-                vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
-                kprintf("Detected PCI bridge, but cannot reach it yet\n");
-                vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+        // If device is a PCI bridhge
+        if(this_device->Class == 6 && this_device->Subclass == 4) {
+            vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
+            uint16_t seconaryBus = pci_config_read_word(bus,device,0,PCI_BAR2);
+            uint16_t primaryBus = (seconaryBus & ~0xFF00);
+            seconaryBus = (seconaryBus & ~0x00FF) >> 8;
+            kprintf("PCI-to-PCI bridge, Primary %X Seconary %X, scanning now.\n", primaryBus, seconaryBus);
+            pci_check_busses(seconaryBus);
+            vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-            // If device is a different kind of bridge
-            } else if(this_device->Class == 6) {
-                vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
-                kprintf("Detected other type of bridge on PCI bus. No other protocols implemented yet...\n");
-                vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-            }
+        // If device is a different kind of bridge
+        } else if(this_device->Class == 6) {
+            vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
+            kprintf("Detected other type of bridge on PCI bus. No other protocols implemented yet...\n");
+            vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
         }
 
         // Free object
