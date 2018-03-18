@@ -29,7 +29,7 @@ struct mem_info {
 	uint32_t memoryKb;
 
 	// Paging tables.
-	page_t kernelPageDirectory;
+	uintptr_t kernelPageDirectory;
 	bool paeEnabled;
 	bool nxEnabled;
 

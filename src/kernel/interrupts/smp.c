@@ -47,6 +47,9 @@ uint32_t ap_get_stack(uint32_t apicId) {
 }
 
 void ap_main() {
+    // Reload paging directory.
+    paging_change_directory(memInfo.kernelPageDirectory);
+
     // Get processor ID.
     uint32_t cpu = lapic_id();
 
@@ -109,14 +112,17 @@ void smp_setup_apboot() {
     for (page_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
         paging_map_virtual_to_phys(page, page);
     
-    // Copy root paging structure and GDT into low memory.
-    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_ADDRESS), (void*)&memInfo.kernelPageDirectory, sizeof(memInfo.kernelPageDirectory));
-    memset((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_PAE_ADDRESS), memInfo.paeEnabled ? 1 : 0, sizeof(uint32_t));
+    // Copy 32-bit GDT into low memory.
     memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT32_ADDRESS), (void*)&gdt32Ptr, sizeof(gdt_ptr_t));
 
 #ifdef X86_64
-    // Copy 64-bit GDT.
+    // Copy 64-bit GDT and PML4 table into low memory.
+    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_PML4), (void*)PAGE_LONG_PML4_ADDRESS, PAGE_SIZE_4K);
     memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT64_ADDRESS), (void*)&gdt64Ptr, sizeof(gdt_ptr_t));
+#else
+    // Copy root paging structure address into low memory.
+    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_ADDRESS), (void*)&memInfo.kernelPageDirectory, sizeof(memInfo.kernelPageDirectory));
+    memset((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_PAE_ADDRESS), memInfo.paeEnabled ? 1 : 0, sizeof(uint32_t));
 #endif
 
     // Copy AP bootstrap code into low memory.
@@ -126,7 +132,7 @@ void smp_setup_apboot() {
 void smp_destroy_apboot() {
     // Remove identity mapping.
     for (page_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
-        paging_map_virtual_to_phys(page, 0);
+        paging_unmap_virtual(page);
 }
 
 void smp_init() {

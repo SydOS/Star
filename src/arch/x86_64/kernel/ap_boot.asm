@@ -1,8 +1,7 @@
 ; Constants. These should match the ones in smp.h.
-SMP_PAGING_ADDRESS equ 0x500
-SMP_PAGING_PAE_ADDRESS equ 0x510
 SMP_GDT32_ADDRESS equ 0x5A0
 SMP_GDT64_ADDRESS equ 0x600
+SMP_PAGING_PML4   equ 0x7000
 
 _ap_bootstrap_protected_real equ _ap_bootstrap_protected - 0xC0000000
 ap_bootstrap_stack_end equ 0x1000 + ap_bootstrap_stack
@@ -150,7 +149,7 @@ _ap_bootstrap_protected:
 
     ; Set up paging using the root paging structure
     ; thats already set up.
-    mov eax, [SMP_PAGING_ADDRESS]
+    mov eax, SMP_PAGING_PML4
     mov cr3, eax
 
     ; Enable PAE.
