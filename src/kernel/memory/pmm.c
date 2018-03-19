@@ -367,11 +367,11 @@ static void pmm_build_stacks() {
         entry = (multiboot_memory_map_t*)((uint32_t)entry + entry->size + sizeof(entry->size))) {
         
         // If not available memory, skip over.
-        if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
+        if (entry->type != MULTIBOOT_MEMORY_AVAILABLE || entry->len < PAGE_SIZE_4K)
             continue;
 
         // If the entry is normal memory, add it to main stack.
-        if (((uintptr_t)entry->addr) > 0) {
+        if (((uint32_t)entry->addr) > 0) {
             // Add frame to stack.
             uint32_t pageFrameBase = ALIGN_4K(entry->addr);	
             kprintf("PMM: Adding pages in 0x%p!\n", pageFrameBase);			
