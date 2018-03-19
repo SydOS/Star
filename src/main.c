@@ -124,7 +124,7 @@ void hmmm_thread() {
 
 void kernel_late() {
 	kprintf("Adding second task...\n");
-	__addProcess(tasking_create_process("hmmm", (uint32_t)hmmm_thread));
+	__addProcess(tasking_create_process("hmmm", (uintptr_t)hmmm_thread));
 	kprintf("Starting tasking...\n");
 
 	// Initialize PS/2.

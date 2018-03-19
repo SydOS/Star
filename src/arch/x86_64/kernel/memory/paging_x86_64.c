@@ -4,21 +4,40 @@
 #include <string.h>
 #include <io.h>
 #include <kernel/memory/paging.h>
-
 #include <kernel/cpuid.h>
 
+/**
+ * Calculates the PDPT index.
+ * @param virtAddr The address to use.
+ * @return The PDPT index.
+ */
 static uint32_t paging_long_calculate_pdpt(page_t virtAddr) {
     return virtAddr / PAGE_SIZE_512G;
 }
 
+/**
+ * Calculates the directory index.
+ * @param virtAddr The address to use.
+ * @return The directory index.
+ */
 static uint32_t paging_long_calculate_directory(page_t virtAddr) {
     return (virtAddr - (paging_long_calculate_pdpt(virtAddr) * PAGE_SIZE_512G)) / PAGE_SIZE_1G;
 }
 
+/**
+ * Calculates the table index.
+ * @param virtAddr The address to use.
+ * @return The table index.
+ */
 static uint32_t paging_long_calculate_table(page_t virtAddr) {
     return (virtAddr - (paging_long_calculate_directory(virtAddr) * PAGE_SIZE_1G)) / PAGE_SIZE_2M;
 }
 
+/**
+ * Calculates the entry index.
+ * @param virtAddr The address to use.
+ * @return The entry index.
+ */
 static uint32_t paging_long_calculate_entry(page_t virtAddr) {
     return virtAddr % PAGE_SIZE_2M / PAGE_SIZE_4K;
 }
@@ -37,7 +56,7 @@ static void paging_map_long(page_t virtual, page_t physical, bool unmap) {
     // If there isn't one, create one.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no directory defined.
     uint64_t* directoryPointerTable = (uint64_t*)PAGE_LONG_PDPT_ADDRESS(pdptIndex);
-    if (MASK_PAGE_LONG_4K(pml4Table[pdptIndex]) == 0) {
+    if (MASK_PAGE_4K(pml4Table[pdptIndex]) == 0) {
         // Pop page for new PDPT.
         pml4Table[pdptIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
@@ -50,7 +69,7 @@ static void paging_map_long(page_t virtual, page_t physical, bool unmap) {
     // If there isn't one, create one.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no directory defined.
     uint64_t* directory = (uint64_t*)PAGE_LONG_DIR_ADDRESS(pdptIndex, dirIndex);
-    if (MASK_PAGE_LONG_4K(directoryPointerTable[dirIndex]) == 0) {
+    if (MASK_PAGE_4K(directoryPointerTable[dirIndex]) == 0) {
         // Pop page for new directory.
         directoryPointerTable[dirIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
@@ -63,7 +82,7 @@ static void paging_map_long(page_t virtual, page_t physical, bool unmap) {
     // If there isn't one, create one.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.
     uint64_t *table = (uint64_t*)(PAGE_LONG_TABLE_ADDRESS(pdptIndex, dirIndex, tableIndex)); 
-    if (MASK_PAGE_LONG_4K(directory[tableIndex]) == 0) {
+    if (MASK_PAGE_4K(directory[tableIndex]) == 0) {
         // Pop page frame for new table.
         directory[tableIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
@@ -73,10 +92,10 @@ static void paging_map_long(page_t virtual, page_t physical, bool unmap) {
     }
     
     // Add address to table.
-    table[entryIndex] = unmap ? 0 : (MASK_PAGE_LONG_4K(physical) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
+    table[entryIndex] = unmap ? 0 : (MASK_PAGE_4K(physical) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
 }
 
-void paging_map_virtual_to_phys(page_t virtual, page_t physical) {
+void paging_map_virtual_to_phys(page_t virtual, uintptr_t physical) {
     // Map address.
     paging_map_long(virtual, physical, false);
 
@@ -106,21 +125,21 @@ bool paging_get_phys(page_t virtual, uint64_t *physOut) {
     // If there isn't one, no mapping exists.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no directory defined.
     uint64_t* directoryPointerTable = (uint64_t*)PAGE_LONG_PDPT_ADDRESS(pdptIndex);
-    if (MASK_PAGE_LONG_4K(pml4Table[pdptIndex]) == 0)
+    if (MASK_PAGE_4K(pml4Table[pdptIndex]) == 0)
         return false;
 
     // Get address of directory from PDPT.
     // If there isn't one, no mapping exists.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no directory defined.
     uint64_t* directory = (uint64_t*)PAGE_LONG_DIR_ADDRESS(pdptIndex, dirIndex);
-    if (MASK_PAGE_LONG_4K(directoryPointerTable[dirIndex]) == 0)
+    if (MASK_PAGE_4K(directoryPointerTable[dirIndex]) == 0)
         return false;
 
     // Get address of table from directory.
     // If there isn't one, no mapping exists.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.
     uint64_t *table = (uint64_t*)(PAGE_LONG_TABLE_ADDRESS(pdptIndex, dirIndex, tableIndex)); 
-    if (MASK_PAGE_LONG_4K(directory[tableIndex]) == 0)
+    if (MASK_PAGE_4K(directory[tableIndex]) == 0)
         return false;
     
     // Is page present?
@@ -128,10 +147,13 @@ bool paging_get_phys(page_t virtual, uint64_t *physOut) {
         return false;
 
     // Get address from table.
-    *physOut = MASK_PAGE_LONG_4K(table[entryIndex]);
+    *physOut = MASK_PAGE_4K(table[entryIndex]);
     return true;
 }
 
+/**
+ * Sets up 4-level paging.
+ */
 void paging_late_long() {
     kprintf("PAGING: Initializing 4 level paging!\n");
 
@@ -212,6 +234,7 @@ void paging_late_long() {
         uint64_t msr = cpu_msr_read(0xC0000080);
         cpu_msr_write(0xC0000080, msr | 0x800);
         memInfo.nxEnabled = true;
-        kprintf("NX bit enabled!\n");
+        kprintf("PAGING: NX bit enabled!\n");
     }
+    kprintf("PAGING: 4-level paging initialized! PML4 table located at 0x%p.\n", memInfo.kernelPageDirectory);
 }

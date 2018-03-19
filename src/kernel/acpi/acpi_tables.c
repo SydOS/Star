@@ -80,7 +80,7 @@ page_t acpi_map_table(uintptr_t address) {
 
 void acpi_unmap_table(acpi_sdt_header_t *table) {
     // Get page count and unmap table.
-    uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K((uint32_t)table) + table->length - 1, PAGE_SIZE_4K);
+    uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K((uintptr_t)table) + table->length - 1, PAGE_SIZE_4K);
     page_t startPage = MASK_PAGE_4K((uint32_t)table);
     for (page_t page = 0; page < pageCount; page++)
         paging_unmap_virtual(startPage + page);

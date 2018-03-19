@@ -51,7 +51,6 @@
 #define MASK_DIRECTORY_PAE(addr)        ((uint64_t)(addr) & 0xFFFFFFF0)     // Get only the PDPT address.
 #define MASK_PAGE_PAE_4K(size)          ((uint64_t)(size) & 0xFFFFF000)     // Get only the page address.
 #define MASK_PAGEFLAGS_PAE_4K(size)     ((uint64_t)(size) & ~0xFFFFF000)    // Get only the page flags.
-#define MASK_PAGE_LONG_4K(size)         ((uint64_t)(size) & 0xFFFFFFFFFFFFF000) // Get only the page address.
 
 // Alignments.
 #define ALIGN_4K(size)          	(((uint32_t)(size) + (uint32_t)PAGE_SIZE_4K) & 0xFFFFF000)
@@ -59,8 +58,13 @@
 #define ALIGN_64K(size)             (((uint32_t)(size) + (uint32_t)PAGE_SIZE_64K) & 0xFFFF0000)
 
 // Mask macros.
+#ifdef X86_64
+#define MASK_PAGE_4K(size)          ((uint64_t)(size) & 0xFFFFFFFFFFFFF000)     // Get only the page address.
+#define MASK_PAGEFLAGS_4K(size)     ((uint64_t)(size) & ~0xFFFFFFFFFFFFF000)    // Get only the page flags.
+#else
 #define MASK_PAGE_4K(size)          ((uint32_t)(size) & 0xFFFFF000)     // Get only the page address.
 #define MASK_PAGEFLAGS_4K(size)     ((uint32_t)(size) & ~0xFFFFF000)    // Get only the page flags.
+#endif
 
 enum {
     PAGING_PAGE_PRESENT         = 0x01,

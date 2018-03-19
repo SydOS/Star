@@ -7,18 +7,22 @@
 
 // Constants determined by linker and early boot.
 extern uint32_t MULTIBOOT_INFO;
-extern uint32_t KERNEL_VIRTUAL_OFFSET;
-extern uint32_t KERNEL_VIRTUAL_START;
-extern uint32_t KERNEL_VIRTUAL_END;
+extern uintptr_t KERNEL_VIRTUAL_OFFSET;
+extern uintptr_t KERNEL_VIRTUAL_START;
+extern uintptr_t KERNEL_VIRTUAL_END;
 
 extern uint32_t DMA_FRAMES_FIRST;
 extern uint32_t DMA_FRAMES_LAST;
-extern uint32_t PAGE_FRAME_STACK_PAE_START;
-extern uint32_t PAGE_FRAME_STACK_PAE_END;
 extern uint32_t PAGE_FRAME_STACK_START;
 extern uint32_t PAGE_FRAME_STACK_END;
 extern uint32_t EARLY_PAGES_LAST;
+
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
+// PAE constants.
+extern uint32_t PAGE_FRAME_STACK_PAE_START;
+extern uint32_t PAGE_FRAME_STACK_PAE_END;
 extern bool PAE_ENABLED;
+#endif
 
 // Used to store info about memory in the system.
 mem_info_t memInfo;
@@ -27,13 +31,15 @@ uint32_t earlyPagesLast;
 // DMA bitmap. Each bit represents a 64KB page, in order.
 static bool dmaFrames[PMM_NO_OF_DMA_FRAMES];
 
+// Page frame stack, stores addresses to 4K page frames in physical memory.
+static uintptr_t *pageFrameStack;
+static uint32_t pageFramesAvailable = 0;
+
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
 // Page frame stack, stores addresses to 4K page frames in physical memory. This stack contains only PAE pages.
 static uint64_t *pageFrameStackPae;
 static uint32_t pageFramesPaeAvailable = 0;
-
-// Page frame stack, stores addresses to 4K page frames in physical memory.
-static page_t *pageFrameStack;
-static uint32_t pageFramesAvailable = 0;
+#endif
 
 /**
  * 
@@ -80,7 +86,7 @@ uint32_t pmm_dma_get_phys(uint32_t frame) {
 static void pmm_dma_build_bitmap() {
     // Zero out frames and set frame available.
     for (uint32_t frame = 0; frame < PMM_NO_OF_DMA_FRAMES; frame++) {
-        memset((void*)memInfo.dmaPageFrameFirst + (frame * PAGE_SIZE_64K), 0, PAGE_SIZE_64K);
+        memset((void*)(memInfo.dmaPageFrameFirst + (frame * PAGE_SIZE_64K)), 0, PAGE_SIZE_64K);
         dmaFrames[frame] = true;
     }
 
@@ -143,19 +149,12 @@ uint32_t pmm_frames_available() {
 }
 
 /**
- * Gets the current number of PAE page frames available.
- */
-uint32_t pmm_frames_available_pae() {
-    return pageFramesPaeAvailable;
-}
-
-/**
  * Pops a page frame off the stack.
  * @return 		The physical address of the page frame.
  */
-page_t pmm_pop_frame() {
+uintptr_t pmm_pop_frame() {
     // Get frame off stack.
-    page_t frame = *pageFrameStack;
+    uintptr_t frame = *pageFrameStack;
 
     // Verify there are frames.
     if (pmm_frames_available() == 0)
@@ -165,6 +164,37 @@ page_t pmm_pop_frame() {
     pageFrameStack--;
     pageFramesAvailable--;
     return frame;
+}
+
+/**
+ * Pushes a page frame to the stack.
+ * @param frame	The physical address of the page frame to push.
+ */
+void pmm_push_frame(uintptr_t frame) {
+    // Increment stack pointer and check its within bounds.
+    pageFrameStack++;
+    if (((uintptr_t)pageFrameStack) < memInfo.pageFrameStackStart || ((uintptr_t)pageFrameStack) >= memInfo.pageFrameStackEnd)
+        panic("PMM: Page frame stack pointer out of bounds!\n");
+
+    // Push frame to stack.
+    *pageFrameStack = frame;
+    pageFramesAvailable++;
+}
+
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
+/**
+ * Pushes a page frame to the PAE stack.
+ * @param frame	The physical address of the page frame to push.
+ */
+void pmm_push_frame_pae(uint64_t frame) {
+    // Increment stack pointer and check its within bounds.
+    pageFrameStackPae++;
+    if (((uintptr_t)pageFrameStackPae) < memInfo.pageFrameStackPaeStart || ((uintptr_t)pageFrameStackPae) >= memInfo.pageFrameStackPaeEnd)
+        panic("PMM: PAE page frame stack pointer out of bounds!\n");
+
+    // Push frame to stack.
+    *pageFrameStackPae = frame;
+    pageFramesPaeAvailable++;
 }
 
 /**
@@ -186,34 +216,12 @@ uint64_t pmm_pop_frame_pae() {
 }
 
 /**
- * Pushes a page frame to the stack.
- * @param frame	The physical address of the page frame to push.
+ * Gets the current number of PAE page frames available.
  */
-void pmm_push_frame(page_t frame) {
-    // Increment stack pointer and check its within bounds.
-    pageFrameStack++;
-    if (((page_t)pageFrameStack) < memInfo.pageFrameStackStart || ((page_t)pageFrameStack) >= memInfo.pageFrameStackEnd)
-        panic("PMM: Page frame stack pointer out of bounds!\n");
-
-    // Push frame to stack.
-    *pageFrameStack = frame;
-    pageFramesAvailable++;
+uint32_t pmm_frames_available_pae() {
+    return pageFramesPaeAvailable;
 }
-
-/**
- * Pushes a page frame to the PAE stack.
- * @param frame	The physical address of the page frame to push.
- */
-void pmm_push_frame_pae(uint64_t frame) {
-    // Increment stack pointer and check its within bounds.
-    pageFrameStackPae++;
-    if (((uint32_t)pageFrameStackPae) < memInfo.pageFrameStackPaeStart || ((uint32_t)pageFrameStackPae) >= memInfo.pageFrameStackPaeEnd)
-        panic("PMM: PAE page frame stack pointer out of bounds!\n");
-
-    // Push frame to stack.
-    *pageFrameStackPae = frame;
-    pageFramesPaeAvailable++;
-}
+#endif
 
 /**
  * Prints the memory map.
@@ -257,8 +265,11 @@ void pmm_print_memmap() {
     kprintf("PMM: Kernel start: 0x%X | Kernel end: 0x%X\n", memInfo.kernelStart, memInfo.kernelEnd);
     kprintf("PMM: Multiboot info start: 0x%X\n", (uint32_t)memInfo.mbootInfo);
     kprintf("PMM: Page frame stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageFrameStackStart, memInfo.pageFrameStackEnd);
+
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
     if (memInfo.paeEnabled && memInfo.pageFrameStackPaeStart > 0 && memInfo.pageFrameStackPaeEnd > 0)
         kprintf("PMM: PAE page frame stack start: 0x%X | Page stack end: 0x%X\n", memInfo.pageFrameStackPaeStart, memInfo.pageFrameStackPaeEnd);
+#endif
 
     memInfo.memoryKb = memory / 1024;
     kprintf("PMM: Detected usable RAM: %uKB\n", memInfo.memoryKb);
@@ -270,16 +281,16 @@ void pmm_print_memmap() {
 static void pmm_build_stacks() {
     // Initialize stack.
     kprintf("PMM: Initializing page frame stack at 0x%X...\n", memInfo.pageFrameStackStart);
-    pageFrameStack = (page_t*)(memInfo.pageFrameStackStart);
+    pageFrameStack = (uintptr_t*)(memInfo.pageFrameStackStart);
     memset(pageFrameStack, 0, memInfo.pageFrameStackEnd - memInfo.pageFrameStackStart);
 
     // Perform memory test on stack areas.
     kprintf("PMM: Testing %uKB of memory at 0x%X...", (memInfo.pageFrameStackEnd - memInfo.pageFrameStackStart) / 1024, memInfo.pageFrameStackStart);
-    for (page_t i = 0; i <= (memInfo.pageFrameStackEnd - memInfo.pageFrameStackStart) / sizeof(page_t); i++)
+    for (uintptr_t i = 0; i <= (memInfo.pageFrameStackEnd - memInfo.pageFrameStackStart) / sizeof(uintptr_t); i++)
         pageFrameStack[i] = i;
 
     bool pass = true;
-    for (page_t i = 0; i <= (memInfo.pageFrameStackEnd - memInfo.pageFrameStackStart) / sizeof(page_t); i++)
+    for (uintptr_t i = 0; i <= (memInfo.pageFrameStackEnd - memInfo.pageFrameStackStart) / sizeof(uintptr_t); i++)
         if (pageFrameStack[i] != i) {
             pass = false;
             break;
@@ -288,7 +299,7 @@ static void pmm_build_stacks() {
     if (!pass)
         panic("PMM: Memory test of page frame stack area failed.\n");
 
-#ifndef X86_64
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
     // If PAE is enabled, initialize PAE stack.
     if (memInfo.paeEnabled && memInfo.pageFrameStackPaeStart > 0 && memInfo.pageFrameStackPaeEnd > 0) {
         // Initialize stack pointer.
@@ -356,10 +367,10 @@ static void pmm_build_stacks() {
             continue;
 
         // If the entry is normal memory, add it to main stack.
-        if (((page_t)entry->addr) > 0) {
+        if (((uintptr_t)entry->addr) > 0) {
             // Add frame to stack.
             uint32_t pageFrameBase = ALIGN_4K(entry->addr);	
-            kprintf("PMM: Adding pages in 0x%X!\n", pageFrameBase);			
+            kprintf("PMM: Adding pages in 0x%p!\n", pageFrameBase);			
             for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
                 uint32_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
 
@@ -396,9 +407,9 @@ static void pmm_build_stacks() {
 
     // Print out status.
     kprintf("PMM: Added %u page frames!\n", pageFramesAvailable);
-    kprintf("PMM: First page on stack: 0x%X\n", *pageFrameStack);
+    kprintf("PMM: First page on stack: 0x%p\n", *pageFrameStack);
 
-#ifndef X86_64
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
     if (memInfo.paeEnabled && pageFramesAvailable > 0) {
         kprintf("PMM: Added %u PAE page frames!\n", pageFramesPaeAvailable);
         kprintf("PMM: First page on PAE stack: 0x%llX\n", *pageFrameStackPae);
@@ -413,28 +424,26 @@ void pmm_init() {
     kprintf("PMM: Initializing physical memory manager...\n");
 
     // Store away Multiboot info.
-    memInfo.mbootInfo = (multiboot_info_t*)(MULTIBOOT_INFO + (uint32_t)&KERNEL_VIRTUAL_OFFSET);
+    memInfo.mbootInfo = (multiboot_info_t*)(MULTIBOOT_INFO + (uintptr_t)&KERNEL_VIRTUAL_OFFSET);
 
     // Store where the kernel is. These come from the linker.
-    memInfo.kernelVirtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
-    memInfo.kernelStart = (uint32_t)&KERNEL_VIRTUAL_START;
-    memInfo.kernelEnd = (uint32_t)&KERNEL_VIRTUAL_END;
+    memInfo.kernelVirtualOffset = (uintptr_t)&KERNEL_VIRTUAL_OFFSET;
+    memInfo.kernelStart = (uintptr_t)&KERNEL_VIRTUAL_START;
+    memInfo.kernelEnd = (uintptr_t)&KERNEL_VIRTUAL_END;
 
     // Store where the DMA page frames are.
     memInfo.dmaPageFrameFirst = DMA_FRAMES_FIRST;
     memInfo.dmaPageFrameLast = DMA_FRAMES_LAST;
 
     // Store page frame stack locations. This is determined during early boot in kernel_main_early().
-#ifndef X86_64
-    memInfo.pageFrameStackPaeStart = PAGE_FRAME_STACK_PAE_START;
-    memInfo.pageFrameStackPaeEnd = PAGE_FRAME_STACK_PAE_END;
-#endif
     memInfo.pageFrameStackStart = PAGE_FRAME_STACK_START;
     memInfo.pageFrameStackEnd = PAGE_FRAME_STACK_END;
     
-#ifdef X86_64
+#ifdef X86_64 // PAE does not apply to the 64-bit kernel.
     memInfo.paeEnabled = true;
 #else
+    memInfo.pageFrameStackPaeStart = PAGE_FRAME_STACK_PAE_START;
+    memInfo.pageFrameStackPaeEnd = PAGE_FRAME_STACK_PAE_END;
     memInfo.paeEnabled = PAE_ENABLED;
 #endif
     earlyPagesLast = EARLY_PAGES_LAST;
