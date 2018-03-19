@@ -4,7 +4,11 @@
 #include <main.h>
 
 // Address that the I/O APIC is mapped to.
+#ifdef X86_64
+#define IOAPIC_ADDRESS  0xFFFFFF00FF0A0000
+#else
 #define IOAPIC_ADDRESS  0xFF0A0000
+#endif
 
 // I/O APIC memory registers.
 #define IOAPIC_IOREGSL      0x00 // I/O Register Select (index).
