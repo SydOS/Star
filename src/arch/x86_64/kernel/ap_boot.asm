@@ -6,13 +6,13 @@ SMP_PAGING_PML4   equ 0x7000
 ; Offset the two jump functions to get the physical address.
 _ap_bootstrap_protected_real equ _ap_bootstrap_protected - 0xFFFF800000000000
 _ap_bootstrap_long_real equ _ap_bootstrap_long - 0xFFFF800000000000
-ap_bootstrap_stack_end equ 0x1000 + ap_bootstrap_stack
 
 ; Allocate stack
 section .bss
 	align 32
 ap_bootstrap_stack:
 	resb 4096
+ap_bootstrap_stack_end:
 
 section .text
 
@@ -183,10 +183,6 @@ _ap_bootstrap_size equ $ - _ap_bootstrap_init - 1
 ; 64-bit bootstrap code.
 [bits 64]
 _ap_bootstrap_long:
-    ; Set up temporary stack.
-    mov rsp, ap_bootstrap_stack
-    mov rbp, ap_bootstrap_stack
-
     ; load 0x10 into all data segment registers
     mov ax, 0x10
     mov ss, ax
@@ -194,6 +190,15 @@ _ap_bootstrap_long:
     mov es, ax
     mov fs, ax
     mov gs, ax
+
+    ; Jump to higher half.
+    mov rax, _ap_bootstrap_higherhalf
+    jmp rax
+
+_ap_bootstrap_higherhalf:
+    ; Set up temporary stack.
+    mov rsp, ap_bootstrap_stack_end
+    mov rbp, ap_bootstrap_stack_end
 
     ; Get the ID for this processor's LAPIC. ID is placed in RAX.
     extern lapic_id

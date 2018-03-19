@@ -34,7 +34,7 @@ uint8_t *cpus;
 uintptr_t *apStacks;
 
 // Bitmap for indicating which processors are initialized, used during initial startup.
-static volatile uint64_t ap_map;
+static volatile uint64_t apMap;
 
 uint32_t ap_get_stack(uint32_t apicId) {
     uint32_t index = 0;
@@ -56,8 +56,8 @@ void ap_main() {
     kprintf("Hi from a core!\n");
     kprintf("I should be core %u\n", cpu);
 
-    // Processor is initialized.
-    ap_map |= (1 << cpu);
+    // Processor is initialized, so mark it as such which signals the BSP to continue.
+    apMap |= (1 << cpu);
 
     // Load existing GDT and IDT into processor.
     gdt_load();
@@ -109,7 +109,7 @@ void smp_setup_apboot() {
         panic("SMP: AP bootstrap code bigger than a 4KB page.\n");
     
     // Identity map low memory and kernel.
-    for (page_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
+    for (uintptr_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
         paging_map_virtual_to_phys(page, page);
     
     // Copy 32-bit GDT into low memory.
@@ -131,7 +131,7 @@ void smp_setup_apboot() {
 
 void smp_destroy_apboot() {
     // Remove identity mapping.
-    for (page_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
+    for (uintptr_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
         paging_unmap_virtual(page);
 }
 
@@ -202,7 +202,7 @@ void smp_init() {
         lapic_send_startup(cpus[cpu], SMP_AP_BOOTSTRAP_ADDRESS / PAGE_SIZE_4K);
 
         // Wait for processor to come up.
-        while (!(ap_map & (1 << cpus[cpu])));
+        while (!(apMap & (1 << cpus[cpu])));
     }
 
     // Destroy AP boot code.
