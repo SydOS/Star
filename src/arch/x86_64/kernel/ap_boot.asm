@@ -3,7 +3,9 @@ SMP_GDT32_ADDRESS equ 0x5A0
 SMP_GDT64_ADDRESS equ 0x600
 SMP_PAGING_PML4   equ 0x7000
 
-_ap_bootstrap_protected_real equ _ap_bootstrap_protected - 0xC0000000
+; Offset the two jump functions to get the physical address.
+_ap_bootstrap_protected_real equ _ap_bootstrap_protected - 0xFFFF800000000000
+_ap_bootstrap_long_real equ _ap_bootstrap_long - 0xFFFF800000000000
 ap_bootstrap_stack_end equ 0x1000 + ap_bootstrap_stack
 
 ; Allocate stack
@@ -172,16 +174,18 @@ _ap_bootstrap_protected:
     mov eax, SMP_GDT64_ADDRESS
     lgdt [eax]
 
-    ; Jump to 64-bit higher half.
-    jmp 0b1000:_ap_bootstrap_higherhalf
+    ; Jump to 64-bit.
+    jmp 0b1000:_ap_bootstrap_long_real
 
 _ap_bootstrap_end:
 _ap_bootstrap_size equ $ - _ap_bootstrap_init - 1
 
+; 64-bit bootstrap code.
 [bits 64]
-_ap_bootstrap_higherhalf:
+_ap_bootstrap_long:
     ; Set up temporary stack.
-    mov rsp, ap_bootstrap_stack_end
+    mov rsp, ap_bootstrap_stack
+    mov rbp, ap_bootstrap_stack
 
     ; load 0x10 into all data segment registers
     mov ax, 0x10
@@ -203,7 +207,7 @@ _ap_bootstrap_higherhalf:
     ; Load up stack for this processor.
     mov rsp, rax
     add rsp, 0x4000
-    ;mov ebp, esp
+    mov rbp, rsp
 
     ; Pop into C code.
     extern ap_main

@@ -73,7 +73,7 @@ void pmm_dma_set_frame(uintptr_t frame, bool status) {
         panic("PMM: Invalid DMA frame 0x%p specified!\n", frame);
 
     // Change status of frame.
-    dmaFrames[(memInfo.dmaPageFrameFirst - frame) / PAGE_SIZE_64K] = status;
+    dmaFrames[(frame - memInfo.dmaPageFrameFirst) / PAGE_SIZE_64K] = status;
 }
 
 uintptr_t pmm_dma_get_phys(uintptr_t frame) {
@@ -433,19 +433,19 @@ void pmm_init() {
     memInfo.kernelStart = (uintptr_t)&KERNEL_VIRTUAL_START;
     memInfo.kernelEnd = (uintptr_t)&KERNEL_VIRTUAL_END;
 
-    // Store where the DMA page frames are.
-    memInfo.dmaPageFrameFirst = DMA_FRAMES_FIRST;
-    memInfo.dmaPageFrameLast = DMA_FRAMES_LAST;
+    // Store where the DMA page frames are virtually.
+    memInfo.dmaPageFrameFirst = DMA_FRAMES_FIRST + memInfo.kernelVirtualOffset;
+    memInfo.dmaPageFrameLast = DMA_FRAMES_LAST + memInfo.kernelVirtualOffset;
 
-    // Store page frame stack locations. This is determined during early boot in kernel_main_early().
-    memInfo.pageFrameStackStart = PAGE_FRAME_STACK_START;
-    memInfo.pageFrameStackEnd = PAGE_FRAME_STACK_END;
+    // Store the virtual page frame stack locations. This is determined during early boot in kernel_main_early().
+    memInfo.pageFrameStackStart = PAGE_FRAME_STACK_START + memInfo.kernelVirtualOffset;
+    memInfo.pageFrameStackEnd = PAGE_FRAME_STACK_END + memInfo.kernelVirtualOffset;
     
 #ifdef X86_64 // PAE does not apply to the 64-bit kernel.
     memInfo.paeEnabled = true;
 #else
-    memInfo.pageFrameStackPaeStart = PAGE_FRAME_STACK_PAE_START;
-    memInfo.pageFrameStackPaeEnd = PAGE_FRAME_STACK_PAE_END;
+    memInfo.pageFrameStackPaeStart = PAGE_FRAME_STACK_PAE_START + memInfo.kernelVirtualOffset;
+    memInfo.pageFrameStackPaeEnd = PAGE_FRAME_STACK_PAE_END + memInfo.kernelVirtualOffset;
     memInfo.paeEnabled = PAE_ENABLED;
 #endif
     earlyPagesLast = EARLY_PAGES_LAST;

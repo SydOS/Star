@@ -29,7 +29,7 @@ void idt_set_gate(uint8_t gate, uintptr_t base, uint16_t selector, uint8_t flags
 void idt_load() {
     // Load the IDT into the processor.
     asm volatile ("lidt %0" : : "g"(idtPtr));
-    kprintf("IDT: Loaded at 0x%X.\n", &idtPtr);
+    kprintf("IDT: Loaded at 0x%p.\n", &idtPtr);
 }
 
 // Initializes the IDT.

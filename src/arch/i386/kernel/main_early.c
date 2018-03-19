@@ -7,7 +7,6 @@
 
 // Constants in linker file.
 extern uint32_t KERNEL_VIRTUAL_OFFSET;
-extern uint32_t KERNEL_VIRTUAL_END;
 extern uint32_t KERNEL_PHYSICAL_END;
 extern uint32_t KERNEL_INIT_END;
 
@@ -41,7 +40,7 @@ __attribute__((section(".init"))) static void setup_paging_std() {
     uint32_t virtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
 
     // Create page directory.
-    uint32_t *pageDirectory = (uint32_t*)ALIGN_4K(PAGE_FRAME_STACK_END - virtualOffset);
+    uint32_t *pageDirectory = (uint32_t*)ALIGN_4K(PAGE_FRAME_STACK_END);
     memset(pageDirectory, 0, PAGE_SIZE_4K);
 
     // Create page table for mapping low memory + ".init" section of kernel. This is an identity mapping.
@@ -205,7 +204,7 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
 	}
 
     // Determine DMA start and last frame (64 total frames).
-    DMA_FRAMES_FIRST = ALIGN_64K((uint32_t)&KERNEL_VIRTUAL_END);
+    DMA_FRAMES_FIRST = ALIGN_64K((uint32_t)&KERNEL_PHYSICAL_END);
     DMA_FRAMES_LAST = DMA_FRAMES_FIRST + (PAGE_SIZE_64K * 64);
 
     // Determine PAE page frame stack offset and size. This is only created if PAE is enabled and more than 4GB of RAM exist.

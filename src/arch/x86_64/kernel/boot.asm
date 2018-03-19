@@ -1,8 +1,7 @@
 ; 32-bit code.
 [bits 32]
 
-extern KERNEL_VIRTUAL_OFFSET
-extern KERNEL_VIRTUAL_END
+extern KERNEL_PHYSICAL_END
 extern KERNEL_INIT_END
 
 ; Allocate stack
@@ -37,6 +36,7 @@ pagePml4Table: dd 0
 pageDirectoryPointerTableLow: dd 0
 pageDirectoryLow: dd 0
 pageTableLow: dd 0
+pageDirectoryPointerTableKernel: dd 0
 pageDirectoryKernel: dd 0
 pageTableKernelFirst: dd 0
 pageTableKernelCurrent: dd 0
@@ -67,8 +67,8 @@ _start:
     ; Load 64-bit GDT.
     lgdt [gdt_descriptor]
 
-    ; Jump to 64-bit higher half.
-    jmp 0b1000:_start_higherhalf
+    ; Jump to 64-bit.
+    jmp 0b1000:_start_long
 
 ; Takes in address in EAX and places a 4KB aligned address in EAX.
 _align_4k:
@@ -202,7 +202,7 @@ multiboot_memory_done:
 _setup_stack:
     ; Determine start location of DMA frames. This is located after the kernel.
     ; Get first 64KB aligned address after the kernel.
-    mov eax, KERNEL_VIRTUAL_END
+    mov eax, KERNEL_PHYSICAL_END
     add eax, 0x10000
     and eax, 0xFFFF0000
     mov [DMA_FRAMES_FIRST], eax
@@ -243,7 +243,6 @@ _setup_paging:
     ;
     ; Get first 4KB aligned address after the page frame stack.
     mov eax, [PAGE_FRAME_STACK_END]
-    sub eax, KERNEL_VIRTUAL_OFFSET
     call _align_4k
 
     ; Save address of new PML4 table and zero it.
@@ -337,20 +336,37 @@ low_loop:
     mov [ebx], eax
 
     ;
+    ; KERNEL PDPT
+    ;
+    ; Get first 4KB aligned address after the PML4 table for kernel (128TB) PDPT.
+    mov eax, [pageTableLow]
+    call _align_4k
+
+    ; Save address of kernel page directory pointer table (PDPT) and zero it.
+    mov [pageDirectoryPointerTableKernel], eax
+    call _zero_page
+    
+    ; Add 128TB PDPT to PML4 table.
+    mov eax, [pageDirectoryPointerTableKernel]
+    mov ebx, [pagePml4Table]
+    add ebx, (256 * 8) ; 255th index in PDPT, each entry is 8 bytes.
+    or eax, 0x3 ; Page is R/W and present.
+    mov [ebx], eax
+
+    ;
     ; KERNEL PAGE DIRECTORY
     ;
-    ; Get first 4KB aligned address after the low page table for the page directory used for the kernel.
-    mov eax, [pageTableLow]
+    ; Get first 4KB aligned address after the kernel PDPT for the page directory used for the kernel.
+    mov eax, [pageDirectoryPointerTableKernel]
     call _align_4k
 
     ; Save address of kernel page directory and zero it.
     mov [pageDirectoryKernel], eax
     call _zero_page
 
-    ; Add kernel page directory to 0GB PDPT.
+    ; Add kernel page directory to 128TB PDPT.
     mov eax, [pageDirectoryKernel]
-    mov ebx, [pageDirectoryPointerTableLow]
-    add ebx, (3 * 8) ; 3rd index in PDPT, each entry is 8 bytes.
+    mov ebx, [pageDirectoryPointerTableKernel]
     or eax, 0x3 ; Page is R/W and present.
     mov [ebx], eax
 
@@ -376,7 +392,6 @@ low_loop:
     ; Store current page in ESI and end page in EDI.
     xor esi, esi ; Start at address/page 0.
     mov eax, [PAGE_FRAME_STACK_END] ; End at page at the end of the page frame stack.
-    sub eax, KERNEL_VIRTUAL_OFFSET ; We want the physical address.
     cdq
     mov ebx, 0x1000 ; Each page is 4KB big.
     div ebx
@@ -504,23 +519,29 @@ gdt_descriptor:
     dq gdt64
     dq 0
 
-; Higher-half of our start function.
-section .text
+; 64-bit of start function.
 [bits 64]
-_start_higherhalf:
-    ; Point stack pointer to top.
-    mov rsp, stack_top
-
-    ; load 0 into all data segment registers
+_start_long:
+    ; Load all data segment registers.
     mov ax, 0x10
     mov ss, ax
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
- 
+
+    ; Jump to higher half.
+    mov rax, _start_higherhalf
+    jmp rax
+
+section .text
+_start_higherhalf:
+    ; Point stack pointer to top.
+    mov rsp, stack_top
+    mov rbp, stack_top
+
     ; Ensure stack is 16-bit aligned.
-    and esp, -16
+    and rsp, -16
 
     ; Call the kernel main function!
     extern kernel_main

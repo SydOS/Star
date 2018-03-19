@@ -57,7 +57,7 @@ void ap_main() {
     kprintf("I should be core %u\n", cpu);
 
     // Processor is initialized.
-    ap_map |= (1 << lapic_id());
+    ap_map |= (1 << cpu);
 
     // Load existing GDT and IDT into processor.
     gdt_load();
@@ -65,7 +65,7 @@ void ap_main() {
     //lapic_setup();
 
     // Enable interrupts.
-    //asm volatile ("sti");
+    asm volatile ("sti");
     kprintf("CPU%u: INTERRUPTS ENABLED.\n", cpu);
     while (true) {
         sleep(2000);

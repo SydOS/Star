@@ -105,7 +105,7 @@ void kernel_main() {
 	ps2_init();
 
 	// Initialize SMP.
-	smp_init();
+	//smp_init(); // SMP broken on 64-bit.
 
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");

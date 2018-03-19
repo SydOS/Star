@@ -169,10 +169,10 @@ void paging_late_long() {
     uint64_t *pagePml4Table = (uint64_t*)0x0;
     memset(pagePml4Table, 0, PAGE_SIZE_4K);
 
-    // Pop a new page frame for the 0GB PDPT, and map it to 0x1000 in the current virtual space.
-    page_t pageDirectoryPointerTableAddr = pmm_pop_frame();
+    // Pop a new page frame for the 128TB PDPT, and map it to 0x1000 in the current virtual space.
+    uint64_t pageDirectoryPointerTableAddr = pmm_pop_frame();
     earlyPageTableLow[1] = pageDirectoryPointerTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-    pagePml4Table[0] = pageDirectoryPointerTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    pagePml4Table[256] = pageDirectoryPointerTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     paging_flush_tlb();
 
     // Get pointer to the 0GB PDPT and zero it.
@@ -181,9 +181,9 @@ void paging_late_long() {
 
     // Pop a new page for the 3GB page directory, which will hold the kernel at 0xC0000000.
     // This is mapped to 0x2000 in the current virtual address space.
-    page_t pageDirectoryAddr = pmm_pop_frame();
+    uint64_t pageDirectoryAddr = pmm_pop_frame();
     earlyPageTableLow[2] = pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
-    pageDirectoryPointerTable[3] = pageDirectoryAddr | PAGING_PAGE_PRESENT;
+    pageDirectoryPointerTable[0] = pageDirectoryAddr | PAGING_PAGE_PRESENT;
     paging_flush_tlb();
 
     // Get pointer to the page directory.
@@ -191,7 +191,7 @@ void paging_late_long() {
     memset(pageDirectory, 0, PAGE_SIZE_4K);
 
     // Create the first page table for the kernel, and map it to 0x3000 in the current virtual space.
-    page_t pageKernelTableAddr = pmm_pop_frame();
+    uint64_t pageKernelTableAddr = pmm_pop_frame();
     earlyPageTableLow[3] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     paging_flush_tlb();
 

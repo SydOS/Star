@@ -4,11 +4,13 @@
 #include <math.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/acpi/acpi_tables.h>
+
 #include <kernel/memory/paging.h>
+#include <kernel/memory/pmm.h>
 
 acpi_rsdp_t *acpi_get_rsdp() {
     // Search the BIOS area of low memory for the RSDP.
-    for (uintptr_t i = 0xC00E0000; i < 0xC00FFFFF; i += 16) {
+    for (uintptr_t i = (memInfo.kernelVirtualOffset + 0x000E0000); i < (memInfo.kernelVirtualOffset + 0x000FFFFF); i += 16) {
         uint32_t *block = (uint32_t*)i;
         if ((memcmp(block, ACPI_RSDP_PATTERN1, 4) == 0) && (memcmp(block + 1, ACPI_RSDP_PATTERN2, 4) == 0)) {
             // Verify checksum matches.

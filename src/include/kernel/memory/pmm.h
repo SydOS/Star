@@ -34,13 +34,13 @@ struct mem_info {
 	bool nxEnabled;
 
 	// DMA frames.
-	uint32_t dmaPageFrameFirst;
-	uint32_t dmaPageFrameLast;
+	uintptr_t dmaPageFrameFirst;
+	uintptr_t dmaPageFrameLast;
 
 #ifndef X86_64
 	// Page frame stack (PAE).
-    uint32_t pageFrameStackPaeStart;
-    uint32_t pageFrameStackPaeEnd;
+    uintptr_t pageFrameStackPaeStart;
+    uintptr_t pageFrameStackPaeEnd;
 #endif
 
 	// Page frame stack.

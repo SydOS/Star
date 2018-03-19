@@ -36,10 +36,10 @@ static void gdt_set_descriptor(gdt_entry_t *gdt, int32_t num, uint32_t base, uin
 void gdt_load() {
 	// Load the GDT into the processor.
    	_gdt_load();
-	kprintf("32-bit GDT: Loaded at 0x%X.\n", &gdt32Ptr);
+	kprintf("32-bit GDT: Loaded at 0x%p.\n", &gdt32Ptr);
 
 #ifdef X86_64
-	kprintf("64-bit GDT: Loaded at 0x%X.\n", &gdt64Ptr);
+	kprintf("64-bit GDT: Loaded at 0x%p.\n", &gdt64Ptr);
 #endif
 }
 
