@@ -20,8 +20,8 @@
 #define X86_64
 #endif
 
-#if defined(__i486__)
-$define I486
+#if defined(__i486__) || defined(__i586__) || defined(__i686__) || defined(__x86_64__)
+#define I486
 #endif
 
 extern void panic(const char *format, ...);
