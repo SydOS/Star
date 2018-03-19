@@ -27,10 +27,8 @@ void pci_print_info(struct PCIDevice* dev) {
 
 /**
  * Read a word from the PCI config area
- * @param  bus    PCI bus to read from
- * @param  slot   PCI slot to read from
- * @param  func   PCI card function to read from
- * @param  offset PCI card's config area offset
+ * @param  dev    PCIDevice struct with at least the bus, device, and function
+ *                filled.
  * @return        A uint16_t containing the data returned by the card
  */
 uint16_t pci_config_read_word(struct PCIDevice* dev, uint8_t offset) {
