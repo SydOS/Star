@@ -33,16 +33,16 @@ void pci_print_info(struct PCIDevice* dev) {
  * @param  offset PCI card's config area offset
  * @return        A uint16_t containing the data returned by the card
  */
-uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset) {
+uint16_t pci_config_read_word(struct PCIDevice* dev, uint8_t offset) {
     uint32_t address;
-    uint32_t lbus  = (uint32_t)bus;
-    uint32_t lslot = (uint32_t)slot;
-    uint32_t lfunc = (uint32_t)func;
+    uint32_t lbus  = (uint32_t)dev->Bus;
+    uint32_t lslot = (uint32_t)dev->Device;
+    uint32_t lfunc = (uint32_t)dev->Function;
     uint16_t tmp = 0;
  
     /* create configuration address as per Figure 1 */
     address = (uint32_t)((lbus << 16) | (lslot << 11) |
-              (lfunc << 8) | (offset & 0xfc) | ((uint32_t)0x80000000));
+        (lfunc << 8) | (offset & 0xfc) | ((uint32_t)0x80000000));
  
     /* write out the address */
     outl(PCI_ADDRESS_PORT, address);
@@ -64,8 +64,6 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
 
     // Set base configuration address and other base info for our PCIDevice
-    this_device->ConfigurationAddress = (uintptr_t)(((uintptr_t)bus << 16) | ((uintptr_t)device << 11) |
-        ((uintptr_t)function << 8) | (0x0 & 0xfc) | ((uintptr_t)0x80000000));
     this_device->Bus = bus;
     this_device->Device = device;
     this_device->Function = function;
@@ -73,12 +71,12 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     // Define variables inside our PCIDevice struct
     // Class and Subclass are bytes, but we read a word, so we have to split the
     // two halves
-    this_device->VendorID = pci_config_read_word(bus,device,0,PCI_VENDOR_ID);
-    this_device->DeviceID = pci_config_read_word(bus,device,0,PCI_DEVICE_ID);
-    uint16_t classInfo = pci_config_read_word(bus,device,0,PCI_SUBCLASS);
+    this_device->VendorID = pci_config_read_word(this_device,PCI_VENDOR_ID);
+    this_device->DeviceID = pci_config_read_word(this_device,PCI_DEVICE_ID);
+    uint16_t classInfo = pci_config_read_word(this_device,PCI_SUBCLASS);
     this_device->Class = (classInfo & ~0x00FF) >> 8;
     this_device->Subclass = (classInfo & ~0xFF00);
-    this_device->HeaderType = (pci_config_read_word(bus,device,0,PCI_HEADER_TYPE) & ~0x00FF) >> 8;
+    this_device->HeaderType = (pci_config_read_word(this_device,PCI_HEADER_TYPE) & ~0x00FF) >> 8;
 
     // Return if vendor is none
     if (this_device->VendorID == 0xFFFF) return this_device;
@@ -108,7 +106,7 @@ void pci_check_busses(uint8_t bus) {
         // If device is a PCI bridhge
         if(this_device->Class == 6 && this_device->Subclass == 4) {
             vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
-            uint16_t seconaryBus = pci_config_read_word(bus,device,0,PCI_BAR2);
+            uint16_t seconaryBus = pci_config_read_word(this_device,PCI_BAR2);
             uint16_t primaryBus = (seconaryBus & ~0xFF00);
             seconaryBus = (seconaryBus & ~0x00FF) >> 8;
             kprintf("PCI-to-PCI bridge, Primary %X Seconary %X, scanning now.\n", primaryBus, seconaryBus);
