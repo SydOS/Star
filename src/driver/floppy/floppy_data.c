@@ -19,7 +19,7 @@ extern bool floppy_wait_for_irq(uint16_t timeout);
  */
 bool floppy_init_dma() {
     // Allocate space for DMA buffer.
-	uint32_t frame = 0;
+	uintptr_t frame = 0;
 	if (!pmm_dma_get_free_frame(&frame))
 		return false;
 	floppyDmaBuffer = (uint8_t*)frame;
@@ -32,7 +32,7 @@ bool floppy_init_dma() {
 		uint8_t bytes[4];
 		uint32_t data;
 	} addr, count;
-	addr.data = pmm_dma_get_phys((uint32_t)floppyDmaBuffer);
+	addr.data = (uint32_t)pmm_dma_get_phys((uintptr_t)floppyDmaBuffer);
 	count.data = PAGE_SIZE_64K - 1;
 
 	// Ensure address is under 24 bits, and count is under 16 bits.

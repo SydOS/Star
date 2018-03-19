@@ -97,12 +97,12 @@ void smp_setup_stacks() {
 
 void smp_setup_apboot() {
     // Get start and end of the AP bootstrap code.
-    uint32_t apStart = (uint32_t)&_ap_bootstrap_init;
-    uint32_t apEnd = (uint32_t)&_ap_bootstrap_end;
+    uintptr_t apStart = (uintptr_t)&_ap_bootstrap_init;
+    uintptr_t apEnd = (uintptr_t)&_ap_bootstrap_end;
     uint32_t apSize = apEnd - apStart;
 
     kprintf("SMP: Setting up bootstrap code for APs...\n");
-    kprintf("SMP:     Bootstrap start: 0x%X, size: %u bytes\n", apStart, apSize);
+    kprintf("SMP:     Bootstrap start: 0x%p, size: %u bytes\n", apStart, apSize);
 
     // Ensure AP bootstrap is within a page.
     if (apSize > PAGE_SIZE_4K)
@@ -113,7 +113,7 @@ void smp_setup_apboot() {
         paging_map_virtual_to_phys(page, page);
     
     // Copy 32-bit GDT into low memory.
-    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT32_ADDRESS), (void*)&gdt32Ptr, sizeof(gdt_ptr_t));
+    memcpy((void*)((uintptr_t)(memInfo.kernelVirtualOffset + SMP_GDT32_ADDRESS)), (void*)&gdt32Ptr, sizeof(gdt_ptr_t));
 
 #ifdef X86_64
     // Copy 64-bit GDT and PML4 table into low memory.

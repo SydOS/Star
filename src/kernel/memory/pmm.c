@@ -52,7 +52,7 @@ static uint32_t pageFramesPaeAvailable = 0;
  * @param frameOut Pointer to where the frame address should be stored.
  * @return True if the function succeeded; otherwise false.
  */
-bool pmm_dma_get_free_frame(uint32_t *frameOut) {
+bool pmm_dma_get_free_frame(uintptr_t *frameOut) {
     // Search until we find a free page frame.
     for (uint32_t frame = 0; frame < PMM_NO_OF_DMA_FRAMES; frame++) {
         if (dmaFrames[frame]) {
@@ -67,16 +67,16 @@ bool pmm_dma_get_free_frame(uint32_t *frameOut) {
     return false;
 }
 
-void pmm_dma_set_frame(uint32_t frame, bool status) {
+void pmm_dma_set_frame(uintptr_t frame, bool status) {
     // Ensure we are in bounds and aligned.
     if (frame < memInfo.dmaPageFrameFirst || frame > memInfo.dmaPageFrameLast || (frame % PAGE_SIZE_64K != 0))
-        panic("PMM: Invalid DMA frame 0x%X specified!\n", frame);
+        panic("PMM: Invalid DMA frame 0x%p specified!\n", frame);
 
     // Change status of frame.
     dmaFrames[(memInfo.dmaPageFrameFirst - frame) / PAGE_SIZE_64K] = status;
 }
 
-uint32_t pmm_dma_get_phys(uint32_t frame) {
+uintptr_t pmm_dma_get_phys(uintptr_t frame) {
     return frame - memInfo.kernelVirtualOffset;
 }
 
@@ -86,13 +86,13 @@ uint32_t pmm_dma_get_phys(uint32_t frame) {
 static void pmm_dma_build_bitmap() {
     // Zero out frames and set frame available.
     for (uint32_t frame = 0; frame < PMM_NO_OF_DMA_FRAMES; frame++) {
-        memset((void*)(memInfo.dmaPageFrameFirst + (frame * PAGE_SIZE_64K)), 0, PAGE_SIZE_64K);
+        memset((void*)((uintptr_t)(memInfo.dmaPageFrameFirst + (frame * PAGE_SIZE_64K))), 0, PAGE_SIZE_64K);
         dmaFrames[frame] = true;
     }
 
     // Test out frame functions.
     kprintf("PMM: Testing DMA memory manager...\n");
-    uint32_t frame1;
+    uintptr_t frame1;
     if (!pmm_dma_get_free_frame(&frame1))
         panic("PMM: Couldn't get DMA frame!\n");
 
@@ -111,7 +111,7 @@ static void pmm_dma_build_bitmap() {
     kprintf("%s!\n", pass ? "passed" : "failed");
 
     // Pull another frame.
-    uint32_t frame2;
+    uintptr_t frame2;
     if (!pmm_dma_get_free_frame(&frame2))
         panic("PMM: Couldn't get DMA frame!\n");
 
@@ -233,12 +233,13 @@ void pmm_print_memmap() {
 #ifdef PMM_MULTIBOOT2
     // Get first tag.
     multiboot_tag_t *tag = (multiboot_tag_t*)((uint64_t)&memInfo.mbootInfo->firstTag);
-    uint64_t end = &memInfo.mbootInfo + memInfo.mbootInfo->size;
+    uint64_t end = (uint64_t)&memInfo.mbootInfo + memInfo.mbootInfo->size;
 
     for (; (tag->type != MULTIBOOT_TAG_TYPE_END) && ((uint64_t)tag < end); tag = (multiboot_tag_t*)((uint8_t*)tag + ((tag->size + 7) & ~7))) {
         if (tag->type == MULTIBOOT_TAG_TYPE_MMAP) {
             multiboot_tag_mmap_t* mmap = (multiboot_tag_mmap_t*)tag;
-            for (multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t*)mmap->entries; (uint64_t)entry < (uint64_t)mmap + mmap->size; entry = (uint64_t)entry + mmap->entry_size) {
+            for (multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t*)mmap->entries;
+                (uint64_t)entry < (uint64_t)mmap + mmap->size; entry = (multiboot_mmap_entry_t*)((uint64_t)entry + mmap->entry_size)) {
                 // Print out info.
                 kprintf("PMM:     region start: 0x%llX length: 0x%llX type: 0x%X\n", entry->addr, entry->len, entry->type);
                 if (entry->type == 1)
@@ -333,7 +334,8 @@ static void pmm_build_stacks() {
     for (; (tag->type != MULTIBOOT_TAG_TYPE_END) && ((uint64_t)tag < end); tag = (multiboot_tag_t*)((uint8_t*)tag + ((tag->size + 7) & ~7))) {
         if (tag->type == MULTIBOOT_TAG_TYPE_MMAP) {
             multiboot_tag_mmap_t* mmap = (multiboot_tag_mmap_t*)tag;
-            for (multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t*)mmap->entries; (uint64_t)entry < (uint64_t)mmap + mmap->size; entry = (uint64_t)entry + mmap->entry_size) {
+            for (multiboot_mmap_entry_t *entry = (multiboot_mmap_entry_t*)mmap->entries;
+                (uint64_t)entry < (uint64_t)mmap + mmap->size; entry = (multiboot_mmap_entry_t*)((uint64_t)entry + mmap->entry_size)) {
                 // If not available memory, skip over.
                 if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
                     continue;
