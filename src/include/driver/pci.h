@@ -23,6 +23,8 @@
 
 
 struct PCIDevice {
+	uintptr_t ConfigurationAddress;
+
 	uint16_t VendorID;
 	uint16_t DeviceID;
 

@@ -75,6 +75,8 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     // Define variables inside our PCIDevice struct
     // Class and Subclass are bytes, but we read a word, so we have to split the
     // two halves
+    this_device->ConfigurationAddress = (uintptr_t)(((uintptr_t)bus << 16) | ((uintptr_t)device << 11) |
+              ((uintptr_t)function << 8) | (0x0 & 0xfc) | ((uintptr_t)0x80000000));
     this_device->VendorID = vendorID;
     this_device->DeviceID = deviceID;
     this_device->Class = (classInfo & ~0x00FF) >> 8;
