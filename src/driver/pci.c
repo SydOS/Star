@@ -60,31 +60,28 @@ uint16_t pci_config_read_word(uint8_t bus, uint8_t slot, uint8_t func, uint8_t o
  * @return          A PCIDevice struct with the info filled
  */
 struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function) {
-    // Get various bits of info from the PCI card
-    uint16_t vendorID = pci_config_read_word(bus,device,0,PCI_VENDOR_ID);
-    uint16_t deviceID = pci_config_read_word(bus,device,0,PCI_DEVICE_ID);
-    uint16_t classInfo = pci_config_read_word(bus,device,0,PCI_SUBCLASS);
-    uint16_t headerType = (pci_config_read_word(bus,device,0,PCI_HEADER_TYPE) & ~0x00FF) >> 8;
-
     // Define our PCIDevice
     struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
 
-    // Return if vendor is none
-    if (vendorID == 0xFFFF) return this_device;
+    // Set base configuration address and other base info for our PCIDevice
+    this_device->ConfigurationAddress = (uintptr_t)(((uintptr_t)bus << 16) | ((uintptr_t)device << 11) |
+        ((uintptr_t)function << 8) | (0x0 & 0xfc) | ((uintptr_t)0x80000000));
+    this_device->Bus = bus;
+    this_device->Device = device;
+    this_device->Function = function;
 
     // Define variables inside our PCIDevice struct
     // Class and Subclass are bytes, but we read a word, so we have to split the
     // two halves
-    this_device->ConfigurationAddress = (uintptr_t)(((uintptr_t)bus << 16) | ((uintptr_t)device << 11) |
-              ((uintptr_t)function << 8) | (0x0 & 0xfc) | ((uintptr_t)0x80000000));
-    this_device->VendorID = vendorID;
-    this_device->DeviceID = deviceID;
+    this_device->VendorID = pci_config_read_word(bus,device,0,PCI_VENDOR_ID);
+    this_device->DeviceID = pci_config_read_word(bus,device,0,PCI_DEVICE_ID);
+    uint16_t classInfo = pci_config_read_word(bus,device,0,PCI_SUBCLASS);
     this_device->Class = (classInfo & ~0x00FF) >> 8;
     this_device->Subclass = (classInfo & ~0xFF00);
-    this_device->HeaderType = headerType;
-    this_device->Bus = bus;
-    this_device->Device = device;
-    this_device->Function = function;
+    this_device->HeaderType = (pci_config_read_word(bus,device,0,PCI_HEADER_TYPE) & ~0x00FF) >> 8;
+
+    // Return if vendor is none
+    if (this_device->VendorID == 0xFFFF) return this_device;
 
     pci_print_info(this_device);
 
