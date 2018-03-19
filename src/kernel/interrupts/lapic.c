@@ -37,12 +37,12 @@ bool lapic_enabled() {
 
 static uint32_t lapic_read(uint16_t offset) {
     // Read value from LAPIC.
-    return *(volatile uint32_t*)(LAPIC_ADDRESS + offset);
+    return *(volatile uint32_t*)((uintptr_t)(LAPIC_ADDRESS + offset));
 }
 
 static void lapic_write(uint16_t offset, uint32_t value) {
     // Send data to LAPIC.
-    *(volatile uint32_t*)(LAPIC_ADDRESS + offset) = value;
+    *(volatile uint32_t*)((uintptr_t)(LAPIC_ADDRESS + offset)) = value;
     (void)lapic_read(LAPIC_REG_ID);
 }
 

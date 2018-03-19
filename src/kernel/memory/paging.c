@@ -11,6 +11,13 @@
 // https://forum.osdev.org/viewtopic.php?f=15&t=19387
 // https://medium.com/@connorstack/recursive-page-tables-ad1e03b20a85
 
+#ifdef X86_64
+extern void paging_late_long();
+#else
+extern void paging_late_std();
+extern void paging_late_pae();
+#endif
+
 /**
  * Changes the current paging structure.
  * @param directoryPhysicalAddr The physical address of the root paging structure.

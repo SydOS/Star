@@ -148,7 +148,7 @@ void interrupts_irq_remove_handler(uint8_t irq) {
 
 // Handler for ISRs.
 void interrupts_isr_handler(registers_t *regs) {
-    uint32_t intNum, errorCode;
+    uintptr_t intNum, errorCode;
     // Blank handler pointer.
     isr_handler handler;
 
@@ -163,7 +163,7 @@ void interrupts_isr_handler(registers_t *regs) {
     else {
         // If we have an exception, print default message.
         if (intNum < IRQ_OFFSET) {
-            panic("CPU%d: Exception: %s\n", lapic_id(), exception_messages[intNum]);
+            panic("CPU%d: Exception: %s (error code: %p)\n", lapic_id(), exception_messages[intNum], errorCode);
         }
     }
 

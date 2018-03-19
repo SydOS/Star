@@ -78,6 +78,9 @@ enum {
     PAGING_PAGE_GLOBAL          = 0x80
 };
 
+extern void paging_change_directory(uintptr_t directoryPhysicalAddr);
+extern void paging_flush_tlb();
+extern void paging_flush_tlb_address(uintptr_t address);
 extern void paging_map_virtual_to_phys(page_t virt, page_t phys);
 extern void paging_unmap_virtual(page_t virtual);
 extern bool paging_get_phys(page_t virtual, uint64_t *physOut);
