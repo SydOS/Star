@@ -248,17 +248,25 @@ void pmm_print_memmap() {
         }  
     }
 #else
-    uint32_t base = memInfo.mbootInfo->mmap_addr;
-    uint32_t end = base + memInfo.mbootInfo->mmap_length;
-    multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
+    // Is a memory map present?
+    if (memInfo.mbootInfo->flags & MULTIBOOT_INFO_MEM_MAP) {
+        uint32_t base = memInfo.mbootInfo->mmap_addr;
+        uint32_t end = base + memInfo.mbootInfo->mmap_length;
+        multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base;
 
-    for (; base < end; base += entry->size + sizeof(uint32_t)) {
-        entry = (multiboot_memory_map_t*)base;
+        for (; base < end; base += entry->size + sizeof(uint32_t)) {
+            entry = (multiboot_memory_map_t*)base;
 
-        // Print out info.
-        kprintf("PMM:     region start: 0x%llX length: 0x%llX type: 0x%X\n", entry->addr, entry->len, (uint64_t)entry->type);
-        if (entry->type == 1 && (((uint32_t)entry->addr) > 0 || (memInfo.paeEnabled && (entry->addr & 0xF00000000))))
-            memory += entry->len;
+            // Print out info.
+            kprintf("PMM:     region start: 0x%llX length: 0x%llX type: 0x%X\n", entry->addr, entry->len, (uint64_t)entry->type);
+            if (entry->type == 1 && (((uint32_t)entry->addr) > 0 || (memInfo.paeEnabled && (entry->addr & 0xF00000000))))
+                memory += entry->len;
+        }
+    }
+    else {
+        // No memory map, so take the high memory amount instead.
+        kprintf("PMM: No memory map found! The reported RAM may be incorrect.\n");
+        memory = memInfo.mbootInfo->mem_upper * 1024;
     }
 #endif
 
@@ -363,48 +371,68 @@ static void pmm_build_stacks() {
         }  
     }
 #else
-    for (multiboot_memory_map_t *entry = (multiboot_memory_map_t*)memInfo.mbootInfo->mmap_addr; (uint32_t)entry < memInfo.mbootInfo->mmap_addr + memInfo.mbootInfo->mmap_length;
-        entry = (multiboot_memory_map_t*)((uint32_t)entry + entry->size + sizeof(entry->size))) {
-        
-        // If not available memory, skip over.
-        if (entry->type != MULTIBOOT_MEMORY_AVAILABLE || entry->len < PAGE_SIZE_4K)
-            continue;
+    // Is a memory map present?
+    if (memInfo.mbootInfo->flags & MULTIBOOT_INFO_MEM_MAP) {
+        for (multiboot_memory_map_t *entry = (multiboot_memory_map_t*)memInfo.mbootInfo->mmap_addr; (uint32_t)entry < memInfo.mbootInfo->mmap_addr + memInfo.mbootInfo->mmap_length;
+            entry = (multiboot_memory_map_t*)((uint32_t)entry + entry->size + sizeof(entry->size))) {
+            
+            // If not available memory, skip over.
+            if (entry->type != MULTIBOOT_MEMORY_AVAILABLE || entry->len < PAGE_SIZE_4K)
+                continue;
 
-        // If the entry is normal memory, add it to main stack.
-        if (((uint32_t)entry->addr) > 0) {
-            // Add frame to stack.
-            uint32_t pageFrameBase = ALIGN_4K(entry->addr);	
-            kprintf("PMM: Adding pages in 0x%p!\n", pageFrameBase);			
-            for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
-                uint32_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
-
-                // If the address is in conventional memory (low memory), or is reserved by
-                // the kernel or the frame stack, don't mark it free.
-                if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
-                    addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)) || addr >= entry->addr + entry->len)
-                    continue;
-
+            // If the entry is normal memory, add it to main stack.
+            if (((uint32_t)entry->addr) > 0) {
                 // Add frame to stack.
-                pmm_push_frame(addr);
+                uint32_t pageFrameBase = ALIGN_4K(entry->addr);	
+                kprintf("PMM: Adding pages in 0x%p!\n", pageFrameBase);			
+                for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
+                    uint32_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
+
+                    // If the address is in conventional memory (low memory), or is reserved by
+                    // the kernel or the frame stack, don't mark it free.
+                    if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
+                        addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)) || addr >= entry->addr + entry->len)
+                        continue;
+
+                    // Add frame to stack.
+                    pmm_push_frame(addr);
+                }
+            }
+            // Is the entry a 64-bit one and PAE is enabled?
+            else if (memInfo.paeEnabled && (entry->addr & 0xF00000000)) {
+                // Add frame to stack.
+                uint64_t pageFrameBase = ALIGN_4K_64BIT(entry->addr);	
+                kprintf("PMM: Adding PAE pages in 0x%llX!\n", pageFrameBase);			
+                for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
+                    uint64_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
+
+                    // If the address is in conventional memory (low memory), or is reserved by
+                    // the kernel or the frame stack, don't mark it free.
+                    if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
+                        addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)) || addr >= entry->addr + entry->len)
+                        continue;
+
+                    // Add frame to stack.
+                    pmm_push_frame_pae(addr);
+                }
             }
         }
-        // Is the entry a 64-bit one and PAE is enabled?
-        else if (memInfo.paeEnabled && (entry->addr & 0xF00000000)) {
+    }
+    else {
+        // No memory map, so take the high memory amount instead.
+        uint32_t pageFrameBase = ALIGN_4K(0x100000);	
+        kprintf("PMM: Adding pages in 0x%p!\n", pageFrameBase);			
+        for (uint32_t i = 0; i < ((memInfo.mbootInfo->mem_upper * 1024) / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
+            uint32_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
+
+            // If the address is in conventional memory (low memory), or is reserved by
+            // the kernel or the frame stack, don't mark it free.
+            if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
+                addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)))
+                continue;
+
             // Add frame to stack.
-            uint64_t pageFrameBase = ALIGN_4K_64BIT(entry->addr);	
-            kprintf("PMM: Adding PAE pages in 0x%llX!\n", pageFrameBase);			
-            for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
-                uint64_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
-
-                // If the address is in conventional memory (low memory), or is reserved by
-                // the kernel or the frame stack, don't mark it free.
-                if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
-                    addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)) || addr >= entry->addr + entry->len)
-                    continue;
-
-                // Add frame to stack.
-                pmm_push_frame_pae(addr);
-            }
+            pmm_push_frame(addr);
         }
     }
 #endif

@@ -168,8 +168,8 @@ __attribute__((section(".init"))) static void setup_paging_pae() {
  * This function must not call code outside of this file.
  */
 __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, multiboot_info_t* mbootInfo) {
-	// Ensure multiboot magic value is good and a memory map is present.
-	if ((mbootMagic != MULTIBOOT_BOOTLOADER_MAGIC) || ((mbootInfo->flags & MULTIBOOT_INFO_MEM_MAP) == 0))
+	// Ensure multiboot magic value is good.
+	if ((mbootMagic != MULTIBOOT_BOOTLOADER_MAGIC))
         return;
 
     // Determine if PAE is supported.
@@ -189,19 +189,27 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     // Count up memory in bytes.
     uint64_t memory = 0; // Count in bytes of memory below 4GB (32-bit addresses).
     uint64_t memoryHigh = 0; // Count in bytes of memory above 4GB (64-bit addresses).
-    uintptr_t base = mbootInfo->mmap_addr;
-	uintptr_t end = base + mbootInfo->mmap_length;
-	for(multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base; base < end; base += entry->size + sizeof(uintptr_t)) {
-		entry = (multiboot_memory_map_t*)base;
-		if(entry->type == 1) {
-            // Is the entry's address below the 4GB mark?
-            if (((page_t)entry->addr) > 0)
-			    memory += entry->len;
-            // Or is it above?
-            else if (PAE_ENABLED && (entry->addr & 0xF00000000))
-                memoryHigh += entry->len;
+
+    // Is a memory map present?
+    if (mbootInfo->flags & MULTIBOOT_INFO_MEM_MAP) {
+        uintptr_t base = mbootInfo->mmap_addr;
+        uintptr_t end = base + mbootInfo->mmap_length;
+        for(multiboot_memory_map_t* entry = (multiboot_memory_map_t*)base; base < end; base += entry->size + sizeof(uintptr_t)) {
+            entry = (multiboot_memory_map_t*)base;
+            if(entry->type == 1) {
+                // Is the entry's address below the 4GB mark?
+                if (((uint32_t)entry->addr) > 0)
+                    memory += entry->len;
+                // Or is it above?
+                else if (PAE_ENABLED && (entry->addr & 0xF00000000))
+                    memoryHigh += entry->len;
+            }
         }
-	}
+    }
+    else {
+        // No memory map, so take the high memory amount instead.
+        memory = mbootInfo->mem_upper * 1024;
+    }
 
     // Determine DMA start and last frame (64 total frames).
     DMA_FRAMES_FIRST = ALIGN_64K((uint32_t)&KERNEL_PHYSICAL_END);

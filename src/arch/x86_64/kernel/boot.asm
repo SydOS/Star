@@ -47,6 +47,11 @@ _start:
     ; Disable interrupts.
     cli
 
+    ; Print `SYDOS` to screen corner.
+    mov dword [0xb8000], 0x2f592f53
+	mov dword [0xb8004], 0x2f4f2f44
+	mov word [0xb8008], 0x2f53
+
     ; Save Multiboot info for later use.
     mov [MULTIBOOT_MAGIC], eax
     mov [MULTIBOOT_INFO], ebx

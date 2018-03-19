@@ -44,8 +44,13 @@ void paging_flush_tlb() {
  * @param address The address to flush.
  */
 void paging_flush_tlb_address(uintptr_t address) {
+#ifdef I486
     // Flush specified address in TLB.
     asm volatile ("invlpg (%0)" : : "b"(address) : "memory");
+#else
+    // 386 and below don't have the invlpg instruction.
+    paging_flush_tlb();
+#endif
 }
 
 void paging_map_region(page_t startAddress, page_t endAddress, bool kernel, bool writeable) {
