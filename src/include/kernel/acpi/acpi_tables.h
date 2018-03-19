@@ -2,7 +2,6 @@
 #define ACPI_TABLES_H
 
 #include <main.h>
-#include <kernel/memory/paging.h>
 
 // ACPI RDSP signature.
 #define ACPI_RSDP_PATTERN1  "RSD "
@@ -353,9 +352,9 @@ typedef struct acpi_madt acpi_madt_t;
 extern acpi_rsdp_t *acpi_get_rsdp();
 extern acpi_sdt_header_t *acpi_map_header_temp(uintptr_t address);
 extern void acpi_unmap_header_temp();
-extern page_t acpi_map_table(uintptr_t address);
+extern uintptr_t acpi_map_table(uintptr_t address);
 extern void acpi_unmap_table(acpi_sdt_header_t *table);
 extern acpi_sdt_header_t *acpi_get_table(uintptr_t address, const char *signature);
-extern acpi_rsdt_t *acpi_get_rsdt(uint32_t address);
+extern acpi_rsdt_t *acpi_get_rsdt(uintptr_t address);
 
 #endif

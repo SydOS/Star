@@ -77,9 +77,6 @@ void kernel_main() {
 	// Initialize memory.
 	pmm_init();
     paging_init();
-
-	// Initialize kernel heap.
-	kprintf("Initializing kernel heap...\n");
 	kheap_init();
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);

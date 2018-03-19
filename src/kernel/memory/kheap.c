@@ -312,19 +312,21 @@ void kheap_free(void *ptr) {
 }
 
 void kheap_init() {
+    kprintf("Initializing kernel heap...\n");
+
     // Start with 4MB heap. TODO: better VMM allocation code, the heap shouldn't need to invoke the PMM.
     currentKernelHeapSize = KHEAP_INITIAL_SIZE;
-    for (page_t i = KHEAP_START; i <= KHEAP_START + currentKernelHeapSize; i+=PAGE_SIZE_4K)
+    for (uintptr_t i = KHEAP_START; i <= KHEAP_START + currentKernelHeapSize; i += PAGE_SIZE_4K)
         paging_map_virtual_to_phys(i, pmm_pop_frame());
 
     // Test heap area.
     kprintf("Testing %uKB of heap memory...\n", currentKernelHeapSize / 1024);
-    page_t *testBuffer = (page_t*)KHEAP_START;
-    for (page_t i = 0; i < currentKernelHeapSize / sizeof(page_t); i++)
+    uint32_t *testBuffer = (uint32_t*)KHEAP_START;
+    for (uint32_t i = 0; i < currentKernelHeapSize / sizeof(uint32_t); i++)
         testBuffer[i] = i;
 
     bool pass = true;
-    for (page_t i = 0; i < currentKernelHeapSize / sizeof(page_t); i++)
+    for (uint32_t i = 0; i < currentKernelHeapSize / sizeof(uint32_t); i++)
         if (testBuffer[i] != i) {
             pass = false;
             break;
@@ -344,7 +346,7 @@ void kheap_init() {
 
     // Add the initial region to the correct bin.
     kheap_add_node(kheap_get_bin_index(initialRegion->size), initialRegion);
-    kprintf("Kernel heap at 0x%X with a size of %uKB initialized!\n", KHEAP_START, currentKernelHeapSize / 1024);
+    kprintf("Kernel heap at 0x%p with a size of %uKB initialized!\n", KHEAP_START, currentKernelHeapSize / 1024);
 
     // Attempt allocation.
     kprintf("Allocation 1: ");

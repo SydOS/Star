@@ -46,7 +46,7 @@ global _start
 _start:
     ; Disable interrupts.
     cli
-    
+
     ; Save Multiboot info for later use.
     mov [MULTIBOOT_MAGIC], eax
     mov [MULTIBOOT_INFO], ebx
@@ -59,7 +59,7 @@ _start:
     ; Get memory map and set up page frame stack.
     call _get_memory_map
     call _setup_stack
-    
+
     ; Set up early 4-level page tables and enable paging.
     call _setup_paging
     call _enable_paging
@@ -195,18 +195,44 @@ multiboot_memory_entry:
     add [memory], ebx
     adc [memory+4], ecx
     jmp multiboot_next_mem_entry
-    
+
 multiboot_memory_done:
     ret
 
 _setup_stack:
-    ; Determine start location of DMA frames. This is located after the kernel.
-    ; Get first 64KB aligned address after the kernel.
-    mov eax, KERNEL_PHYSICAL_END
+    ; Determine start location of DMA frames. This is located after the kernel or the Multiboot 2 info.
+    ; Get kernel end.
+    mov ebx, KERNEL_PHYSICAL_END
+
+    ; Get Multiboot 2 end.
+    mov ecx, [MULTIBOOT_INFO]
+    mov edx, [ecx] ; Get size.
+    add ecx, edx ; Add size.
+
+    ; Pick the one that is bigger.
+    cmp ecx, ebx ; EBX = kernel, ECX = Multiboot.
+    ja _setup_stack_dma_mb
+
+_setup_stack_dma_kernel:
+    ; Place DMA frames after kernel.
+    mov eax, ebx
+
+    ; Get first 64KB aligned address after kernel.
+    add eax, 0x10000
+    and eax, 0xFFFF0000
+    mov [DMA_FRAMES_FIRST], eax
+    jmp _setup_stack_dma_done
+
+_setup_stack_dma_mb:
+    ; Place DMA frames after Multiboot info.
+    mov eax, ecx
+
+    ; Get first 64KB aligned address after Multiboot 2 info.
     add eax, 0x10000
     and eax, 0xFFFF0000
     mov [DMA_FRAMES_FIRST], eax
 
+_setup_stack_dma_done:
     ; Determine location of last DMA frame. This is 64 frames, each 64KB each.
     mov eax, [DMA_FRAMES_FIRST]
     add eax, (0x10000 * 64)
@@ -259,7 +285,7 @@ _setup_paging:
     ; Save address of 0GB page directory pointer table (PDPT) and zero it.
     mov [pageDirectoryPointerTableLow], eax
     call _zero_page
-    
+
     ; Add 0GB PDPT to PML4 table.
     mov eax, [pageDirectoryPointerTableLow]
     mov ebx, [pagePml4Table]
@@ -272,7 +298,7 @@ _setup_paging:
     ; Get first 4KB aligned address after the 0GB PDPT for the 0GB page directory.
     mov eax, [pageDirectoryPointerTableLow]
     call _align_4k
-    
+
     ; Save address of 0GB page directory and zero it.
     mov [pageDirectoryLow], eax
     call _zero_page
@@ -328,7 +354,7 @@ low_loop:
     ; Have we hit all the pages?
     cmp esi, edi
     jbe low_loop
-    
+
     ; Add page table to 0GB page directory.
     mov eax, [pageTableLow]
     mov ebx, [pageDirectoryLow]
@@ -345,7 +371,7 @@ low_loop:
     ; Save address of kernel page directory pointer table (PDPT) and zero it.
     mov [pageDirectoryPointerTableKernel], eax
     call _zero_page
-    
+
     ; Add 128TB PDPT to PML4 table.
     mov eax, [pageDirectoryPointerTableKernel]
     mov ebx, [pagePml4Table]
@@ -397,7 +423,7 @@ low_loop:
     div ebx
     inc eax
     mov edi, eax ; The number of 4KB pages to map will be stored here.
-    
+
 kernel_loop:
     ; Have we reach the need to create another table?
     ; Don't check if we are at page 0.
@@ -410,7 +436,7 @@ kernel_loop:
     mov ebx, 512
     div ebx
     cmp edx, 0
-    jnz kernel_map_page       
+    jnz kernel_map_page
 
     ; Get first 4KB aligned address after current kernel page table for the next one.
     mov eax, [pageTableKernelCurrent]
@@ -546,7 +572,7 @@ _start_higherhalf:
     ; Call the kernel main function!
     extern kernel_main
     call kernel_main
- 
+
     ; Disable interrupts and loop forever.
     cli
 .hang:	hlt

@@ -12,17 +12,18 @@ SECTIONS {
 	. = 1M;
 	KERNEL_INIT_START = .;
 	.init ALIGN(4K) : {
-		*(.multiboot);
-		*(.init);
+		*(.multiboot)
+		*(.init)
 	}
 
 	KERNEL_INIT_END = .;
+	KERNEL_PHYSICAL_START = KERNEL_VIRTUAL_START - KERNEL_VIRTUAL_OFFSET;
 	KERNEL_PHYSICAL_END = KERNEL_VIRTUAL_END - KERNEL_VIRTUAL_OFFSET;
+	KERNEL_PHYSICAL_DATA_END = KERNEL_VIRTUAL_DATA_END - KERNEL_VIRTUAL_OFFSET;
 	. += KERNEL_VIRTUAL_OFFSET;
 
 	/* For use within code. */
-	KERNEL_VIRTUAL_START  = .;
-    KERNEL_PHYSICAL_START = . - KERNEL_VIRTUAL_OFFSET;
+	KERNEL_VIRTUAL_START = .;
 
 	/* Multiboot header must be first, .text section, and read-only data. */
 	.text ALIGN (0x1000) : AT(ADDR(.text) - KERNEL_VIRTUAL_OFFSET) {	
@@ -34,6 +35,8 @@ SECTIONS {
 	.data ALIGN (0x1000) : AT(ADDR(.data) - KERNEL_VIRTUAL_OFFSET) {
 		*(.data)
 	}
+
+	KERNEL_VIRTUAL_DATA_END = .;
 
 	/* Read-write data (uninitialized) and stack. */
 	.bss : AT(ADDR(.bss) - KERNEL_VIRTUAL_OFFSET) {

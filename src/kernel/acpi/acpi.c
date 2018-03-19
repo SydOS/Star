@@ -26,7 +26,7 @@ static acpi_sdt_header_t *acpi_search_rsdt(const char *signature, uint32_t index
         if (memcmp(header->signature, signature, 4) == 0) {
             // Unmap header and map table.
             acpi_unmap_header_temp();
-            page_t page = acpi_map_table(rsdt->entries[entry]);
+            uintptr_t page = acpi_map_table(rsdt->entries[entry]);
 
             // Attempt to get table.
             acpi_sdt_header_t *table = acpi_get_table(page, signature);

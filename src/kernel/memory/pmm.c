@@ -233,7 +233,7 @@ void pmm_print_memmap() {
 #ifdef PMM_MULTIBOOT2
     // Get first tag.
     multiboot_tag_t *tag = (multiboot_tag_t*)((uint64_t)&memInfo.mbootInfo->firstTag);
-    uint64_t end = (uint64_t)&memInfo.mbootInfo + memInfo.mbootInfo->size;
+    uint64_t end = (uint64_t)memInfo.mbootInfo + memInfo.mbootInfo->size;
 
     for (; (tag->type != MULTIBOOT_TAG_TYPE_END) && ((uint64_t)tag < end); tag = (multiboot_tag_t*)((uint8_t*)tag + ((tag->size + 7) & ~7))) {
         if (tag->type == MULTIBOOT_TAG_TYPE_MMAP) {
@@ -263,9 +263,11 @@ void pmm_print_memmap() {
 #endif
 
     // Print summary.
-    kprintf("PMM: Kernel start: 0x%p | Kernel end: 0x%p\n", memInfo.kernelStart, memInfo.kernelEnd);
-    kprintf("PMM: Multiboot info start: 0x%p\n", memInfo.mbootInfo);
-    kprintf("PMM: Page frame stack start: 0x%p | Page stack end: 0x%p\n", memInfo.pageFrameStackStart, memInfo.pageFrameStackEnd);
+    kprintf("PMM: Kernel start: 0x%p | End: 0x%p\n", memInfo.kernelStart, memInfo.kernelEnd);
+    #ifdef X86_64
+    kprintf("PMM: Multiboot info start: 0x%p | End: 0x%p\n", memInfo.mbootInfo, ((uintptr_t)memInfo.mbootInfo) + memInfo.mbootInfo->size);
+    #endif
+    kprintf("PMM: Page frame stack start: 0x%p | End: 0x%p\n", memInfo.pageFrameStackStart, memInfo.pageFrameStackEnd);
 
 #ifndef X86_64 // PAE does not apply to the 64-bit kernel.
     if (memInfo.paeEnabled && memInfo.pageFrameStackPaeStart > 0 && memInfo.pageFrameStackPaeEnd > 0)
@@ -329,7 +331,7 @@ static void pmm_build_stacks() {
 #ifdef X86_64
     // Get first tag.
     multiboot_tag_t *tag = (multiboot_tag_t*)((uint64_t)&memInfo.mbootInfo->firstTag);
-    uint64_t end = (uint64_t)&memInfo.mbootInfo + memInfo.mbootInfo->size;
+    uint64_t end = (uint64_t)memInfo.mbootInfo + memInfo.mbootInfo->size;
 
     for (; (tag->type != MULTIBOOT_TAG_TYPE_END) && ((uint64_t)tag < end); tag = (multiboot_tag_t*)((uint8_t*)tag + ((tag->size + 7) & ~7))) {
         if (tag->type == MULTIBOOT_TAG_TYPE_MMAP) {

@@ -30,7 +30,7 @@ static uint32_t paging_long_calculate_directory(page_t virtAddr) {
  * @return The table index.
  */
 static uint32_t paging_long_calculate_table(page_t virtAddr) {
-    return (virtAddr - (paging_long_calculate_directory(virtAddr) * PAGE_SIZE_1G)) / PAGE_SIZE_2M;
+    return (virtAddr - (paging_long_calculate_pdpt(virtAddr) * PAGE_SIZE_512G) - (paging_long_calculate_directory(virtAddr) * PAGE_SIZE_1G)) / PAGE_SIZE_2M;
 }
 
 /**
@@ -43,6 +43,10 @@ static uint32_t paging_long_calculate_entry(page_t virtAddr) {
 }
 
 static void paging_map_long(page_t virtual, page_t physical, bool unmap) {
+    // If the address is canonical, strip off the leading 0xFFFF.
+    if (virtual & 0xFFFF000000000000)
+        virtual &= 0x0000FFFFFFFFFFFF;
+
     // Get pointer to PML4.
     uint64_t *pml4Table = (uint64_t*)PAGE_LONG_PML4_ADDRESS;
 
@@ -112,6 +116,10 @@ void paging_unmap_virtual(page_t virtual) {
 }
 
 bool paging_get_phys(page_t virtual, uint64_t *physOut) {
+    // If the address is canonical, strip off the leading 0xFFFF.
+    if (virtual & 0xFFFF000000000000)
+        virtual &= 0x0000FFFFFFFFFFFF;
+
     // Get pointer to PML4.
     uint64_t *pml4Table = (uint64_t*)PAGE_LONG_PML4_ADDRESS;
 

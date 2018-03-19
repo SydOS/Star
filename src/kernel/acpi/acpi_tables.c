@@ -43,13 +43,13 @@ void acpi_unmap_header_temp() {
     paging_unmap_virtual(ACPI_TEMP_ADDRESS);
 }
 
-page_t acpi_map_table(uintptr_t address) {
+uintptr_t acpi_map_table(uintptr_t address) {
     // Map header and get number of pages to map.
     acpi_sdt_header_t *header = acpi_map_header_temp(address);
     uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K(address) + header->length - 1, PAGE_SIZE_4K);
 
     // Get next available virtual range.
-    page_t page = ACPI_FIRST_ADDRESS;
+    uintptr_t page = ACPI_FIRST_ADDRESS;
     uint32_t currentCount = 0;
     uint64_t phys;
     while (currentCount < pageCount) {     
@@ -116,8 +116,8 @@ acpi_sdt_header_t *acpi_get_table(uintptr_t address, const char *signature) {
     return table;
 }
 
-acpi_rsdt_t *acpi_get_rsdt(uint32_t address) {
+acpi_rsdt_t *acpi_get_rsdt(uintptr_t address) {
     // Map RSDT.
-    uint32_t page = acpi_map_table(address);
+    uintptr_t page = acpi_map_table(address);
     return (acpi_rsdt_t*)acpi_get_table(page, ACPI_SIGNATURE_RSDT);
 }
