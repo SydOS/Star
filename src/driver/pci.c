@@ -19,9 +19,7 @@ void pci_print_info(struct PCIDevice* dev) {
 
     // Print class info
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    kprintf("  - ");
-    kprintf(pci_class_descriptions[dev->Class]);
-    kprintf("\n");
+    kprintf("  - %s\n", pci_class_descriptions[dev->Class]);
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 }
 
