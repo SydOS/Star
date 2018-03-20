@@ -99,7 +99,7 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     uint16_t classInfo = pci_config_read_word(this_device,PCI_SUBCLASS);
     this_device->Class = (classInfo & ~0x00FF) >> 8;
     this_device->Subclass = (classInfo & ~0xFF00);
-    this_device->HeaderType = (pci_config_read_word(this_device,PCI_HEADER_TYPE) & ~0x00FF) >> 8;
+    this_device->HeaderType = pci_config_read_word(this_device,PCI_HEADER_TYPE);
 
     // Define interrupt info in our PCIDevice struct
     uint16_t intInfo = pci_config_read_word(this_device,PCI_INT_LINE);
@@ -117,9 +117,12 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     pci_print_info(this_device);
 
     // If the card reports more than one function, let's scan those too
-    if((this_device->HeaderType & 0x80) != 0) {
-        struct PCIDevice *sub_device = pci_check_device(bus, device, function++);
-        kheap_free(sub_device);
+    if((this_device->HeaderType & 0x80) != 0 && function == 0) {
+        // Check each function on the device
+        for (int t_function = 1; t_function < 8; t_function++) {
+            struct PCIDevice *func_device = pci_check_device(bus, device, t_function);
+            kheap_free(func_device);
+        }
     }
     
     // Return the device
@@ -136,6 +139,7 @@ void pci_check_busses(uint8_t bus) {
         // Get info on the device and print info
         struct PCIDevice *this_device = pci_check_device(bus, device, 0);
 
+        // Check if the device is the RTL8139
         if(this_device->VendorID == 0x10EC && this_device->DeviceID == 0x8139) {
             vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
             kprintf("  - DETECTED RTL8139\n");
