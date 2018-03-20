@@ -12,6 +12,7 @@
 #define PAGE_SIZE_2M		            0x200000
 #define PAGE_SIZE_4M		            0x400000
 #define PAGE_SIZE_1G		            0x40000000
+#define PAGE_SIZE_4G                    0x100000000
 #define PAGE_SIZE_512G                  0x8000000000
 #define PAGE_DIRECTORY_SIZE             1024
 #define PAGE_TABLE_SIZE                 1024
@@ -49,8 +50,8 @@
 
 // Masks.
 #define MASK_DIRECTORY_PAE(addr)        ((uint64_t)(addr) & 0xFFFFFFF0)     // Get only the PDPT address.
-#define MASK_PAGE_PAE_4K(size)          ((uint64_t)(size) & 0xFFFFF000)     // Get only the page address.
-#define MASK_PAGEFLAGS_PAE_4K(size)     ((uint64_t)(size) & ~0xFFFFF000)    // Get only the page flags.
+#define MASK_PAGE_4K_64BIT(size)        ((uint64_t)(size) & 0xFFFFF000)     // Get only the page address.
+#define MASK_PAGEFLAGS_4K_64BIT(size)   ((uint64_t)(size) & ~0xFFFFF000)    // Get only the page flags.
 
 // Alignments.
 #define ALIGN_4K(size)          	(((uint32_t)(size) + (uint32_t)PAGE_SIZE_4K) & 0xFFFFF000)
@@ -81,9 +82,15 @@ enum {
 extern void paging_change_directory(uintptr_t directoryPhysicalAddr);
 extern void paging_flush_tlb();
 extern void paging_flush_tlb_address(uintptr_t address);
-extern void paging_map_virtual_to_phys(page_t virt, page_t phys);
-extern void paging_unmap_virtual(page_t virtual);
-extern bool paging_get_phys(page_t virtual, uint64_t *physOut);
+extern void paging_map(uintptr_t virt, uint64_t phys, bool kernel, bool writeable);
+extern void paging_unmap(uintptr_t virtual);
+extern bool paging_get_phys(uintptr_t virtual, uint64_t *physOut);
+
+extern void paging_map_region(uintptr_t startAddress, uintptr_t endAddress, bool kernel, bool writeable);
+extern void paging_map_region_phys(uintptr_t startAddress, uintptr_t endAddress, uint64_t startPhys, bool kernel, bool writeable);
+extern void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress);
+extern void paging_unmap_region_phys(uintptr_t startAddress, uintptr_t endAddress);
+
 extern void paging_init();
 
 #endif

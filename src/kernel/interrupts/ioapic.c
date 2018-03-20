@@ -129,7 +129,7 @@ void ioapic_init() {
 
     // Map I/O APIC to virtual memory.
     kprintf("IOAPIC: Initializing I/O APIC %u at 0x%X...\n", ioApicMadt->ioApicId, ioApicMadt->ioApicAddress);
-    paging_map_virtual_to_phys(IOAPIC_ADDRESS, ioApicMadt->ioApicAddress);
+    paging_map(IOAPIC_ADDRESS, ioApicMadt->ioApicAddress, true, true);
 
     // Get info about I/O APIC.
     uint8_t maxInterrupts = ioapic_max_interrupts();

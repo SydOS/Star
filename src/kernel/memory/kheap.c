@@ -175,7 +175,7 @@ static bool kheap_expand(size_t size) {
 
     for (page_t page = currentKernelHeapSize; page < ALIGN_4K(newSize) - PAGE_SIZE_4K; page += PAGE_SIZE_4K) {
         // Pop another page and increase size of heap.
-        paging_map_virtual_to_phys(KHEAP_START + page, pmm_pop_frame());
+        paging_map(KHEAP_START + page, pmm_pop_frame(), true, true);
 
         // Increase wilderness size.
         kheap_node_t *wildNode = kheap_get_wilderness();
@@ -312,15 +312,14 @@ void kheap_free(void *ptr) {
 }
 
 void kheap_init() {
-    kprintf("Initializing kernel heap...\n");
+    kprintf("KHEAP: Initializing at 0x%p...\n", KHEAP_START);
 
-    // Start with 4MB heap. TODO: better VMM allocation code, the heap shouldn't need to invoke the PMM.
+    // Start with 4MB heap.
     currentKernelHeapSize = KHEAP_INITIAL_SIZE;
-    for (uintptr_t i = KHEAP_START; i <= KHEAP_START + currentKernelHeapSize; i += PAGE_SIZE_4K)
-        paging_map_virtual_to_phys(i, pmm_pop_frame());
+    paging_map_region(KHEAP_START, KHEAP_START + currentKernelHeapSize, true, true);
 
     // Test heap area.
-    kprintf("Testing %uKB of heap memory...\n", currentKernelHeapSize / 1024);
+    kprintf("KHEAP: Testing %uKB of heap memory...\n", currentKernelHeapSize / 1024);
     uint32_t *testBuffer = (uint32_t*)KHEAP_START;
     for (uint32_t i = 0; i < currentKernelHeapSize / sizeof(uint32_t); i++)
         testBuffer[i] = i;
@@ -331,9 +330,9 @@ void kheap_init() {
             pass = false;
             break;
         }
-    kprintf("Test %s!\n", pass ? "passed" : "failed");
+    kprintf("KHEAP: Test %s!\n", pass ? "passed" : "failed");
     if (!pass)
-        panic("Memory test of heap failed.\n");
+        panic("KHEAP: Memory test of heap failed.\n");
 
     // Create initial region, the "wilderness" chunk, as the heap is one
     // large unallocated chunk to begin with.
@@ -346,22 +345,22 @@ void kheap_init() {
 
     // Add the initial region to the correct bin.
     kheap_add_node(kheap_get_bin_index(initialRegion->size), initialRegion);
-    kprintf("Kernel heap at 0x%p with a size of %uKB initialized!\n", KHEAP_START, currentKernelHeapSize / 1024);
+    kprintf("KHEAP: Kernel heap at 0x%p with a size of %uKB initialized!\n", KHEAP_START, currentKernelHeapSize / 1024);
 
     // Attempt allocation.
-    kprintf("Allocation 1: ");
+    kprintf("KHEAP: Allocation 1: ");
     uint32_t *test = kheap_alloc(sizeof(uint32_t)*2);
-    kprintf("0x%X\n", test);
+    kprintf("KHEAP: 0x%X\n", test);
     test[1] = 55555;
 
-    kprintf("Allocation 2: ");
+    kprintf("KHEAP: Allocation 2: ");
     uint32_t *test2 = kheap_alloc(sizeof(uint32_t)*2);
-    kprintf("0x%X\n", test2);
+    kprintf("KHEAP: 0x%X\n", test2);
     test2[1] = 55335;
 
-    kprintf("Big allocation: ");
+    kprintf("KHEAP: Big allocation: ");
     uint32_t *big = kheap_alloc(sizeof(uint32_t)*1000);
-    kprintf("0x%X, size: %u\n", big, sizeof(uint32_t)*1000);
+    kprintf("KHEAP: 0x%X, size: %u\n", big, sizeof(uint32_t)*1000);
 
     for (uint32_t i = 0; i < 1000; i++)
         big[i] = i*2;
@@ -374,9 +373,9 @@ void kheap_init() {
     }
 
 
-    kprintf("Allocation 4: ");
+    kprintf("KHEAP: Allocation 4: ");
     uint32_t *test4 = kheap_alloc(sizeof(uint32_t)*2);
-    kprintf("0x%X\n", test4);
+    kprintf("KHEAP: 0x%X\n", test4);
 
     test4[1] = 55335;
 
@@ -384,6 +383,5 @@ void kheap_init() {
     kheap_free(big);
     kheap_free(test2);
     kheap_free(test4);
-
-    kheap_dump_all_bins();
+    kprintf("KHEAP: Initialized!\n");
 }

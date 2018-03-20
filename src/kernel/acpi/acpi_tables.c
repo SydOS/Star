@@ -34,13 +34,13 @@ acpi_rsdp_t *acpi_get_rsdp() {
 
 acpi_sdt_header_t *acpi_map_header_temp(uintptr_t address) {
     // Map header to temp page.
-    paging_map_virtual_to_phys(ACPI_TEMP_ADDRESS, address);
+    paging_map(ACPI_TEMP_ADDRESS, address, true, false);
     return (acpi_sdt_header_t*)(ACPI_TEMP_ADDRESS + MASK_PAGEFLAGS_4K(address));
 }
 
 void acpi_unmap_header_temp() {
     // Unmap the temp page.
-    paging_unmap_virtual(ACPI_TEMP_ADDRESS);
+    paging_unmap(ACPI_TEMP_ADDRESS);
 }
 
 uintptr_t acpi_map_table(uintptr_t address) {
@@ -72,8 +72,7 @@ uintptr_t acpi_map_table(uintptr_t address) {
         panic("ACPI: Out of virtual addresses!\n");
 
     // Map range.
-    for (uint32_t p = 0; p < pageCount; p++)
-        paging_map_virtual_to_phys(page + (p * PAGE_SIZE_4K), MASK_PAGE_4K(address) + (p * PAGE_SIZE_4K));
+    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), MASK_PAGE_4K(address), true, false);
 
     // Return address.
     acpi_unmap_header_temp();
@@ -84,8 +83,7 @@ void acpi_unmap_table(acpi_sdt_header_t *table) {
     // Get page count and unmap table.
     uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K((uintptr_t)table) + table->length - 1, PAGE_SIZE_4K);
     page_t startPage = MASK_PAGE_4K((uintptr_t)table);
-    for (page_t page = 0; page < pageCount; page++)
-        paging_unmap_virtual(startPage + page);
+    paging_unmap_region_phys(startPage, startPage + (pageCount * PAGE_SIZE_4K) - 1);
 }
 
 static bool acpi_checksum_sdt(acpi_sdt_header_t *header) {

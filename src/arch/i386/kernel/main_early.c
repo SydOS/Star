@@ -99,7 +99,7 @@ __attribute__((section(".init"))) static void setup_paging_pae() {
     uint32_t virtualOffset = (uint32_t)&KERNEL_VIRTUAL_OFFSET;
 
     // Create page directory pointer table (PDPT).
-    uint64_t *pageDirectoryPointerTable = (uint64_t*)ALIGN_4K(PAGE_FRAME_STACK_END - virtualOffset);
+    uint64_t *pageDirectoryPointerTable = (uint64_t*)ALIGN_4K(PAGE_FRAME_STACK_END);
     memset(pageDirectoryPointerTable, 0, PAGE_SIZE_4K);
 
     // Create page directory for the 0GB space.
@@ -230,7 +230,7 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + ((memory / PAGE_SIZE_4K) * sizeof(uint32_t)); // Space for 32-bit addresses.
 
     // Force PAE off for now.
-    //PAE_ENABLED = false;
+    PAE_ENABLED = false;
 
     // Is PAE enabled?
     if (PAE_ENABLED)

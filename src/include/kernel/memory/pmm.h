@@ -55,13 +55,12 @@ extern bool pmm_dma_get_free_frame(uintptr_t *frameOut);
 extern void pmm_dma_set_frame(uintptr_t frame, bool status);
 extern uintptr_t pmm_dma_get_phys(uintptr_t frame);
 extern uint32_t pmm_frames_available();
-extern uintptr_t pmm_pop_frame();
-extern void pmm_push_frame(uintptr_t frame);
+extern uint64_t pmm_pop_frame();
+extern void pmm_push_frame(uint64_t frame);
 
 #ifndef X86_64 // PAE does not apply to the 64-bit kernel.
 extern uint32_t pmm_frames_available_pae();
-extern uint64_t pmm_pop_frame_pae();
-extern void pmm_push_frame_pae(uint64_t frame);
+extern uint32_t pmm_pop_frame_nonpae();
 #endif
 
 

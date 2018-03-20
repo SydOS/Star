@@ -11,7 +11,7 @@
  * @param virtAddr The address to use.
  * @return The PDPT index.
  */
-static uint32_t paging_long_calculate_pdpt(page_t virtAddr) {
+static uint32_t paging_long_calculate_pdpt(uintptr_t virtAddr) {
     return virtAddr / PAGE_SIZE_512G;
 }
 
@@ -20,7 +20,7 @@ static uint32_t paging_long_calculate_pdpt(page_t virtAddr) {
  * @param virtAddr The address to use.
  * @return The directory index.
  */
-static uint32_t paging_long_calculate_directory(page_t virtAddr) {
+static uint32_t paging_long_calculate_directory(uintptr_t virtAddr) {
     return (virtAddr - (paging_long_calculate_pdpt(virtAddr) * PAGE_SIZE_512G)) / PAGE_SIZE_1G;
 }
 
@@ -29,7 +29,7 @@ static uint32_t paging_long_calculate_directory(page_t virtAddr) {
  * @param virtAddr The address to use.
  * @return The table index.
  */
-static uint32_t paging_long_calculate_table(page_t virtAddr) {
+static uint32_t paging_long_calculate_table(uintptr_t virtAddr) {
     return (virtAddr - (paging_long_calculate_pdpt(virtAddr) * PAGE_SIZE_512G) - (paging_long_calculate_directory(virtAddr) * PAGE_SIZE_1G)) / PAGE_SIZE_2M;
 }
 
@@ -38,11 +38,11 @@ static uint32_t paging_long_calculate_table(page_t virtAddr) {
  * @param virtAddr The address to use.
  * @return The entry index.
  */
-static uint32_t paging_long_calculate_entry(page_t virtAddr) {
+static uint32_t paging_long_calculate_entry(uintptr_t virtAddr) {
     return virtAddr % PAGE_SIZE_2M / PAGE_SIZE_4K;
 }
 
-static void paging_map_long(page_t virtual, page_t physical, bool unmap) {
+static void paging_map_long(uintptr_t virtual, uint64_t physical, bool unmap) {
     // If the address is canonical, strip off the leading 0xFFFF.
     if (virtual & 0xFFFF000000000000)
         virtual &= 0x0000FFFFFFFFFFFF;
@@ -96,18 +96,26 @@ static void paging_map_long(page_t virtual, page_t physical, bool unmap) {
     }
     
     // Add address to table.
-    table[entryIndex] = unmap ? 0 : (MASK_PAGE_4K(physical) | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT);
+    table[entryIndex] = unmap ? 0 : physical;
 }
 
-void paging_map_virtual_to_phys(page_t virtual, uintptr_t physical) {
+void paging_map(uintptr_t virtual, uint64_t physical, bool kernel, bool writeable) {
+    // Determine flags.
+    uint64_t flags = 0;
+    if (!kernel)
+        flags |= PAGING_PAGE_USER;
+    if (writeable)
+        flags |= PAGING_PAGE_READWRITE;
+    flags |= PAGING_PAGE_PRESENT;
+
     // Map address.
-    paging_map_long(virtual, physical, false);
+    paging_map_long(virtual, physical | flags, false);
 
     // Flush TLB
     paging_flush_tlb_address(virtual);
 }
 
-void paging_unmap_virtual(page_t virtual) {
+void paging_unmap(uintptr_t virtual) {
     // Map address.
     paging_map_long(virtual, 0, true);
 
@@ -115,7 +123,7 @@ void paging_unmap_virtual(page_t virtual) {
     paging_flush_tlb_address(virtual);
 }
 
-bool paging_get_phys(page_t virtual, uint64_t *physOut) {
+bool paging_get_phys(uintptr_t virtual, uint64_t *physOut) {
     // If the address is canonical, strip off the leading 0xFFFF.
     if (virtual & 0xFFFF000000000000)
         virtual &= 0x0000FFFFFFFFFFFF;

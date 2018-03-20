@@ -109,8 +109,7 @@ void smp_setup_apboot() {
         panic("SMP: AP bootstrap code bigger than a 4KB page.\n");
     
     // Identity map low memory and kernel.
-    for (uintptr_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
-        paging_map_virtual_to_phys(page, page);
+    paging_map_region_phys(0x0, ALIGN_4K_64BIT(memInfo.kernelEnd - memInfo.kernelVirtualOffset), 0x0, true, true);
     
     // Copy 32-bit GDT into low memory.
     memcpy((void*)((uintptr_t)(memInfo.kernelVirtualOffset + SMP_GDT32_ADDRESS)), (void*)&gdt32Ptr, sizeof(gdt_ptr_t));
@@ -131,8 +130,7 @@ void smp_setup_apboot() {
 
 void smp_destroy_apboot() {
     // Remove identity mapping.
-    for (uintptr_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
-        paging_unmap_virtual(page);
+    paging_unmap_region_phys(0x0, ALIGN_4K_64BIT(memInfo.kernelEnd - memInfo.kernelVirtualOffset));
 }
 
 void smp_init() {

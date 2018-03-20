@@ -160,7 +160,7 @@ void lapic_setup() {
 void lapic_init() {
     // Get the base address of the local APIC and map it.
     uint32_t base = lapic_get_base();
-    paging_map_virtual_to_phys(LAPIC_ADDRESS, base);
+    paging_map(LAPIC_ADDRESS, base, true, true);
     kprintf("LAPIC: Initializing LAPIC at 0x%p...\n", base);
     idt_set_gate(0xFF, (uintptr_t)_isr_empty, 0x08, 0x8E);
 

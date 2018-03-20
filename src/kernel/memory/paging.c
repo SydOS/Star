@@ -53,13 +53,86 @@ void paging_flush_tlb_address(uintptr_t address) {
 #endif
 }
 
-void paging_map_region(page_t startAddress, page_t endAddress, bool kernel, bool writeable) {
+/**
+ * Maps a region of virtual memory.
+ * @param startAddress The first address to map.
+ * @param endAddress The last address to map.
+ * @param kernel Is the region for the kernel?
+ * @param writeable Is the region read/write?
+ */
+void paging_map_region(uintptr_t startAddress, uintptr_t endAddress, bool kernel, bool writeable) {
     // Ensure addresses are on 4KB boundaries.
-    startAddress = MASK_PAGE_4K(startAddress);
-    endAddress = MASK_PAGE_4K(endAddress);
+    if (MASK_PAGEFLAGS_4K(startAddress) || MASK_PAGEFLAGS_4K(endAddress))
+        panic("PAGING: Non-4KB aligned address range (0x%p-0x%p) specified!\n", startAddress, endAddress);
+    if (startAddress > endAddress)
+        panic("PAGING: Start address (0x%p) is after end address (0x%p)!\n", startAddress, endAddress);
 
-    // Map space.
-    
+    // Map range, popping physical page frames for each virtual page.
+    for (uint32_t i = 0; i <= (endAddress - startAddress) / PAGE_SIZE_4K; i++)
+        paging_map(startAddress + (i * PAGE_SIZE_4K), pmm_pop_frame(), kernel, writeable);
+}
+
+/**
+ * Maps a region of virtual memory using the specified physical address.
+ * @param startAddress The first address to map.
+ * @param endAddress The last address to map.
+ * @param startPhys The first physical address to map to.
+ * @param kernel Is the region for the kernel?
+ * @param writeable Is the region read/write?
+ */
+void paging_map_region_phys(uintptr_t startAddress, uintptr_t endAddress, uint64_t startPhys, bool kernel, bool writeable) {
+    // Ensure addresses are on 4KB boundaries.
+    if (MASK_PAGEFLAGS_4K(startAddress) || MASK_PAGEFLAGS_4K(endAddress))
+        panic("PAGING: Non-4KB aligned address range (0x%p-0x%p) specified!\n", startAddress, endAddress);
+    if (startAddress > endAddress)
+        panic("PAGING: Start address (0x%p) is after end address (0x%p)!\n", startAddress, endAddress);
+    if (MASK_PAGEFLAGS_4K_64BIT(startPhys))
+        panic("PAGING: Non-4KB aligned physical start address (0x%llX) specified!\n", startPhys);
+
+    // Map space, starting with the physical address specified.
+    for (uint32_t i = 0; i <= (endAddress - startAddress) / PAGE_SIZE_4K; i++)
+        paging_map(startAddress + (i * PAGE_SIZE_4K), startPhys + (i * PAGE_SIZE_4K), kernel, writeable);
+}
+
+/**
+ * Unmaps a region of virtual memory.
+ * @param startAddress The first address to unmap.
+ * @param endAddress The last address to unmap.
+ */
+void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress) {
+    // Ensure addresses are on 4KB boundaries.
+    if (MASK_PAGEFLAGS_4K(startAddress) || MASK_PAGEFLAGS_4K(endAddress))
+        panic("PAGING: Non-4KB aligned address range (0x%p-0x%p) specified!\n", startAddress, endAddress);
+    if (startAddress > endAddress)
+        panic("PAGING: Start address (0x%p) is after end address (0x%p)!\n", startAddress, endAddress);
+
+    // Unmap range, freeing page frames.
+    for (uint32_t i = 0; i <= (endAddress - startAddress) / PAGE_SIZE_4K; i++) {
+        uintptr_t frame = 0;
+        bool mapped = paging_get_phys(startAddress + (i * PAGE_SIZE_4K), &frame);
+        paging_unmap(startAddress + (i * PAGE_SIZE_4K));
+
+        // Push frame if needed.
+        if (mapped)
+            pmm_push_frame(frame);
+    }
+}
+
+/**
+ * Unmaps a region of virtual memory without returning pages to the page stack, or unmapping non-stack memory.
+ * @param startAddress The first address to unmap.
+ * @param endAddress The last address to unmap.
+ */
+void paging_unmap_region_phys(uintptr_t startAddress, uintptr_t endAddress) {
+    // Ensure addresses are on 4KB boundaries.
+    if (MASK_PAGEFLAGS_4K(startAddress) || MASK_PAGEFLAGS_4K(endAddress))
+        panic("PAGING: Non-4KB aligned address range (0x%p-0x%p) specified!\n", startAddress, endAddress);
+    if (startAddress > endAddress)
+        panic("PAGING: Start address (0x%p) is after end address (0x%p)!\n", startAddress, endAddress);
+
+    // Unmap range.
+    for (uint32_t i = 0; i <= (endAddress - startAddress) / PAGE_SIZE_4K; i++)
+        paging_unmap(startAddress + (i * PAGE_SIZE_4K));
 }
 
 static void paging_pagefault_handler(registers_t *regs) {
@@ -99,34 +172,30 @@ void paging_init() {
         
     // Change to use our new page directory.
     paging_change_directory(memInfo.kernelPageDirectory);
-
-    // Pop physical page for test.
-    page_t page = pmm_pop_frame();
-    kprintf("PAGING: Popped page 0x%X for test...\n", page);
     
-    // Map physical page to 0x1000 for testing.
-    paging_map_virtual_to_phys(0x1000, page);
+    // Map range from 0x1000 to 0x5000 for testing.
+    kprintf("PAGING: Mapping range 0x1000 to 0x5000...\n");
+    paging_map_region(0x1000, 0x5000, true, true);
 
     // Test memory at location.
     kprintf("PAGING: Testing memory at virtual address 0x1000...\n");
     uint32_t *testPage = (uint32_t*)0x1000;
-    for (uint32_t i = 0; i < PAGE_SIZE_4K / sizeof(uint32_t); i++)
+    for (uint32_t i = 0; i < (PAGE_SIZE_4K / sizeof(uint32_t)) * 4; i++)
         testPage[i] = i;
 
     bool pass = true;
-    for (uint32_t i = 0; i < PAGE_SIZE_4K / sizeof(uint32_t); i++)
+    for (uint32_t i = 0; i < (PAGE_SIZE_4K / sizeof(uint32_t)) * 4; i++)
         if (testPage[i] != i) {
             pass = false;
             break;
         }
     kprintf("PAGING: Test %s!\n", pass ? "passed" : "failed");
     if (!pass)
-        panic("Memory test of virtual address 0x1000 failed.\n");
+        panic("PAGING: Test failed.\n");
 
     // Unmap virtual address and return page to stack.
-    kprintf("PAGING: Unmapping 0x1000 and pushing page 0x%X back to stack...\n", page);
-    paging_unmap_virtual(0x1000);
-    pmm_push_frame(page);
+    kprintf("PAGING: Unmapping test region...\n");
+    paging_unmap_region(0x1000, 0x5000);
 
     kprintf("PAGING: Initialized!\n");
 }

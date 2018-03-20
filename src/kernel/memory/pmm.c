@@ -148,17 +148,57 @@ uint32_t pmm_frames_available() {
     return pageFramesAvailable;
 }
 
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
+/**
+ * Pops a page frame off the standard stack.
+ * @return 		The physical address of the page frame.
+ */
+uint32_t pmm_pop_frame_nonpae() {
+    // Verify there are frames.
+    if (pmm_frames_available() == 0)
+        panic("PMM: No more page frames!\n");
+
+    // Get frame off stack.
+    uintptr_t frame = *pageFrameStack;
+
+    // Decrement stack and return frame.
+    pageFrameStack--;
+    pageFramesAvailable--;
+    return frame;
+}
+
+/**
+ * Gets the current number of PAE page frames available.
+ */
+uint32_t pmm_frames_available_pae() {
+    return pageFramesPaeAvailable;
+}
+#endif
+
 /**
  * Pops a page frame off the stack.
  * @return 		The physical address of the page frame.
  */
-uintptr_t pmm_pop_frame() {
-    // Get frame off stack.
-    uintptr_t frame = *pageFrameStack;
+uint64_t pmm_pop_frame() {
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
+    // Are there PAE frames available? If so pop one of those.
+    if (pmm_frames_available_pae()) {
+        // Get frame off stack.
+        uint64_t frame = *pageFrameStackPae;
+
+        // Decrement stack and return frame.
+        pageFrameStackPae--;
+        pageFramesPaeAvailable--;
+        return frame;
+    }
+#endif
 
     // Verify there are frames.
     if (pmm_frames_available() == 0)
         panic("PMM: No more page frames!\n");
+
+    // Get frame off stack.
+    uintptr_t frame = *pageFrameStack;
 
     // Decrement stack and return frame.
     pageFrameStack--;
@@ -170,58 +210,35 @@ uintptr_t pmm_pop_frame() {
  * Pushes a page frame to the stack.
  * @param frame	The physical address of the page frame to push.
  */
-void pmm_push_frame(uintptr_t frame) {
+void pmm_push_frame(uint64_t frame) {
+#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
+    // Is the frame above 4GB? If so, its a PAE frame.
+    if (frame >= PAGE_SIZE_4G) {
+        // If PAE is not enabled, we can't push PAE frames.
+        if (!memInfo.paeEnabled)
+            panic("PMM: Attempting to push PAE page frame 0x%llX without PAE!\n", frame);
+
+        // Increment stack pointer and check its within bounds.
+        pageFrameStackPae++;
+        if (((uintptr_t)pageFrameStackPae) < memInfo.pageFrameStackPaeStart || ((uintptr_t)pageFrameStackPae) >= memInfo.pageFrameStackPaeEnd)
+            panic("PMM: PAE page frame stack pointer out of bounds!\n");
+
+        // Push frame to stack.
+        *pageFrameStackPae = frame;
+        pageFramesPaeAvailable++;
+        return;
+    }
+#endif
+
     // Increment stack pointer and check its within bounds.
     pageFrameStack++;
     if (((uintptr_t)pageFrameStack) < memInfo.pageFrameStackStart || ((uintptr_t)pageFrameStack) >= memInfo.pageFrameStackEnd)
         panic("PMM: Page frame stack pointer out of bounds!\n");
 
     // Push frame to stack.
-    *pageFrameStack = frame;
+    *pageFrameStack = (uintptr_t)frame;
     pageFramesAvailable++;
 }
-
-#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
-/**
- * Pushes a page frame to the PAE stack.
- * @param frame	The physical address of the page frame to push.
- */
-void pmm_push_frame_pae(uint64_t frame) {
-    // Increment stack pointer and check its within bounds.
-    pageFrameStackPae++;
-    if (((uintptr_t)pageFrameStackPae) < memInfo.pageFrameStackPaeStart || ((uintptr_t)pageFrameStackPae) >= memInfo.pageFrameStackPaeEnd)
-        panic("PMM: PAE page frame stack pointer out of bounds!\n");
-
-    // Push frame to stack.
-    *pageFrameStackPae = frame;
-    pageFramesPaeAvailable++;
-}
-
-/**
- * Pops a page frame off the PAE stack.
- * @return 		The physical address of the page frame.
- */
-uint64_t pmm_pop_frame_pae() {
-    // Get frame off stack.
-    uint64_t frame = *pageFrameStackPae;
-
-    // Verify there are frames.
-    if (pmm_frames_available() == 0)
-        panic("PMM: No more PAE page frames!\n");
-
-    // Decrement stack and return frame.
-    pageFrameStackPae--;
-    pageFramesPaeAvailable--;
-    return frame;
-}
-
-/**
- * Gets the current number of PAE page frames available.
- */
-uint32_t pmm_frames_available_pae() {
-    return pageFramesPaeAvailable;
-}
-#endif
 
 /**
  * Prints the memory map.
@@ -380,41 +397,24 @@ static void pmm_build_stacks() {
             if (entry->type != MULTIBOOT_MEMORY_AVAILABLE || entry->len < PAGE_SIZE_4K)
                 continue;
 
-            // If the entry is normal memory, add it to main stack.
-            if (((uint32_t)entry->addr) > 0) {
+            // Add frame to stack.
+            uint64_t pageFrameBase = ALIGN_4K_64BIT(entry->addr);	
+            kprintf("PMM: Adding pages in 0x%llX!\n", pageFrameBase);			
+            for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
+                uint64_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
+
+                // If the address is in conventional memory (low memory), or is reserved by
+                // the kernel or the frame stack, don't mark it free.
+                if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
+                    addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)) || addr >= entry->addr + entry->len)
+                    continue;
+
+                // If address is a PAE one, and PAE is not enabled, ignore.
+                if (addr >= PAGE_SIZE_4G && !memInfo.paeEnabled)
+                    break;
+
                 // Add frame to stack.
-                uint32_t pageFrameBase = ALIGN_4K(entry->addr);	
-                kprintf("PMM: Adding pages in 0x%p!\n", pageFrameBase);			
-                for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
-                    uint32_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
-
-                    // If the address is in conventional memory (low memory), or is reserved by
-                    // the kernel or the frame stack, don't mark it free.
-                    if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
-                        addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)) || addr >= entry->addr + entry->len)
-                        continue;
-
-                    // Add frame to stack.
-                    pmm_push_frame(addr);
-                }
-            }
-            // Is the entry a 64-bit one and PAE is enabled?
-            else if (memInfo.paeEnabled && (entry->addr & 0xF00000000)) {
-                // Add frame to stack.
-                uint64_t pageFrameBase = ALIGN_4K_64BIT(entry->addr);	
-                kprintf("PMM: Adding PAE pages in 0x%llX!\n", pageFrameBase);			
-                for (uint32_t i = 0; i < (entry->len / PAGE_SIZE_4K) - 1; i++) { // Give buffer incase another section of the memory map starts partway through a page.
-                    uint64_t addr = pageFrameBase + (i * PAGE_SIZE_4K);
-
-                    // If the address is in conventional memory (low memory), or is reserved by
-                    // the kernel or the frame stack, don't mark it free.
-                    if (addr <= 0x100000 || (addr >= (memInfo.kernelStart - memInfo.kernelVirtualOffset) &&
-                        addr <= (memInfo.pageFrameStackEnd - memInfo.kernelVirtualOffset)) || addr >= entry->addr + entry->len)
-                        continue;
-
-                    // Add frame to stack.
-                    pmm_push_frame_pae(addr);
-                }
+                pmm_push_frame(addr);
             }
         }
     }
