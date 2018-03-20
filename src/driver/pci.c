@@ -15,12 +15,10 @@ void pci_print_info(struct PCIDevice* dev) {
     kprintf("PCI device: %X:%X | Class %X Sub %X | Bus %d Device %d Function %d\n", 
         dev->VendorID, dev->DeviceID, dev->Class,  dev->Subclass, dev->Bus, 
         dev->Device, dev->Function);
-    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
+    
     // Print class info
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     kprintf("  - %s\n", pci_class_descriptions[dev->Class]);
-    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 }
 
 /**
@@ -106,20 +104,20 @@ void pci_check_busses(uint8_t bus) {
             uint16_t seconaryBus = pci_config_read_word(this_device,PCI_BAR2);
             uint16_t primaryBus = (seconaryBus & ~0xFF00);
             seconaryBus = (seconaryBus & ~0x00FF) >> 8;
-            kprintf("PCI-to-PCI bridge, Primary %X Seconary %X, scanning now.\n", primaryBus, seconaryBus);
+            kprintf("  - PCI bridge, Primary %X Seconary %X, scanning now.\n", primaryBus, seconaryBus);
             pci_check_busses(seconaryBus);
-            vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
         // If device is a different kind of bridge
         } else if(this_device->Class == 6) {
             vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
-            kprintf("Detected other type of bridge on PCI bus. No other protocols implemented yet...\n");
-            vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+            kprintf("  - Ignoring non-PCI bridge\n");
         }
 
         // Free object
         kheap_free(this_device);
     }
+
+    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 }
 
 /**
