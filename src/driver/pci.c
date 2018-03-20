@@ -47,6 +47,14 @@ uint16_t pci_config_read_word(struct PCIDevice* dev, uint8_t offset) {
     return (tmp);
 }
 
+/**
+ * Read a DWORD (32 bits) from a PCIDevice's config space. Quite hacky, but
+ * it works
+ * @param  dev    PCIDevice struct with at least the bus, device, and function
+ *                filled.
+ * @param  offset Offset to use for the PCI config address
+ * @return        A uint32_t containing the data returned by the card
+ */
 uint32_t pci_config_read_dword(struct PCIDevice* dev, uint8_t offset) {
     uint32_t result;
     result = (pci_config_read_word(dev, offset) << 16) + pci_config_read_word(dev, offset+2);
@@ -82,6 +90,7 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     // Return if vendor is none
     if (this_device->VendorID == 0xFFFF) return this_device;
 
+    // Print PCIDevice info and PCI device base addresses
     pci_print_info(this_device);
     kprintf("  - BARS: 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X\n", pci_config_read_dword(this_device, PCI_BAR0),
         pci_config_read_dword(this_device, PCI_BAR1), pci_config_read_dword(this_device, PCI_BAR2),
