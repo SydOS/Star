@@ -35,7 +35,7 @@ build-kernel: $(ASM_OBJECTS) $(C_OBJECTS)
 	@echo $(abspath src/main.c)
 	# Link objects together into binary.
 ifeq ($(ARCH), x86_64)
-	$(ARCH)-elf-gcc -T src/arch/x86_64/kernel/linker.ld -o Star-$(ARCH).kernel -ffreestanding -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc -z max-page-size=0x1000
+	$(ARCH)-elf-gcc -T src/arch/x86_64/kernel/linker.ld -o Star-$(ARCH).kernel -fPIC -ffreestanding -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc -z max-page-size=0x1000
 else
 	$(ARCH)-elf-gcc -T src/arch/i386/kernel/linker.ld -o Star-$(ARCH).kernel -ffreestanding -nostdlib $(ASM_OBJECTS) $(C_OBJECTS) -lgcc
 endif
@@ -66,7 +66,7 @@ endif
 $(C_OBJECTS):
 	mkdir -p $(dir $@)
 ifeq ($(ARCH), x86_64)
-	$(ARCH)-elf-gcc -c $(subst build, src, $(subst .o,.c,$@)) -o $@ $(CFLAGS) -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-asynchronous-unwind-tables -g
+	$(ARCH)-elf-gcc -c $(subst build, src, $(subst .o,.c,$@)) -o $@ $(CFLAGS) -fPIC -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-asynchronous-unwind-tables -g
 else
 	$(ARCH)-elf-gcc -c $(subst build, src, $(subst .o,.c,$@)) -o $@ $(CFLAGS)
 endif
