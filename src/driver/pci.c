@@ -19,6 +19,14 @@ void pci_print_info(struct PCIDevice* dev) {
     // Print class info
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     kprintf("  - %s\n", pci_class_descriptions[dev->Class]);
+
+    // Interrupt info
+    kprintf("  - Interrupt PIN %d Line %d\n", dev->IntPIN, dev->IntLine);
+    vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+    if(dev->IntPIN != 0) { 
+        kprintf("  - THIS DEVICE USES INTERRUPTS\n"); 
+        vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    }
 }
 
 /**
@@ -86,6 +94,11 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     this_device->Class = (classInfo & ~0x00FF) >> 8;
     this_device->Subclass = (classInfo & ~0xFF00);
     this_device->HeaderType = (pci_config_read_word(this_device,PCI_HEADER_TYPE) & ~0x00FF) >> 8;
+
+    // Define interrupt info in our PCIDevice struct
+    uint16_t intInfo = pci_config_read_word(this_device,PCI_INT_LINE);
+    this_device->IntPIN = (intInfo & ~0x00FF) >> 8;
+    this_device->IntLine = (intInfo & ~0xFF00);
 
     // Return if vendor is none
     if (this_device->VendorID == 0xFFFF) return this_device;
