@@ -39,6 +39,8 @@ struct PCIDevice {
 	uint8_t Device;
 	uint8_t Function;
 
+	uint32_t BAR[6];
+
 	uint8_t IntPIN;
 	uint8_t IntLine;
 };

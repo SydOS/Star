@@ -19,6 +19,8 @@ void pci_print_info(struct PCIDevice* dev) {
     // Print class info
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     kprintf("  - %s\n", pci_class_descriptions[dev->Class]);
+    kprintf("  - BARS: 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X\n", dev->BAR[0], 
+        dev->BAR[1], dev->BAR[2], dev->BAR[3], dev->BAR[4], dev->BAR[5]);
 
     // Interrupt info
     if(dev->IntPIN != 0) { 
@@ -99,15 +101,15 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     this_device->IntPIN = (intInfo & ~0x00FF) >> 8;
     this_device->IntLine = (intInfo & ~0xFF00);
 
+    // Read all 6 base register addresses and store in PCIDevice struct
+    for(int i = 0; i < 6; i++) {
+        this_device->BAR[i] = pci_config_read_dword(this_device, PCI_BAR0 + (i*4));
+    }
+
     // Return if vendor is none
     if (this_device->VendorID == 0xFFFF) return this_device;
 
-    // Print PCIDevice info and PCI device base addresses
     pci_print_info(this_device);
-    kprintf("  - BARS: 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X\n", pci_config_read_dword(this_device, PCI_BAR0),
-        pci_config_read_dword(this_device, PCI_BAR1), pci_config_read_dword(this_device, PCI_BAR2),
-        pci_config_read_dword(this_device, PCI_BAR3), pci_config_read_dword(this_device, PCI_BAR4),
-        pci_config_read_dword(this_device, PCI_BAR5));
 
     // If the card reports more than one function, let's scan those too
     if((this_device->HeaderType & 0x80) != 0) {
