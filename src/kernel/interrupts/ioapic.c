@@ -1,9 +1,10 @@
 #include <main.h>
 #include <kprint.h>
 #include <io.h>
+#include <kernel/interrupts/ioapic.h>
+
 #include <kernel/acpi/acpi.h>
-#include <arch/i386/kernel/ioapic.h>
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/interrupts/interrupts.h>
 #include <kernel/memory/paging.h>
 
 // https://wiki.osdev.org/IOAPIC
@@ -128,7 +129,7 @@ void ioapic_init() {
 
     // Map I/O APIC to virtual memory.
     kprintf("IOAPIC: Initializing I/O APIC %u at 0x%X...\n", ioApicMadt->ioApicId, ioApicMadt->ioApicAddress);
-    paging_map_virtual_to_phys(IOAPIC_ADDRESS, ioApicMadt->ioApicAddress);
+    paging_map(IOAPIC_ADDRESS, ioApicMadt->ioApicAddress, true, true);
 
     // Get info about I/O APIC.
     uint8_t maxInterrupts = ioapic_max_interrupts();

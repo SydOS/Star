@@ -1,7 +1,7 @@
 #include <main.h>
 #include <kprint.h>
 #include <io.h>
-#include <arch/i386/kernel/pic.h>
+#include <kernel/interrupts/pic.h>
 
 // Remaps the PIC.
 static void pic_remap(uint8_t offset1, uint8_t offset2) {

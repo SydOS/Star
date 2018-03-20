@@ -3,9 +3,10 @@
 #include <kprint.h>
 #include <tools.h>
 #include <driver/ps2/keyboard.h>
+
 #include <driver/ps2/ps2.h>
-#include <arch/i386/kernel/interrupts.h>
 #include <driver/vga.h>
+#include <kernel/interrupts/interrupts.h>
 
 // http://www.computer-engineering.org/ps2keyboard/scancodes2.html
 

@@ -3,12 +3,12 @@
 #include <io.h>
 #include <string.h>
 #include <tools.h>
-#include <arch/i386/kernel/smp.h>
+#include <kernel/interrupts/smp.h>
 
+#include <kernel/gdt.h>
 #include <kernel/acpi/acpi.h>
-#include <arch/i386/kernel/gdt.h>
-#include <arch/i386/kernel/idt.h>
-#include <arch/i386/kernel/lapic.h>
+#include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/lapic.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
@@ -18,7 +18,11 @@
 
 extern uintptr_t _ap_bootstrap_init;
 extern uintptr_t _ap_bootstrap_end;
-extern gdt_ptr_t gdtPtr;
+extern gdt_ptr_t gdt32Ptr;
+
+#ifdef X86_64
+extern gdt_ptr_t gdt64Ptr;
+#endif
 
 static bool smpInitialized;
 
@@ -30,27 +34,30 @@ uint8_t *cpus;
 uintptr_t *apStacks;
 
 // Bitmap for indicating which processors are initialized, used during initial startup.
-static volatile uint64_t ap_map;
+static volatile uint64_t apMap;
 
-uint32_t ap_get_stack_index(uint8_t apicId) {
+uint32_t ap_get_stack(uint32_t apicId) {
     uint32_t index = 0;
     while (index < cpuCount && cpus[index] != apicId)
         index++;
 
     if (index >= cpuCount)
         panic("SMP: Failed to find stack for processor LAPIC %u!\n", apicId);
-    return index;
+    return apStacks[index];
 }
 
 void ap_main() {
+    // Reload paging directory.
+    paging_change_directory(memInfo.kernelPageDirectory);
+
     // Get processor ID.
     uint32_t cpu = lapic_id();
 
     kprintf("Hi from a core!\n");
     kprintf("I should be core %u\n", cpu);
 
-    // Processor is initialized.
-    ap_map |= (1 << lapic_id());
+    // Processor is initialized, so mark it as such which signals the BSP to continue.
+    apMap |= (1 << cpu);
 
     // Load existing GDT and IDT into processor.
     gdt_load();
@@ -58,7 +65,7 @@ void ap_main() {
     //lapic_setup();
 
     // Enable interrupts.
-    //asm volatile ("sti");
+    asm volatile ("sti");
     kprintf("CPU%u: INTERRUPTS ENABLED.\n", cpu);
     while (true) {
         sleep(2000);
@@ -90,25 +97,32 @@ void smp_setup_stacks() {
 
 void smp_setup_apboot() {
     // Get start and end of the AP bootstrap code.
-    uint32_t apStart = (uint32_t)&_ap_bootstrap_init;
-    uint32_t apEnd = (uint32_t)&_ap_bootstrap_end;
+    uintptr_t apStart = (uintptr_t)&_ap_bootstrap_init;
+    uintptr_t apEnd = (uintptr_t)&_ap_bootstrap_end;
     uint32_t apSize = apEnd - apStart;
 
     kprintf("SMP: Setting up bootstrap code for APs...\n");
-    kprintf("SMP:     Bootstrap start: 0x%X, size: %u bytes\n", apStart, apSize);
+    kprintf("SMP:     Bootstrap start: 0x%p, size: %u bytes\n", apStart, apSize);
 
     // Ensure AP bootstrap is within a page.
     if (apSize > PAGE_SIZE_4K)
         panic("SMP: AP bootstrap code bigger than a 4KB page.\n");
     
     // Identity map low memory and kernel.
-    for (page_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
-        paging_map_virtual_to_phys(page, page);
+    paging_map_region_phys(0x0, ALIGN_4K_64BIT(memInfo.kernelEnd - memInfo.kernelVirtualOffset), 0x0, true, true);
     
-    // Copy root paging structure and GDT into low memory.
+    // Copy 32-bit GDT into low memory.
+    memcpy((void*)((uintptr_t)(memInfo.kernelVirtualOffset + SMP_GDT32_ADDRESS)), (void*)&gdt32Ptr, sizeof(gdt_ptr_t));
+
+#ifdef X86_64
+    // Copy 64-bit GDT and PML4 table into low memory.
+    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_PML4), (void*)PAGE_LONG_PML4_ADDRESS, PAGE_SIZE_4K);
+    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT64_ADDRESS), (void*)&gdt64Ptr, sizeof(gdt_ptr_t));
+#else
+    // Copy root paging structure address into low memory.
     memcpy((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_ADDRESS), (void*)&memInfo.kernelPageDirectory, sizeof(memInfo.kernelPageDirectory));
     memset((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_PAE_ADDRESS), memInfo.paeEnabled ? 1 : 0, sizeof(uint32_t));
-    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT_ADDRESS), (void*)&gdtPtr, sizeof(gdt_ptr_t));
+#endif
 
     // Copy AP bootstrap code into low memory.
     memcpy((void*)(memInfo.kernelVirtualOffset + SMP_AP_BOOTSTRAP_ADDRESS), (void*)apStart, apSize);
@@ -116,8 +130,7 @@ void smp_setup_apboot() {
 
 void smp_destroy_apboot() {
     // Remove identity mapping.
-    for (page_t page = 0; page <= memInfo.kernelEnd - memInfo.kernelVirtualOffset; page += PAGE_SIZE_4K)
-        paging_map_virtual_to_phys(page, 0);
+    paging_unmap_region_phys(0x0, ALIGN_4K_64BIT(memInfo.kernelEnd - memInfo.kernelVirtualOffset));
 }
 
 void smp_init() {
@@ -187,7 +200,7 @@ void smp_init() {
         lapic_send_startup(cpus[cpu], SMP_AP_BOOTSTRAP_ADDRESS / PAGE_SIZE_4K);
 
         // Wait for processor to come up.
-        while (!(ap_map & (1 << cpus[cpu])));
+        while (!(apMap & (1 << cpus[cpu])));
     }
 
     // Destroy AP boot code.

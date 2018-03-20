@@ -4,11 +4,13 @@
 #include <math.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/acpi/acpi_tables.h>
+
 #include <kernel/memory/paging.h>
+#include <kernel/memory/pmm.h>
 
 acpi_rsdp_t *acpi_get_rsdp() {
     // Search the BIOS area of low memory for the RSDP.
-    for (uint32_t i = 0xC00E0000; i < 0xC00FFFFF; i += 16) {
+    for (uintptr_t i = (memInfo.kernelVirtualOffset + 0x000E0000); i < (memInfo.kernelVirtualOffset + 0x000FFFFF); i += 16) {
         uint32_t *block = (uint32_t*)i;
         if ((memcmp(block, ACPI_RSDP_PATTERN1, 4) == 0) && (memcmp(block + 1, ACPI_RSDP_PATTERN2, 4) == 0)) {
             // Verify checksum matches.
@@ -30,24 +32,24 @@ acpi_rsdp_t *acpi_get_rsdp() {
     return NULL;
 }
 
-acpi_sdt_header_t *acpi_map_header_temp(uint32_t address) {
+acpi_sdt_header_t *acpi_map_header_temp(uintptr_t address) {
     // Map header to temp page.
-    paging_map_virtual_to_phys(ACPI_TEMP_ADDRESS, address);
+    paging_map(ACPI_TEMP_ADDRESS, address, true, false);
     return (acpi_sdt_header_t*)(ACPI_TEMP_ADDRESS + MASK_PAGEFLAGS_4K(address));
 }
 
 void acpi_unmap_header_temp() {
     // Unmap the temp page.
-    paging_unmap_virtual(ACPI_TEMP_ADDRESS);
+    paging_unmap(ACPI_TEMP_ADDRESS);
 }
 
-page_t acpi_map_table(uint32_t address) {
+uintptr_t acpi_map_table(uintptr_t address) {
     // Map header and get number of pages to map.
     acpi_sdt_header_t *header = acpi_map_header_temp(address);
     uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K(address) + header->length - 1, PAGE_SIZE_4K);
 
     // Get next available virtual range.
-    page_t page = ACPI_FIRST_ADDRESS;
+    uintptr_t page = ACPI_FIRST_ADDRESS;
     uint32_t currentCount = 0;
     uint64_t phys;
     while (currentCount < pageCount) {     
@@ -70,8 +72,7 @@ page_t acpi_map_table(uint32_t address) {
         panic("ACPI: Out of virtual addresses!\n");
 
     // Map range.
-    for (uint32_t p = 0; p < pageCount; p++)
-        paging_map_virtual_to_phys(page + (p * PAGE_SIZE_4K), MASK_PAGE_4K(address) + (p * PAGE_SIZE_4K));
+    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), MASK_PAGE_4K(address), true, false);
 
     // Return address.
     acpi_unmap_header_temp();
@@ -80,14 +81,13 @@ page_t acpi_map_table(uint32_t address) {
 
 void acpi_unmap_table(acpi_sdt_header_t *table) {
     // Get page count and unmap table.
-    uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K((uint32_t)table) + table->length - 1, PAGE_SIZE_4K);
-    page_t startPage = MASK_PAGE_4K((uint32_t)table);
-    for (page_t page = 0; page < pageCount; page++)
-        paging_unmap_virtual(startPage + page);
+    uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K((uintptr_t)table) + table->length - 1, PAGE_SIZE_4K);
+    page_t startPage = MASK_PAGE_4K((uintptr_t)table);
+    paging_unmap_region_phys(startPage, startPage + (pageCount * PAGE_SIZE_4K) - 1);
 }
 
 static bool acpi_checksum_sdt(acpi_sdt_header_t *header) {
-    kprintf("ACPI: Getting checksum for table 0x%X...", (uint32_t)header);
+    kprintf("ACPI: Getting checksum for table 0x%p...", header);
 
     // Add bytes of entire table. Checksum dicates the lowest byte must be zero.
     uint8_t sum = 0;
@@ -98,13 +98,13 @@ static bool acpi_checksum_sdt(acpi_sdt_header_t *header) {
     return sum == 0;
 }
 
-acpi_sdt_header_t *acpi_get_table(uint32_t address, const char *signature) {
+acpi_sdt_header_t *acpi_get_table(uintptr_t address, const char *signature) {
     // Get pointer to table.
     acpi_sdt_header_t* table = (acpi_sdt_header_t*)address;
     char sig[5];
     strncpy(sig, table->signature, 4);
     sig[4] = '\0';
-    kprintf("ACPI: Getting table %s, address: 0x%X, length: %u\n", sig, address, table->length);
+    kprintf("ACPI: Getting table %s, address: 0x%p, length: %u\n", sig, address, table->length);
 
     // Ensure table is valid.
     if (((memcmp(table->signature, signature, 4) != 0) || !acpi_checksum_sdt(table)))
@@ -114,8 +114,8 @@ acpi_sdt_header_t *acpi_get_table(uint32_t address, const char *signature) {
     return table;
 }
 
-acpi_rsdt_t *acpi_get_rsdt(uint32_t address) {
+acpi_rsdt_t *acpi_get_rsdt(uintptr_t address) {
     // Map RSDT.
-    uint32_t page = acpi_map_table(address);
+    uintptr_t page = acpi_map_table(address);
     return (acpi_rsdt_t*)acpi_get_table(page, ACPI_SIGNATURE_RSDT);
 }

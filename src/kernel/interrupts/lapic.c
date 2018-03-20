@@ -1,11 +1,11 @@
 #include <main.h>
 #include <kprint.h>
 #include <io.h>
-#include <arch/i386/kernel/idt.h>
-#include <arch/i386/kernel/lapic.h>
-#include <arch/i386/kernel/cpuid.h>
-#include <arch/i386/kernel/pic.h>
-#include <arch/i386/kernel/idt.h>
+#include <kernel/interrupts/lapic.h>
+
+#include <kernel/cpuid.h>
+#include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/pic.h>
 #include <kernel/memory/paging.h>
 
 extern void _isr_empty();
@@ -37,12 +37,12 @@ bool lapic_enabled() {
 
 static uint32_t lapic_read(uint16_t offset) {
     // Read value from LAPIC.
-    return *(volatile uint32_t*)(LAPIC_ADDRESS + offset);
+    return *(volatile uint32_t*)((uintptr_t)(LAPIC_ADDRESS + offset));
 }
 
 static void lapic_write(uint16_t offset, uint32_t value) {
     // Send data to LAPIC.
-    *(volatile uint32_t*)(LAPIC_ADDRESS + offset) = value;
+    *(volatile uint32_t*)((uintptr_t)(LAPIC_ADDRESS + offset)) = value;
     (void)lapic_read(LAPIC_REG_ID);
 }
 
@@ -142,7 +142,7 @@ void lapic_create_spurious_interrupt(uint8_t interrupt) {
 
 void lapic_setup() {
     // Map LAPIC and get info.
-    kprintf("LAPIC: Mapped to 0x%X\n", LAPIC_ADDRESS);
+    kprintf("LAPIC: Mapped to 0x%p\n", LAPIC_ADDRESS);
     kprintf("LAPIC: x2 APIC: %s\n", lapic_x2apic() ? "yes" : "no");
     kprintf("LAPIC: ID: %u\n", lapic_id());
     kprintf("LAPIC: Version: 0x%x\n", lapic_version());
@@ -160,9 +160,9 @@ void lapic_setup() {
 void lapic_init() {
     // Get the base address of the local APIC and map it.
     uint32_t base = lapic_get_base();
-    paging_map_virtual_to_phys(LAPIC_ADDRESS, base);
-    kprintf("LAPIC: Initializing LAPIC at 0x%X...\n", base);
-    idt_set_gate(0xFF, (uint32_t)_isr_empty, 0x08, 0x8E);
+    paging_map(LAPIC_ADDRESS, base, true, true);
+    kprintf("LAPIC: Initializing LAPIC at 0x%p...\n", base);
+    idt_set_gate(0xFF, (uintptr_t)_isr_empty, 0x08, 0x8E);
 
     lapic_setup();
     kprintf("LAPIC: Initialized!\n");

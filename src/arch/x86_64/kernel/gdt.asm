@@ -1,11 +1,13 @@
-[bits 32]
+[bits 64]
+extern gdt64Ptr
 section .text
 
 ; Sets up the new GDT into the processor while flushing out the old one.
 global _gdt_load
 _gdt_load:
-	mov eax, [esp+4] ; Get the pointer to the GDT, passed as a parameter.
-	lgdt [eax]       ; Load the GDT pointer.
+	; Load the GDT.
+	mov rax, gdt64Ptr
+	lgdt [rax]
 
 	mov ax, 0x10
 	mov ds, ax
@@ -13,7 +15,4 @@ _gdt_load:
 	mov fs, ax
 	mov gs, ax
 	mov ss, ax
-	
-	jmp 0x08:.flush2
-.flush2:
 	ret

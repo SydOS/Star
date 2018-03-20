@@ -2,8 +2,9 @@
 #include <kprint.h>
 #include <tools.h>
 #include <driver/ps2/mouse.h>
+
 #include <driver/ps2/ps2.h>
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/interrupts/interrupts.h>
 
 // https://wiki.osdev.org/Mouse
 // https://wiki.osdev.org/PS/2_Mouse

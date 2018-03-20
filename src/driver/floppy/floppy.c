@@ -8,7 +8,7 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/interrupts/interrupts.h>
 
 static bool irqTriggered = false;
 static bool implied_seeks = false;

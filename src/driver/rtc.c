@@ -5,7 +5,7 @@
 #include <driver/rtc.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
-#include <arch/i386/kernel/interrupts.h>
+#include <kernel/interrupts/interrupts.h>
 
 /**
  * Reads from a specific register for RTC
@@ -80,5 +80,5 @@ void rtc_init() {
 	rtc_settings = rtc_get_settings();
 	rtc_get_time();
 
-	tasking_add_process(tasking_create_process("rtc", (uint32_t)rtc_thread));
+	tasking_add_process(tasking_create_process("rtc", (uintptr_t)rtc_thread));
 }

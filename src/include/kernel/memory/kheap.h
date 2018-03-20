@@ -3,8 +3,13 @@
 
 #include <main.h>
 
+#ifdef X86_64
+#define KHEAP_START         0xFFFF808000000000
+#define KHEAP_END           0xFFFF808FFFFFFFFF
+#else
 #define KHEAP_START         0xD0000000
 #define KHEAP_END           0xDFFFFFFF
+#endif
 #define KHEAP_INITIAL_SIZE  0x1000
 #define KHEAP_MAX_SIZE      (KHEAP_END - KHEAP_START)
 

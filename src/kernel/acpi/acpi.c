@@ -3,7 +3,8 @@
 #include <string.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/acpi/acpi_tables.h>
-#include <arch/i386/kernel/interrupts.h>
+
+#include <kernel/interrupts/interrupts.h>
 
 static bool acpiInitialized;
 static acpi_rsdp_t *rsdp;
@@ -25,7 +26,7 @@ static acpi_sdt_header_t *acpi_search_rsdt(const char *signature, uint32_t index
         if (memcmp(header->signature, signature, 4) == 0) {
             // Unmap header and map table.
             acpi_unmap_header_temp();
-            page_t page = acpi_map_table(rsdt->entries[entry]);
+            uintptr_t page = acpi_map_table(rsdt->entries[entry]);
 
             // Attempt to get table.
             acpi_sdt_header_t *table = acpi_get_table(page, signature);
@@ -78,7 +79,7 @@ void acpi_init() {
         acpiInitialized = false;
         return;
     }
-    kprintf("ACPI: RSDP table found at 0x%X!\n", (uint32_t)rsdp);
+    kprintf("ACPI: RSDP table found at 0x%p!\n", rsdp);
 
     // Print OEM ID and revision.
     char oemId[7];
@@ -97,7 +98,7 @@ void acpi_init() {
         acpiInitialized = false;
         return;
     }
-    kprintf("ACPI: Mapped RSDT to 0x%X, size: %u bytes\n", (uint32_t)rsdt, rsdt->header.length);
+    kprintf("ACPI: Mapped RSDT to 0x%p, size: %u bytes\n", rsdt, rsdt->header.length);
 
     // Get Fixed ACPI Description Table (FADT).
     kprintf("ACPI: Searching for Fixed ACPI Description Table (FADT)...\n");
@@ -107,13 +108,13 @@ void acpi_init() {
         acpiInitialized = false;
         return;
     }
-    kprintf("ACPI: Mapped FADT to 0x%X, size: %u bytes\n", (uint32_t)fadt, fadt->header.length);
+    kprintf("ACPI: Mapped FADT to 0x%p, size: %u bytes\n", fadt, fadt->header.length);
 
     // Get Multiple APIC Description Table (MADT).
     kprintf("ACPI: Searching for Multiple APIC Description Table (MADT)...\n");
     madt = (acpi_madt_t*)acpi_search_rsdt(ACPI_SIGNATURE_MADT, 0);
     if (madt != NULL)
-        kprintf("ACPI: Mapped MADT to 0x%X, size: %u bytes\n", (uint32_t)madt, madt->header.length);
+        kprintf("ACPI: Mapped MADT to 0x%p, size: %u bytes\n", madt, madt->header.length);
     else
         kprintf("ACPI: No MADT found. APICs and SMP will not be available.\n");
 
