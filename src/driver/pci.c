@@ -16,7 +16,7 @@ void pci_print_info(struct PCIDevice* dev) {
         dev->VendorID, dev->DeviceID, dev->Class,  dev->Subclass, dev->Bus, 
         dev->Device, dev->Function);
     
-    // Print class info
+    // Print class info and base addresses
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     kprintf("  - %s\n", pci_class_descriptions[dev->Class]);
     kprintf("  - BARS: 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X\n", dev->BAR[0], 
