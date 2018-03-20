@@ -107,6 +107,11 @@ void pci_check_busses(uint8_t bus) {
     for (int device = 0; device < 32; device++) {
         // Get info on the device and print info
         struct PCIDevice *this_device = pci_check_device(bus, device, 0);
+
+        if(this_device->VendorID == 0x10EC && this_device->DeviceID == 0x8139) {
+            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+            kprintf("  - DETECTED RTL8139\n");
+        }
         
         // If device is a PCI bridhge
         if(this_device->Class == 6 && this_device->Subclass == 4) {
