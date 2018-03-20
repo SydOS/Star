@@ -47,6 +47,12 @@ uint16_t pci_config_read_word(struct PCIDevice* dev, uint8_t offset) {
     return (tmp);
 }
 
+uint32_t pci_config_read_dword(struct PCIDevice* dev, uint8_t offset) {
+    uint32_t result;
+    result = (pci_config_read_word(dev, offset) << 16) + pci_config_read_word(dev, offset+2);
+    return result;
+}
+
 /**
  * Check and get various info about a PCI card
  * @param  bus      PCI bus to read from
@@ -77,6 +83,10 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     if (this_device->VendorID == 0xFFFF) return this_device;
 
     pci_print_info(this_device);
+    kprintf("  - BARS: 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X\n", pci_config_read_dword(this_device, PCI_BAR0),
+        pci_config_read_dword(this_device, PCI_BAR1), pci_config_read_dword(this_device, PCI_BAR2),
+        pci_config_read_dword(this_device, PCI_BAR3), pci_config_read_dword(this_device, PCI_BAR4),
+        pci_config_read_dword(this_device, PCI_BAR5));
 
     // If the card reports more than one function, let's scan those too
     if((this_device->HeaderType & 0x80) != 0) {
