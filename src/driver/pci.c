@@ -19,8 +19,13 @@ void pci_print_info(struct PCIDevice* dev) {
     // Print class info and base addresses
     vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     kprintf("  - %s\n", pci_class_descriptions[dev->Class]);
-    kprintf("  - BARS: 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X\n", dev->BAR[0], 
-        dev->BAR[1], dev->BAR[2], dev->BAR[3], dev->BAR[4], dev->BAR[5]);
+
+    // Print PCIDevice's base addresses if they exist
+    if(dev->BAR[0] != 0 || dev->BAR[1] != 0 || dev->BAR[2] != 0 ||
+       dev->BAR[3] != 0 || dev->BAR[4] != 0 || dev->BAR[5] != 0) {
+        kprintf("  - BARS: 0x%X 0x%X 0x%X 0x%X 0x%X 0x%X\n", dev->BAR[0], 
+            dev->BAR[1], dev->BAR[2], dev->BAR[3], dev->BAR[4], dev->BAR[5]);
+    }
 
     // Interrupt info
     if(dev->IntPIN != 0) { 
