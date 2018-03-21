@@ -133,7 +133,7 @@ void kernel_late() {
 	//floppy_init();
 
 
-	pata_init();
+	ata_init();
 
     vga_enable_cursor();
 

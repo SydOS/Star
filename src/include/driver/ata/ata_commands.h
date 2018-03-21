@@ -5,6 +5,13 @@
 
 #define ATA_CMD_IDENTIFY        0xEC
 
+#define ATA_SERIAL_LENGTH       20
+#define ATA_FIRMWARE_LENGTH     8
+#define ATA_MODEL_LENGTH        40
+#define ATA_ADD_ID_LENGTH       8
+#define ATA_MEDIA_SERIAL_LENGTH 60
+
+#define ATA_IDENTIFY_INTEGRITY_MAGIC 0xA5
 
 // Result of IDENTIFY command.
 struct ata_identify_result {
@@ -21,18 +28,21 @@ struct ata_identify_result {
     // Specific configuration (ATA-5+). Word 7.
     uint16_t specificConfig;
 
-    // Serial number (20 ASCII characters). Words 10-19.
-    char[20] serial;
+    // Serial number (20 ASCII characters plus null). Words 10-19.
+    char serial[ATA_SERIAL_LENGTH+1];
 
-    // Firmware revision (8 ASCII characters). Words 23-26.
-    char[8] firmwareRevision;
+    // Firmware revision (8 ASCII characters plus null). Words 23-26.
+    char firmwareRevision[ATA_FIRMWARE_LENGTH+1];
 
-    // Model name (40 ASCII characters). Words 27-46.
-    char[40] model;
+    // Model name (40 ASCII characters plus null). Words 27-46.
+    char model[ATA_MODEL_LENGTH+1];
 
     // Maximum number of sectors to be transferred in multi-sector read/write commands. Low half of word 47
     uint8_t maxSectorsInterrupt;
     
+    // Trusted computing info (ATA-8+). Word 48.
+    uint16_t trustedComputingFlags;
+
     // Capabilities. Word 49.
     uint16_t capabilities49;
 
@@ -46,9 +56,9 @@ struct ata_identify_result {
     uint16_t flags53;
 
     // Number of current logical cylinders, heads, and sectors per track. Obsolete after ATA-5. Words 54-56.
-    uint16_t numCurrentLogicalCylinders;
-    uint16_t numCurrentLogicalHeads;
-    uint16_t numCurrentLogicalSectorsPerTrack;
+    uint16_t currentLogicalCylinders;
+    uint16_t currentLogicalHeads;
+    uint16_t currentLogicalSectorsPerTrack;
 
     // Current capacity in sectors. Obsolete after ATA-5. Words 57-58.
     uint32_t currentCapacitySectors;
@@ -70,6 +80,9 @@ struct ata_identify_result {
     uint16_t multiwordDmaRecCycleTime;
     uint16_t pioMinCycleTimeNoFlow;
     uint16_t pioMinCycleTimeIoRdy;
+
+    // Additional supported flags (ATA-8+). Word 69.
+    uint16_t additionalSupportedFlags;
 
     // Maximum queue depth - 1 (ATA-4+). Lower 5 bits of Word 75.
     uint8_t maxQueueDepth;
@@ -96,9 +109,9 @@ struct ata_identify_result {
     // Ultra DMA mode flags (ATA-4+) Word 88.
     uint16_t ultraDmaMode;
 
-    // Times required for SECURITY ERASE UNIT command (ATA-4+). Words 89 and 90.
-    uint16_t normalEraseTime;
-    uint16_t enhancedEraseTime;
+    // Times required for SECURITY ERASE UNIT command (ATA-4+). Lower halves of words 89 and 90.
+    uint8_t normalEraseTime;
+    uint8_t enhancedEraseTime;
 
     // Current APM level starting (ATA-4+). Word 91.
     uint16_t currentApmLevel;
@@ -153,8 +166,14 @@ struct ata_identify_result {
     // Device form factor (ATA-8+). Lower 4 bits of word 168.
     uint8_t formFactor;
 
+    // Data set management flags (TRIM) (ATA-8+). Word 169.
+    uint16_t dataSetManagementFlags;
+
+    // Additional product identifier.
+    char additionalIdentifier[ATA_ADD_ID_LENGTH+1];
+
     // Current media serial number string (ATA-6+) Words 176 to 205.
-    char[30] mediaSerial;
+    char mediaSerial[ATA_MEDIA_SERIAL_LENGTH+1];
 
     // SCT command transport flags (ATA-8+). Word 206.
     uint16_t sctCommandTransportFlags;
@@ -184,7 +203,12 @@ struct ata_identify_result {
     // Transport version numbers (ATA-8+). Words 222 and 223.
     uint16_t transportVersionMajor;
     uint16_t transportVersionMinor;
+
+    // Extended number of LBA sectors.
+    uint64_t extendedSectors;
 };
 typedef struct ata_identify_result ata_identify_result_t;
+
+extern bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_result_t *outResult);
 
 #endif

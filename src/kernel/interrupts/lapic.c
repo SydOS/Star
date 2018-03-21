@@ -46,24 +46,6 @@ static void lapic_write(uint16_t offset, uint32_t value) {
     (void)lapic_read(LAPIC_REG_ID);
 }
 
-static lapic_icr_t create_empty_icr() {
-    // Create empty ICR.
-    lapic_icr_t icr;
-    icr.vector = 0;
-    icr.deliveryMode = 0;
-    icr.destinationMode = 0;
-    icr.deliveryStatus = 0;
-    icr.reserved1 = 0;
-    icr.level = 0;
-    icr.triggerMode = 0;
-    icr.reserved2 = 0;
-    icr.destinationShorthand = 0;
-    icr.reserved3 = 0;
-    icr.destination = 0;
-
-    return icr;
-}
-
 static void lapic_send_icr(lapic_icr_t icr) {
     // Get ICR into two 32-bit values.
     uint32_t *data = (uint32_t*)&icr;
@@ -78,7 +60,7 @@ static void lapic_send_icr(lapic_icr_t icr) {
 
 void lapic_send_init(uint8_t apic) {
     // Send INIT to specified APIC.
-    lapic_icr_t icr = create_empty_icr();
+    lapic_icr_t icr = {};
     icr.deliveryMode = LAPIC_DELIVERY_INIT;
     icr.destinationMode = LAPIC_DEST_MODE_PHYSICAL;
     icr.triggerMode = LAPIC_TRIGGER_EDGE;
@@ -91,7 +73,7 @@ void lapic_send_init(uint8_t apic) {
 
 void lapic_send_startup(uint8_t apic, uint8_t vector) {
     // Send startup to specified APIC.
-    lapic_icr_t icr = create_empty_icr();
+    lapic_icr_t icr = {};
     icr.vector = vector;
     icr.deliveryMode = LAPIC_DELIVERY_STARTUP;
     icr.destinationMode = LAPIC_DEST_MODE_PHYSICAL;
@@ -105,7 +87,7 @@ void lapic_send_startup(uint8_t apic, uint8_t vector) {
 
 void lapic_send_nmi_all() {
     // Send NMI to all LAPICs but ourself.
-    lapic_icr_t icr = create_empty_icr();
+    lapic_icr_t icr = {};
     icr.deliveryMode = LAPIC_DELIVERY_NMI;
     icr.triggerMode = LAPIC_TRIGGER_EDGE;
     icr.destinationShorthand = LAPIC_DEST_SHORTHAND_ALL_BUT_SELF;

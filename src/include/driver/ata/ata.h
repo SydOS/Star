@@ -4,26 +4,28 @@
 #include <main.h>
 
 // Primary PATA interface ports.
-#define PATA_PRI_COMMAND_PORT   0x1F0
-#define PATA_PRI_CONTROL_PORT   0x3F4
+#define ATA_PRI_COMMAND_PORT    0x1F0
+#define ATA_PRI_CONTROL_PORT    0x3F4
 
 // Secondary PATA interface ports.
-#define PATA_SEC_COMMAND_PORT   0x170
-#define PATA_SEC_CONTROL_PORT   0x374
+#define ATA_SEC_COMMAND_PORT    0x170
+#define ATA_SEC_CONTROL_PORT    0x374
 
 // Command register offsets.
-#define PATA_CMD_DATA(port)                 (port+0x00) // Read/write PIO data bytes.
-#define PATA_CMD_ERROR_FEATURES(port)       (port+0x01) // Used for ATAPI.
-#define PATA_CMD_SECTOR_COUNT(port)         (port+0x02) // Number of sectors to read/write.
-#define PATA_CMD_SECTOR_NUM(port)           (port+0x03) // CHS, LBA.
-#define PATA_CMD_CYL_LOW(port)              (port+0x04) // Low part of sector address.
-#define PATA_CMD_CYL_HIGH(port)             (port+0x05) // High part of sector address.
-#define PATA_CMD_DRIVE_SELECT(port)         (port+0x06) // Selects the drive and/or head.
-#define PATA_CMD_STATUS_CMD(port)           (port+0x07) // Send commands or read status.
+#define ATA_REG_DATA(port)                  (port+0x00) // Read/write PIO data bytes.
+#define ATA_REG_ERROR(port)                 (port+0x01) // Contains status or error from the last command.
+#define ATA_REG_FEATURES(port)              (port+0x01) // Used for ATAPI.
+#define ATA_REG_SECTOR_COUNT(port)          (port+0x02) // Number of sectors to read/write.
+#define ATA_REG_SECTOR_NUMBER(port)         (port+0x03) // CHS, LBA.
+#define ATA_REG_CYLINDER_LOW(port)          (port+0x04) // Low part of sector address.
+#define ATA_REG_CYLINDER_HIGH(port)         (port+0x05) // High part of sector address.
+#define ATA_REG_DRIVE_SELECT(port)          (port+0x06) // Selects the drive and/or head.
+#define ATA_REG_COMMAND(port)               (port+0x07) // Send commands or read status.
+#define ATA_REG_STATUS(port)                (port+0x07) // Read status.
 
-// Control register offsets.
-#define PATA_CTRL_DEVICE_ALTSTATUS(port)    (port+0x02)
-#define PATA_CTRL_FORWARD_ISA(port)         (port+0x03)
+// Control register offset.
+#define ATA_REG_DEVICE_CONTROL(port)        (port+0x02)
+#define ATA_REG_ALT_STATUS(port)            (port+0x02)
 
 // Device status bits.
 enum {
@@ -40,12 +42,12 @@ enum {
 
 // Device control register bits.
 enum {
-    PATA_DEVICE_CONTROL_NO_INT      = 0x02,
-    PATA_DEVICE_CONTROL_RESET       = 0x04,
-    PATA_DEVICE_CONTROL_HIGH_BYTE   = 0x80
+    ATA_DEVICE_CONTROL_NO_INT       = 0x02,
+    ATA_DEVICE_CONTROL_RESET        = 0x04,
+    ATA_DEVICE_CONTROL_HIGH_BYTE    = 0x80
 };
 
 
-extern void pata_init();
+extern void ata_init();
 
 #endif
