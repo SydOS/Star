@@ -100,7 +100,7 @@ static void ata_print_device_info(ata_identify_result_t info) {
     kprintf("\n");
 
     // Is the device SATA?
-    if (!(info.serialAtaFlags76 = 0x0000 || info.serialAtaFlags76 == 0xFFFF)) {
+    if (!(info.serialAtaFlags76 == 0x0000 || info.serialAtaFlags76 == 0xFFFF)) {
         kprintf("ATA:    Type: SATA\n");
         kprintf("ATA:    Gen1 support: %s\n", info.serialAtaFlags76 & ATA_SATA76_GEN1_SUPPORTED ? "yes" : "no");
         kprintf("ATA:    Gen2 support: %s\n", info.serialAtaFlags76 & ATA_SATA76_GEN2_SUPPORTED ? "yes" : "no");
