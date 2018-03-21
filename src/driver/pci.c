@@ -118,6 +118,8 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
 
     // If the card reports more than one function, let's scan those too
     if((this_device->HeaderType & 0x80) != 0 && function == 0) {
+        vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
+        kprintf("  - Scanning other functions on multifunction device!\n");
         // Check each function on the device
         for (int t_function = 1; t_function < 8; t_function++) {
             struct PCIDevice *func_device = pci_check_device(bus, device, t_function);
@@ -147,7 +149,7 @@ void pci_check_busses(uint8_t bus) {
         
         // If device is a PCI bridhge
         if(this_device->Class == 6 && this_device->Subclass == 4) {
-            vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
+            vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
             uint16_t seconaryBus = pci_config_read_word(this_device,PCI_BAR2);
             uint16_t primaryBus = (seconaryBus & ~0xFF00);
             seconaryBus = (seconaryBus & ~0x00FF) >> 8;
