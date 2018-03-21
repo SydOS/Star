@@ -27,6 +27,29 @@ static bool ata_wait_for_irq_pri() {
 	return ret;
 }
 
+extern irqTriggeredSec;
+static bool ata_wait_for_irq_sec() {
+    // Wait until IRQ is triggered or we time out.
+    uint16_t timeout = 200;
+	uint8_t ret = false;
+	while (!irqTriggeredSec) {
+		if(!timeout)
+			break;
+		timeout--;
+		sleep(10);
+	}
+
+	// Did we hit the IRQ?
+	if(irqTriggeredSec)
+		ret = true;
+	else
+		kprintf("PATA: IRQ timeout for secondary channel!\n");
+
+	// Reset triggered value.
+	irqTriggeredSec = false;
+	return ret;
+}
+
 static uint16_t ata_read_identify_word(uint16_t portCommand, uint8_t *checksum) {
     // Read word, adding value to checksum.
     uint16_t data = ata_read_data_word(portCommand);
@@ -46,7 +69,13 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
 
     // Send identify command and wait for IRQ.
     outb(ATA_REG_COMMAND(portCommand), ATA_CMD_IDENTIFY);
-    if (!ata_wait_for_irq_pri())
+    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri())
+        return false;
+    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec())
+        return false;
+
+    // Ensure drive is ready and there is data to be read.
+    if (!ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
         return false;
 
     // Checksum total, used at end.
@@ -135,7 +164,7 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
     result.currentApmLevel = ata_read_identify_word(portCommand, &checksum);
     result.masterPasswordRevision = ata_read_identify_word(portCommand, &checksum);
     result.hardwareResetResult = ata_read_identify_word(portCommand, &checksum);
-    
+
     // Read acoustic values (word 94).
     uint16_t acoustic = ata_read_identify_word(portCommand, &checksum);
     result.recommendedAcousticValue = (uint8_t)(acoustic >> 8);
@@ -161,7 +190,7 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
     // Read world wide name (words 108-111).
     result.worldWideName = (uint64_t)ata_read_identify_word(portCommand, &checksum) | ((uint64_t)ata_read_identify_word(portCommand, &checksum) << 16)
         | ((uint64_t)ata_read_identify_word(portCommand, &checksum) << 32) | ((uint64_t)ata_read_identify_word(portCommand, &checksum) << 48);
-    
+
     // Read words 112-128.
     ata_read_identify_words(portCommand, &checksum, 112, 116);
     result.logicalSectorSize = (uint32_t)ata_read_identify_word(portCommand, &checksum) | ((uint32_t)ata_read_identify_word(portCommand, &checksum) << 16);
@@ -226,6 +255,12 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
     uint16_t integrity = ata_read_identify_word(portCommand, &checksum);
     if (((uint8_t)(integrity & 0xFF)) == ATA_IDENTIFY_INTEGRITY_MAGIC && checksum != 0)
         return false;
+
+    // Ensure device is in fact an ATA device.
+    if (result.generalConfig & ATA_IDENTIFY_GENERAL_NOT_ATA_DEVICE)
+        return false;
+
+    // Ensure outputs are good.
 
     // Command succeeded.
     *outResult = result;

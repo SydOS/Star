@@ -12,6 +12,28 @@
 #define ATA_MEDIA_SERIAL_LENGTH 60
 
 #define ATA_IDENTIFY_INTEGRITY_MAGIC 0xA5
+#define ATA_IDENTIFY_GENERAL_NOT_ATA_DEVICE 0x8000
+
+// Word 80 ATA version flags.
+enum {
+    ATA_VERSION_ATA1    = 0x02,
+    ATA_VERSION_ATA2    = 0x04,
+    ATA_VERSION_ATA3    = 0x08,
+    ATA_VERSION_ATA4    = 0x10,
+    ATA_VERSION_ATA5    = 0x20,
+    ATA_VERSION_ATA6    = 0x40,
+    ATA_VERSION_ATA7    = 0x80,
+    ATA_VERSION_ATA8    = 0x100
+};
+
+// Word 76 SATA supported feature flags.
+enum {
+    ATA_SATA76_GEN1_SUPPORTED       = 0x02,
+    ATA_SATA76_GEN2_SUPPORTED       = 0x04,
+    ATA_SATA76_NCQ_SUPPORTED        = 0x100,
+    ATA_SATA76_POWER_SUPPORTED      = 0x200,
+    ATA_SATA76_PHY_EVENTS_SUPPORTED = 0x400
+};
 
 // Result of IDENTIFY command.
 struct ata_identify_result {
@@ -39,7 +61,7 @@ struct ata_identify_result {
 
     // Maximum number of sectors to be transferred in multi-sector read/write commands. Low half of word 47
     uint8_t maxSectorsInterrupt;
-    
+
     // Trusted computing info (ATA-8+). Word 48.
     uint16_t trustedComputingFlags;
 
@@ -48,7 +70,7 @@ struct ata_identify_result {
 
     // Capabilities (ATA-4+). Word 50.
     uint16_t capabilities50;
-    
+
     // PIO transfer mode. (ATA-1 to ATA-4). High half of word 51.
     uint8_t pioMode;
 
