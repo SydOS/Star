@@ -201,7 +201,7 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
     result.securityFlags = ata_read_identify_word(portCommand, &checksum);
 
     // Read unused words 129-159.
-    ata_read_identify_words(portCommand, &checksum, 130, 159);
+    ata_read_identify_words(portCommand, &checksum, 129, 159);
 
     // Read words 160-169.
     result.cfaFlags = ata_read_identify_word(portCommand, &checksum);
@@ -258,6 +258,146 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
 
     // Ensure device is in fact an ATA device.
     if (result.generalConfig & ATA_IDENTIFY_GENERAL_NOT_ATA_DEVICE)
+        return false;
+
+    // Ensure outputs are good.
+
+    // Command succeeded.
+    *outResult = result;
+    return true;
+}
+
+bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_packet_result_t *outResult) {
+    // Select device.
+    ata_select_device(portCommand, portControl, false, master);
+
+    // Send identify command and wait for IRQ.
+    outb(ATA_REG_COMMAND(portCommand), ATA_CMD_IDENTIFY_PACKET);
+    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri())
+        return false;
+    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec())
+        return false;
+
+    // Ensure drive is ready and there is data to be read.
+    if (!ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
+        return false;
+
+    // Checksum total, used at end.
+    uint8_t checksum = 0;
+    ata_identify_packet_result_t result = {};
+
+    // Read words 0-9.
+    result.generalConfig = ata_read_identify_word(portCommand, &checksum);
+    ata_read_identify_word(portCommand, &checksum);
+    result.specificConfig = ata_read_identify_word(portCommand, &checksum);
+    ata_read_identify_words(portCommand, &checksum, 3, 9);
+
+    // Read serial number (words 10-19).
+    for (uint16_t i = 0; i < ATA_SERIAL_LENGTH; i+=2) {
+        uint16_t value = ata_read_identify_word(portCommand, &checksum);
+        result.serial[i] = (char)(value >> 8);
+        result.serial[i+1] = (char)(value & 0xFF);
+    }
+    result.serial[ATA_SERIAL_LENGTH] = '\0';
+
+    // Unused words 20-22.
+    ata_read_identify_words(portCommand, &checksum, 20, 22);
+
+    // Read firmware revision (words 23-26).
+    for (uint16_t i = 0; i < ATA_FIRMWARE_LENGTH; i+=2) {
+        uint16_t value = ata_read_identify_word(portCommand, &checksum);
+        result.firmwareRevision[i] = (char)(value >> 8);
+        result.firmwareRevision[i+1] = (char)(value & 0xFF);
+    }
+    result.firmwareRevision[ATA_FIRMWARE_LENGTH] = '\0';
+
+    // Read Model (words 27-46).
+    for (uint16_t i = 0; i < ATA_MODEL_LENGTH; i+=2) {
+        uint16_t value = ata_read_identify_word(portCommand, &checksum);
+        result.model[i] = (char)(value >> 8);
+        result.model[i+1] = (char)(value & 0xFF);
+    }
+    result.model[ATA_MODEL_LENGTH] = '\0';
+
+    // Read words 47-61.
+    ata_read_identify_words(portCommand, &checksum, 47, 48);
+    result.capabilities49 = ata_read_identify_word(portCommand, &checksum);
+    result.capabilities50 = ata_read_identify_word(portCommand, &checksum);
+    result.pioMode = (uint8_t)(ata_read_identify_word(portCommand, &checksum) >> 8);
+    ata_read_identify_word(portCommand, &checksum);
+    result.flags53 = ata_read_identify_word(portCommand, &checksum);
+    ata_read_identify_words(portCommand, &checksum, 54, 61);
+
+    // Read words 62-79.
+    result.dmaFlags62 = ata_read_identify_word(portCommand, &checksum);
+    result.multiwordDmaFlags = ata_read_identify_word(portCommand, &checksum);
+    result.pioModesSupported = (uint8_t)(ata_read_identify_word(portCommand, &checksum) & 0xFF);
+    result.multiwordDmaMinCycleTime = ata_read_identify_word(portCommand, &checksum);
+    result.multiwordDmaRecCycleTime = ata_read_identify_word(portCommand, &checksum);
+    result.pioMinCycleTimeNoFlow = ata_read_identify_word(portCommand, &checksum);
+    result.pioMinCycleTimeIoRdy = ata_read_identify_word(portCommand, &checksum);
+    ata_read_identify_words(portCommand, &checksum, 69, 70);
+    result.timePacketRelease = ata_read_identify_word(portCommand, &checksum);
+    result.timeServiceBusy = ata_read_identify_word(portCommand, &checksum);
+    ata_read_identify_words(portCommand, &checksum, 73, 74);
+    result.maxQueueDepth = (uint8_t)(ata_read_identify_word(portCommand, &checksum) & 0x1F);
+    result.serialAtaFlags76 = ata_read_identify_word(portCommand, &checksum);
+    ata_read_identify_word(portCommand, &checksum);
+    result.serialAtaFlags78 = ata_read_identify_word(portCommand, &checksum);
+    result.serialAtaFlags79 = ata_read_identify_word(portCommand, &checksum);
+
+    // Read words 80-93.
+    result.versionMajor = ata_read_identify_word(portCommand, &checksum);
+    result.versionMinor = ata_read_identify_word(portCommand, &checksum);
+    result.commandFlags82 = ata_read_identify_word(portCommand, &checksum);
+    result.commandFlags83 = ata_read_identify_word(portCommand, &checksum);
+    result.commandFlags84 = ata_read_identify_word(portCommand, &checksum);
+    result.commandFlags85 = ata_read_identify_word(portCommand, &checksum);
+    result.commandFlags86 = ata_read_identify_word(portCommand, &checksum);
+    result.commandFlags87 = ata_read_identify_word(portCommand, &checksum);
+    result.ultraDmaMode = ata_read_identify_word(portCommand, &checksum);
+    result.normalEraseTime = (uint8_t)(ata_read_identify_word(portCommand, &checksum) & 0xFF);
+    result.enhancedEraseTime = (uint8_t)(ata_read_identify_word(portCommand, &checksum) & 0xFF);
+    result.currentApmLevel = ata_read_identify_word(portCommand, &checksum);
+    result.masterPasswordRevision = ata_read_identify_word(portCommand, &checksum);
+    result.hardwareResetResult = ata_read_identify_word(portCommand, &checksum);
+
+    // Read acoustic values (word 94).
+    uint16_t acoustic = ata_read_identify_word(portCommand, &checksum);
+    result.recommendedAcousticValue = (uint8_t)(acoustic >> 8);
+    result.currentAcousticValue = (uint8_t)(acoustic & 0xFF);
+
+    // Read unused words 95-107.
+    ata_read_identify_words(portCommand, &checksum, 95, 107);
+
+    // Read world wide name (words 108-111).
+    result.worldWideName = (uint64_t)ata_read_identify_word(portCommand, &checksum) | ((uint64_t)ata_read_identify_word(portCommand, &checksum) << 16)
+        | ((uint64_t)ata_read_identify_word(portCommand, &checksum) << 32) | ((uint64_t)ata_read_identify_word(portCommand, &checksum) << 48);
+
+    // Read words 112-128.
+    ata_read_identify_words(portCommand, &checksum, 112, 118);
+    result.commandFlags119 = ata_read_identify_word(portCommand, &checksum);
+    result.commandFlags120 = ata_read_identify_word(portCommand, &checksum);
+    ata_read_identify_words(portCommand, &checksum, 121, 126);
+    result.removableMediaFlags = ata_read_identify_word(portCommand, &checksum);
+    result.securityFlags = ata_read_identify_word(portCommand, &checksum);
+
+    // Read unused words 129-221.
+    ata_read_identify_words(portCommand, &checksum, 129, 221);
+
+    // Read words 220-254.
+    result.transportVersionMajor = ata_read_identify_word(portCommand, &checksum);
+    result.transportVersionMinor = ata_read_identify_word(portCommand, &checksum);
+    ata_read_identify_words(portCommand, &checksum, 224, 254);
+
+    // Read integrity word 255.
+    // If the low byte contains the magic number, validate checksum. If check fails, command failed.
+    uint16_t integrity = ata_read_identify_word(portCommand, &checksum);
+    if (((uint8_t)(integrity & 0xFF)) == ATA_IDENTIFY_INTEGRITY_MAGIC && checksum != 0)
+        return false;
+
+    // Ensure device is in fact an ATAPI device.
+    if (!(result.generalConfig & ATA_IDENTIFY_GENERAL_ATAPI_DEVICE))
         return false;
 
     // Ensure outputs are good.

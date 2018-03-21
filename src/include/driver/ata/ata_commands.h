@@ -3,6 +3,7 @@
 
 #include <main.h>
 
+#define ATA_CMD_IDENTIFY_PACKET 0xA1
 #define ATA_CMD_IDENTIFY        0xEC
 
 #define ATA_SERIAL_LENGTH       20
@@ -13,6 +14,7 @@
 
 #define ATA_IDENTIFY_INTEGRITY_MAGIC 0xA5
 #define ATA_IDENTIFY_GENERAL_NOT_ATA_DEVICE 0x8000
+#define ATA_IDENTIFY_GENERAL_ATAPI_DEVICE   0x8000
 
 // Word 80 ATA version flags.
 enum {
@@ -191,7 +193,7 @@ struct ata_identify_result {
     // Data set management flags (TRIM) (ATA-8+). Word 169.
     uint16_t dataSetManagementFlags;
 
-    // Additional product identifier.
+    // Additional product identifier (words 170-173).
     char additionalIdentifier[ATA_ADD_ID_LENGTH+1];
 
     // Current media serial number string (ATA-6+) Words 176 to 205.
@@ -226,10 +228,117 @@ struct ata_identify_result {
     uint16_t transportVersionMajor;
     uint16_t transportVersionMinor;
 
-    // Extended number of LBA sectors.
+    // Extended number of LBA sectors (words 230-233).
     uint64_t extendedSectors;
 };
 typedef struct ata_identify_result ata_identify_result_t;
+
+// Result of IDENTIFY PACKET DEVICE command.
+struct ata_identify_packet_result {
+    // General configuration bits. Word 0.
+    uint16_t generalConfig;
+
+    // Specific configuration (ATAPI-5+). Word 7.
+    uint16_t specificConfig;
+
+    // Serial number (20 ASCII characters plus null). Words 10-19.
+    char serial[ATA_SERIAL_LENGTH+1];
+
+    // Firmware revision (8 ASCII characters plus null). Words 23-26.
+    char firmwareRevision[ATA_FIRMWARE_LENGTH+1];
+
+    // Model name (40 ASCII characters plus null). Words 27-46.
+    char model[ATA_MODEL_LENGTH+1];
+
+    // Capabilities. Word 49.
+    uint16_t capabilities49;
+
+    // Capabilities (ATA-4+). Word 50.
+    uint16_t capabilities50;
+
+    // PIO transfer mode. (ATAPI-4). High half of word 51.
+    uint8_t pioMode;
+
+    // Flags indicating valid IDENTIFY word ranges. Word 53.
+    uint16_t flags53;
+
+    // DMA flags (ATAPI-7+). Word 62.
+    uint16_t dmaFlags62;
+
+    // Flags indicating multiword DMA status. Word 63.
+    uint16_t multiwordDmaFlags;
+
+    // Flags indicuating supported PIO modes. Lower half of word 64.
+    uint8_t pioModesSupported;
+
+    // Cycles times for multiword DMA and PIO. Words 65-68.
+    uint16_t multiwordDmaMinCycleTime;
+    uint16_t multiwordDmaRecCycleTime;
+    uint16_t pioMinCycleTimeNoFlow;
+    uint16_t pioMinCycleTimeIoRdy;
+
+    // Time for PACKET and SERVICE commands (ATAPI-4 to ATAPI-7). Words 71 and 72.
+    uint16_t timePacketRelease;
+    uint16_t timeServiceBusy;
+
+    // Maximum queue depth - 1 (ATAPI-4 to ATAPI-7). Lower 5 bits of Word 75.
+    uint8_t maxQueueDepth;
+
+    // Serial ATA flags (ATAPI-8+). Words 76, 78, and 79.
+    uint16_t serialAtaFlags76;
+    uint16_t serialAtaFlags78;
+    uint16_t serialAtaFlags79;
+
+    // Version flags. Words 80 and 81.
+    uint16_t versionMajor;
+    uint16_t versionMinor;
+
+    // Supported command flags. Words 82-87.
+    uint16_t commandFlags82;
+    uint16_t commandFlags83;
+    uint16_t commandFlags84;
+    uint16_t commandFlags85;
+    uint16_t commandFlags86;
+    uint16_t commandFlags87;
+
+    // Ultra DMA mode flags. Word 88.
+    uint16_t ultraDmaMode;
+
+    // Times required for SECURITY ERASE UNIT command (ATAPI-8+). Lower halves of words 89 and 90.
+    uint8_t normalEraseTime;
+    uint8_t enhancedEraseTime;
+
+    // Current APM level (ATAPI-8+). Word 91.
+    uint16_t currentApmLevel;
+
+    // Master password revision code (ATAPI-8+). Word 92.
+    uint16_t masterPasswordRevision;
+
+    // Hardware reset result (ATAPI-5+). Word 93.
+    uint16_t hardwareResetResult;
+
+    // Acoustic info (ATAPI-6 to ATAPI-8). High and low halfs of word 94.
+    uint8_t recommendedAcousticValue;
+    uint8_t currentAcousticValue;
+
+    // World wide name (ATAPI-7+). Words 108-111.
+    uint64_t worldWideName;
+
+    // Supported command flags (ATAPI-8+). Words 119 and 120.
+    uint16_t commandFlags119;
+    uint16_t commandFlags120;
+
+    // Removable media flags (ATAPI-4 to ATAPI-7). Word 127.
+    uint16_t removableMediaFlags;
+
+    // Security status flags. Word 128.
+    uint16_t securityFlags;
+
+    // Transport version numbers (ATA-8+). Words 222 and 223.
+    uint16_t transportVersionMajor;
+    uint16_t transportVersionMinor;
+};
+typedef struct ata_identify_packet_result ata_identify_packet_result_t;
 
 extern bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_result_t *outResult);
 
