@@ -3,6 +3,8 @@
 
 #include <main.h>
 
+#define ATA_DEVICE_RESET        0x08
+
 #define ATA_CMD_IDENTIFY_PACKET 0xA1
 #define ATA_CMD_IDENTIFY        0xEC
 

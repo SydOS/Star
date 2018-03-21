@@ -4,51 +4,9 @@
 #include <driver/ata/ata_commands.h>
 
 
-extern irqTriggeredPri;
-static bool ata_wait_for_irq_pri() {
-    // Wait until IRQ is triggered or we time out.
-    uint16_t timeout = 200;
-	uint8_t ret = false;
-	while (!irqTriggeredPri) {
-		if(!timeout)
-			break;
-		timeout--;
-		sleep(10);
-	}
+extern bool ata_wait_for_irq_pri();
+extern bool ata_wait_for_irq_sec();
 
-	// Did we hit the IRQ?
-	if(irqTriggeredPri)
-		ret = true;
-	else
-		kprintf("PATA: IRQ timeout for primary channel!\n");
-
-	// Reset triggered value.
-	irqTriggeredPri = false;
-	return ret;
-}
-
-extern irqTriggeredSec;
-static bool ata_wait_for_irq_sec() {
-    // Wait until IRQ is triggered or we time out.
-    uint16_t timeout = 200;
-	uint8_t ret = false;
-	while (!irqTriggeredSec) {
-		if(!timeout)
-			break;
-		timeout--;
-		sleep(10);
-	}
-
-	// Did we hit the IRQ?
-	if(irqTriggeredSec)
-		ret = true;
-	else
-		kprintf("PATA: IRQ timeout for secondary channel!\n");
-
-	// Reset triggered value.
-	irqTriggeredSec = false;
-	return ret;
-}
 
 static uint16_t ata_read_identify_word(uint16_t portCommand, uint8_t *checksum) {
     // Read word, adding value to checksum.
@@ -64,15 +22,16 @@ static void ata_read_identify_words(uint16_t portCommand, uint8_t *checksum, uin
 }
 
 bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_result_t *outResult) {
-    // Select device.
-    ata_select_device(portCommand, portControl, false, master);
-
     // Send identify command and wait for IRQ.
-    outb(ATA_REG_COMMAND(portCommand), ATA_CMD_IDENTIFY);
-    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri())
+    ata_send_command(portCommand, 0x00, 0x00, 0x00, 0x00, ATA_CMD_IDENTIFY);
+    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri()) {
+        ata_check_status(portCommand, master);
         return false;
-    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec())
+    }
+    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec()){
+        ata_check_status(portCommand, master);
         return false;
+    }
 
     // Ensure drive is ready and there is data to be read.
     if (!ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
@@ -268,11 +227,8 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
 }
 
 bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_packet_result_t *outResult) {
-    // Select device.
-    ata_select_device(portCommand, portControl, false, master);
-
     // Send identify command and wait for IRQ.
-    outb(ATA_REG_COMMAND(portCommand), ATA_CMD_IDENTIFY_PACKET);
+    ata_send_command(portCommand, 0x00, 0x00, 0x00, 0x00, ATA_CMD_IDENTIFY_PACKET);
     if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri())
         return false;
     else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec())
@@ -405,4 +361,8 @@ bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master
     // Command succeeded.
     *outResult = result;
     return true;
+}
+
+bool ata_packet(uint16_t portCommand, uint16_t portControl, bool master) {
+    
 }
