@@ -29,9 +29,7 @@ void pci_print_info(struct PCIDevice* dev) {
 
     // Interrupt info
     if(dev->IntPIN != 0) { 
-        vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
         kprintf("  - Interrupt PIN %d Line %d\n", dev->IntPIN, dev->IntLine);
-        vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
     }
 }
 
