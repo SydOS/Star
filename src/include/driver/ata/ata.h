@@ -69,6 +69,13 @@ enum {
 #define ATA_SECTOR_SIZE_512         512
 #define ATA_SECTOR_SIZE_4K          4096
 
+// Values returned from ata_check_status().
+#define ATA_CHK_STATUS_OK               0
+#define ATA_CHK_STATUS_DRIVE_BUSY       -1
+#define ATA_CHK_STATUS_DEVICE_FAULT     -2
+#define ATA_CHK_STATUS_DEVICE_MISMATCH  -10
+#define ATA_CHK_STATUS_ERROR            1
+
 extern void ata_init();
 
 #endif

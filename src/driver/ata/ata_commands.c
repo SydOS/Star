@@ -24,13 +24,13 @@ static void ata_read_identify_words(uint16_t portCommand, uint8_t *checksum, uin
 bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_result_t *outResult) {
     // Send identify command and wait for IRQ.
     ata_send_command(portCommand, 0x00, 0x00, 0x00, 0x00, ATA_CMD_IDENTIFY);
-    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri(portCommand, master))
+    if (portCommand == ATA_PRI_COMMAND_PORT && ata_wait_for_irq_pri(portCommand, master))
         return false;
-    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec(portCommand, master))
+    else if (portCommand == ATA_SEC_COMMAND_PORT && ata_wait_for_irq_sec(portCommand, master))
         return false;
 
     // Ensure drive is ready and there is data to be read.
-    if (!ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
+    if (ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
         return false;
 
     // Checksum total, used at end.
@@ -108,7 +108,7 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
     result.versionMajor = ata_read_identify_word(portCommand, &checksum);
     result.versionMinor = ata_read_identify_word(portCommand, &checksum);
     result.commandFlags82 = ata_read_identify_word(portCommand, &checksum);
-    result.commandFlags83 = ata_read_identify_word(portCommand, &checksum);
+    result.commandFlags83.data = ata_read_identify_word(portCommand, &checksum);
     result.commandFlags84 = ata_read_identify_word(portCommand, &checksum);
     result.commandFlags85 = ata_read_identify_word(portCommand, &checksum);
     result.commandFlags86 = ata_read_identify_word(portCommand, &checksum);
@@ -231,7 +231,7 @@ bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master
         return false;
 
     // Ensure drive is ready and there is data to be read.
-    if (!ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
+    if (ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
         return false;
 
     // Checksum total, used at end.
@@ -441,7 +441,7 @@ bool ata_packet(uint16_t portCommand, uint16_t portControl, bool master, void *p
    // kprintf("ATA: int 0x%X\n", intReason);
 }
 
-bool ata_read_sector(uint16_t portCommand, uint16_t portControl, bool master, uint32_t startSectorLba, void *outData, uint8_t sectorCount) {
+int16_t ata_read_sector(uint16_t portCommand, uint16_t portControl, bool master, uint32_t startSectorLba, void *outData, uint8_t sectorCount) {
     // Send READ SECTOR command.
     ata_set_lba_high(portCommand, (uint8_t)((startSectorLba >> 24) & 0x0F));
     ata_send_command(portCommand, sectorCount, (uint8_t)(startSectorLba & 0xFF),
@@ -449,14 +449,36 @@ bool ata_read_sector(uint16_t portCommand, uint16_t portControl, bool master, ui
 
     // Wait for device.
     if (!ata_wait_for_drq(portControl))
-       return false;
+       return ata_check_status(portCommand, master);
 
     // Read data.
     ata_read_data_pio(portCommand, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
     return ata_check_status(portCommand, master);
 }
 
-bool ata_write_sector(uint16_t portCommand, uint16_t portControl, bool master, uint32_t startSectorLba, const void *data, uint8_t sectorCount) {
+int16_t ata_read_sector_ext(uint16_t portCommand, uint16_t portControl, bool master, uint64_t startSectorLba, void *outData, uint16_t sectorCount) {
+    // Get low and high parts of 48-bit LBA address.
+    uint32_t lbaLow = (uint32_t)(startSectorLba & 0xFFFFFFFF);
+    uint32_t lbaHigh = (uint32_t)(startSectorLba >> 32);
+
+    // Send high LBA bytes, then low LBA bytes and command.
+    ata_set_lba_high(portCommand, (uint8_t)((lbaHigh >> 24) & 0x0F));
+    ata_send_params(portCommand, (uint8_t)(sectorCount >> 8), (uint8_t)(lbaHigh & 0xFF),
+        (uint8_t)((lbaHigh >> 8) & 0xFF), (uint8_t)((lbaHigh >> 16) & 0xFF));
+    ata_set_lba_high(portCommand, (uint8_t)((lbaLow >> 24) & 0x0F));
+    ata_send_command(portCommand, (uint8_t)(sectorCount & 0xFF), (uint8_t)(lbaLow & 0xFF),
+        (uint8_t)((lbaLow >> 8) & 0xFF), (uint8_t)((lbaLow >> 16) & 0xFF), ATA_CMD_READ_SECTOR_EXT);
+
+    // Wait for device.
+    if (!ata_wait_for_drq(portControl))
+       return ata_check_status(portCommand, master);
+
+    // Read data.
+    ata_read_data_pio(portCommand, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
+    return ata_check_status(portCommand, master);
+}
+
+int16_t ata_write_sector(uint16_t portCommand, uint16_t portControl, bool master, uint32_t startSectorLba, const void *data, uint8_t sectorCount) {
     ata_check_status(portCommand, master);
 
     // Send WRITE SECTOR command.
@@ -466,7 +488,7 @@ bool ata_write_sector(uint16_t portCommand, uint16_t portControl, bool master, u
 
     // Wait for device.
     if (!ata_wait_for_drq(portControl))
-       return false;
+       return ata_check_status(portCommand, master);
 
     // Read data.
     ata_write_data_pio(portCommand, data, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);

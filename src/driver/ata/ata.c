@@ -19,31 +19,30 @@ static void ata_callback_sec() {
     kprintf("ATA: IRQ15 raised!\n");
 }
 
-bool ata_check_status(uint16_t portCommand, bool master) {
+int16_t ata_check_status(uint16_t portCommand, bool master) {
     // Get value of selected drive and ensure it is correct.
     if (master && (inb(ATA_REG_DRIVE_SELECT(portCommand)) & 0x10))
-        return false;
+        return ATA_CHK_STATUS_DEVICE_MISMATCH;
     else if (!master && !(inb(ATA_REG_DRIVE_SELECT(portCommand)) & 0x10))
-        return false;
+        return ATA_CHK_STATUS_DEVICE_MISMATCH;
 
-    // Ensure status flags are good.
+    // Get status flag. If status is not ready, return error.
     uint8_t status = inb(ATA_REG_STATUS(portCommand));
-
-    // If error bit is set, print error.
     if (status & ATA_STATUS_ERROR)
-        kprintf("ATA: Error 0x%X\n", inb(ATA_REG_ERROR(portCommand)));
-    if (status & ATA_STATUS_BUSY)
-        kprintf("ATA: Device Busy.\n");
+        return inb(ATA_REG_ERROR(portCommand));
+    else if (status & ATA_STATUS_DRIVE_FAULT)
+        return ATA_CHK_STATUS_DEVICE_FAULT;
+    else if ((status & ATA_STATUS_BUSY) || !(status & ATA_STATUS_READY))
+        return ATA_CHK_STATUS_DRIVE_BUSY;
 
-    if (status & ATA_STATUS_BUSY || status & ATA_STATUS_DRIVE_FAULT || status & ATA_STATUS_ERROR || !(status & ATA_STATUS_READY))
-        return false;
-    return true;
+    // Drive is OK and ready.
+    return ATA_CHK_STATUS_OK;
 }
 
 bool ata_wait_for_irq_pri(uint16_t portCommand, bool master) {
     // Wait until IRQ is triggered or we time out.
     uint16_t timeout = 200;
-	uint8_t ret = false;
+	bool ret = false;
 	while (!irqTriggeredPri) {
 		if(!timeout)
 			break;
@@ -56,13 +55,13 @@ bool ata_wait_for_irq_pri(uint16_t portCommand, bool master) {
 		ret = true;
 	else
 		kprintf("ATA: IRQ14 timeout for primary channel!\n");
-ata_check_status(portCommand, master);
+
 	// Reset triggered value.
 	irqTriggeredPri = false;
 	if (ret)
         return ata_check_status(portCommand, master);
     else
-        return false;
+        return -1;
 }
 
 bool ata_wait_for_irq_sec(uint16_t portCommand, bool master) {
@@ -119,6 +118,15 @@ void ata_send_command(uint16_t portCommand, uint8_t sectorCount, uint8_t sectorN
     outb(ATA_REG_CYLINDER_LOW(portCommand), cylinderLow);
     outb(ATA_REG_CYLINDER_HIGH(portCommand), cylinderHigh);
     outb(ATA_REG_COMMAND(portCommand), command);
+    io_wait();
+}
+
+void ata_send_params(uint16_t portCommand, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh) {
+    // Send command to current ATA device.
+    outb(ATA_REG_SECTOR_COUNT(portCommand), sectorCount);
+    outb(ATA_REG_SECTOR_NUMBER(portCommand), sectorNumber);
+    outb(ATA_REG_CYLINDER_LOW(portCommand), cylinderLow);
+    outb(ATA_REG_CYLINDER_HIGH(portCommand), cylinderHigh);
     io_wait();
 }
 
@@ -261,6 +269,8 @@ static void ata_print_device_info(ata_identify_result_t info) {
     if (info.versionMajor & ATA_VERSION_ATA8)
         kprintf(" ATA-8");
     kprintf("\n");
+    if (info.commandFlags83.info.lba48BitSupported)
+        kprintf("ATA:    48-bit LBA supported.\n");
 
     // Is the device SATA?
     if (!(info.serialAtaFlags76 == 0x0000 || info.serialAtaFlags76 == 0xFFFF)) {
@@ -408,7 +418,7 @@ void ata_reset_identify(uint16_t portCommand, uint16_t portControl) {
                 memset(bytes, 0, ATA_SECTOR_SIZE_512);
 
                 kprintf("Reading data...\n");
-                ata_read_sector(portCommand, portControl, true, 1, bytes, 1);
+                uint16_t status = ata_read_sector_ext(portCommand, portControl, true, 1, bytes, 1);
                 for (uint16_t i = 0; i < ATA_SECTOR_SIZE_512; i++)
                     kprintf(" %X", bytes[i]);
                 kprintf("\n");

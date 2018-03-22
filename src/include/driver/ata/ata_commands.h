@@ -3,21 +3,22 @@
 
 #include <main.h>
 
-#define ATA_DEVICE_RESET        0x08
+#define ATA_DEVICE_RESET            0x08
 
-#define ATA_CMD_READ_SECTOR     0x20
-#define ATA_CMD_WRITE_SECTOR    0x30
-#define ATA_CMD_PACKET          0xA0
-#define ATA_CMD_IDENTIFY_PACKET 0xA1
-#define ATA_CMD_IDENTIFY        0xEC
+#define ATA_CMD_READ_SECTOR         0x20
+#define ATA_CMD_READ_SECTOR_EXT     0x24
+#define ATA_CMD_WRITE_SECTOR        0x30
+#define ATA_CMD_PACKET              0xA0
+#define ATA_CMD_IDENTIFY_PACKET     0xA1
+#define ATA_CMD_IDENTIFY            0xEC
 
-#define ATA_SERIAL_LENGTH       20
-#define ATA_FIRMWARE_LENGTH     8
-#define ATA_MODEL_LENGTH        40
-#define ATA_ADD_ID_LENGTH       8
-#define ATA_MEDIA_SERIAL_LENGTH 60
+#define ATA_SERIAL_LENGTH           20
+#define ATA_FIRMWARE_LENGTH         8
+#define ATA_MODEL_LENGTH            40
+#define ATA_ADD_ID_LENGTH           8
+#define ATA_MEDIA_SERIAL_LENGTH     60
 
-#define ATA_IDENTIFY_INTEGRITY_MAGIC 0xA5
+#define ATA_IDENTIFY_INTEGRITY_MAGIC        0xA5
 #define ATA_IDENTIFY_GENERAL_NOT_ATA_DEVICE 0x8000
 #define ATA_IDENTIFY_GENERAL_ATAPI_DEVICE   0x8000
 
@@ -41,6 +42,25 @@ enum {
     ATA_SATA76_POWER_SUPPORTED      = 0x200,
     ATA_SATA76_PHY_EVENTS_SUPPORTED = 0x400
 };
+
+struct ata_identify_result_word83 {
+    bool downloadMicrocodeSupported : 1;
+    bool readWriteDmaQueuedSupported : 1;
+    bool cfaSupported : 1;
+    bool apmSupported : 1;
+    bool remoteMediaNotificationSupported : 1;
+    bool powerUpStandbySupported : 1;
+    bool setFeaturesSpinupRequired : 1;
+    uint8_t reserved1 : 1;
+    bool setMaxExtensionSupported : 1;
+    bool autoAcousticManagementSupported : 1;
+    bool lba48BitSupported : 1;
+    bool deviceConfigOverlaySupported : 1;
+    bool mandatoryFlushCacheSupported : 1;
+    bool flushCacheExtSupported : 1;
+    uint8_t reserved2 : 2;
+};
+typedef struct ata_identify_result_word83 ata_identify_result_word83_t;
 
 // Result of IDENTIFY command.
 struct ata_identify_result {
@@ -127,7 +147,10 @@ struct ata_identify_result {
 
     // Supported command flags (ATA-3+). Words 82 and 83.
     uint16_t commandFlags82;
-    uint16_t commandFlags83;
+    union {
+        uint16_t data;
+        ata_identify_result_word83_t info;
+    } commandFlags83;
 
     // Supported command flags (ATA-4+). Words 84-87.
     uint16_t commandFlags84;
