@@ -34,7 +34,7 @@ bool ata_wait_for_irq_pri() {
 	if(irqTriggeredPri)
 		ret = true;
 	else
-		kprintf("PATA: IRQ timeout for primary channel!\n");
+		kprintf("ATA: IRQ14 timeout for primary channel!\n");
 
 	// Reset triggered value.
 	irqTriggeredPri = false;
@@ -56,15 +56,33 @@ bool ata_wait_for_irq_sec() {
 	if(irqTriggeredSec)
 		ret = true;
 	else
-		kprintf("PATA: IRQ timeout for secondary channel!\n");
+		kprintf("ATA: IRQ15 timeout for secondary channel!\n");
 
 	// Reset triggered value.
 	irqTriggeredSec = false;
 	return ret;
 }
 
-uint16_t ata_read_data_word(uint16_t port) {
-    return inw(ATA_REG_DATA(port));
+uint16_t ata_read_data_word(uint16_t portCommand) {
+    return inw(ATA_REG_DATA(portCommand));
+}
+
+void ata_read_data_pio(uint16_t portCommand, void *outData, uint32_t size) {
+    // Get pointer to word array.
+    uint16_t *buffer = (uint16_t*)outData;
+
+    // Read words from device.
+    for (uint32_t i = 0; i < size; i += 2)
+        buffer[i / 2] = inw(ATA_REG_DATA(portCommand));
+}
+
+void ata_write_data_pio(uint16_t portCommand, const void *data, uint32_t size) {
+    // Get pointer to word array.
+    uint16_t *buffer = (uint16_t*)data;
+
+    // Write words to device.
+    for (uint32_t i = 0; i < size; i += 2)
+        outw(ATA_REG_DATA(portCommand), buffer[i / 2]);
 }
 
 void ata_send_command(uint16_t portCommand, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh, uint8_t command) {
@@ -93,7 +111,7 @@ void ata_select_device(uint16_t portCommand, uint16_t portControl, bool lba, boo
 void ata_soft_reset(uint16_t portCommand, uint16_t portControl, bool *outMasterPresent, bool *outMasterAtapi, bool *outSlavePresent, bool *outSlaveAtapi) {
     // Cycle reset bit.
     outb(ATA_REG_DEVICE_CONTROL(portControl), ATA_DEVICE_CONTROL_RESET);
-    sleep(30);
+    sleep(10);
     outb(ATA_REG_DEVICE_CONTROL(portControl), 0x00);
     sleep(500);
 
@@ -181,6 +199,28 @@ bool ata_data_ready(uint16_t portCommand) {
     return inb(ATA_REG_STATUS(portCommand)) & ATA_STATUS_DATA_REQUEST;
 }
 
+bool ata_wait_for_drq(uint16_t portControl) {
+    uint16_t timeout = 500;
+    uint8_t response = inb(ATA_REG_ALT_STATUS(portControl));
+    sleep(1);
+
+    // Is the drive busy?
+    while ((response & ATA_STATUS_BUSY) || ((response & ATA_STATUS_DATA_REQUEST) == 0)) {
+        if (!timeout) {
+            kprintf("ATA: Timeout waiting for device!\n");
+            return false;
+        }
+
+        // Decrement timeout period and try again.
+        timeout--;
+        sleep(10);
+        response = inb(ATA_REG_ALT_STATUS(portControl));
+    }
+
+    // Drive is ready.
+    return true;
+}
+
 static void ata_print_device_info(ata_identify_result_t info) {
     kprintf("ATA:    Model: %s\n", info.model);
     kprintf("ATA:    Firmware: %s\n", info.firmwareRevision);
@@ -240,6 +280,8 @@ static void ata_print_device_packet_info(ata_identify_packet_result_t info) {
     if (info.versionMajor & ATA_VERSION_ATA8)
         kprintf(" ATAPI-8");
     kprintf("\n");
+    kprintf("ATA:    Device type: 0x%X\n", info.generalConfig.info.deviceType);
+    kprintf("ATA:    Packet type: 0x%X\n", info.generalConfig.info.packetSize);
 
     // Is the device SATA?
     if (!(info.serialAtaFlags76 == 0x0000 || info.serialAtaFlags76 == 0xFFFF)) {
@@ -272,6 +314,61 @@ void ata_reset_identify(uint16_t portCommand, uint16_t portControl) {
             if (ata_identify_packet(portCommand, portControl, true, &atapiMaster)) {
                 kprintf("ATA: Found ATAPI master device on channel 0x%X!\n", portCommand);
                 ata_print_device_packet_info(atapiMaster);
+
+                /*uint8_t packet[6] = { 0x12, 0, 0, 0, 96, 0 };
+                uint8_t result[96];
+
+
+                ata_packet(portCommand, portControl, true, packet, 6, 12, result, 96);
+
+                char vendor[9];
+                memcpy(vendor, result+8, 8);
+                vendor[8] = '\0';
+                kprintf("ATA: SCSI vendor: %s\n", vendor);
+
+                char product[9];
+                memcpy(product, result+16, 8);
+                product[8] = '\0';
+                kprintf("ATA: SCSI product: %s\n", product);
+
+                char revision[9];
+                memcpy(revision, result+32, 8);
+                revision[8] = '\0';
+                kprintf("ATA: SCSI revision: %s\n", revision);
+
+                ata_packet(portCommand, portControl, true, packet, 6, 12, result, 96);
+
+                memcpy(vendor, result+8, 8);
+                vendor[8] = '\0';
+                kprintf("ATA: SCSI vendor: %s\n", vendor);
+
+                memcpy(product, result+16, 8);
+                product[8] = '\0';
+                kprintf("ATA: SCSI product: %s\n", product);
+
+                memcpy(revision, result+32, 8);
+                revision[8] = '\0';
+                kprintf("ATA: SCSI revision: %s\n", revision);
+
+                uint8_t packet2[6] = { 0x1B, 0, 0, 0, 0x2, 0 };
+                uint8_t result2[1];
+
+                asm volatile ("xchg %bx, %bx");
+
+                ata_packet(portCommand, portControl, true, packet2, 6, 12, result2, 0);
+
+
+                uint8_t packet3[6] = { 0x03, 0, 0, 0, 252, 0 };
+                uint8_t result3[252];
+
+
+                ata_packet(portCommand, portControl, true, packet3, 6, 12, result3, 252);
+
+                for (int i = 0; i < 252; i++)
+                    kprintf(" %X", result3[i]);
+
+
+                kprintf("\ndd\n");*/
             }
             else {
                 kprintf("ATA: Failed to identify ATAPI master device on channel 0x%X.\n", portCommand);

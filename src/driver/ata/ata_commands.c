@@ -229,10 +229,14 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
 bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_packet_result_t *outResult) {
     // Send identify command and wait for IRQ.
     ata_send_command(portCommand, 0x00, 0x00, 0x00, 0x00, ATA_CMD_IDENTIFY_PACKET);
-    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri())
+    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri()) {
+        ata_check_status(portCommand, master);
         return false;
-    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec())
+    }
+    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec()){
+        ata_check_status(portCommand, master);
         return false;
+    }
 
     // Ensure drive is ready and there is data to be read.
     if (!ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
@@ -243,7 +247,7 @@ bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master
     ata_identify_packet_result_t result = {};
 
     // Read words 0-9.
-    result.generalConfig = ata_read_identify_word(portCommand, &checksum);
+    result.generalConfig.data = ata_read_identify_word(portCommand, &checksum);
     ata_read_identify_word(portCommand, &checksum);
     result.specificConfig = ata_read_identify_word(portCommand, &checksum);
     ata_read_identify_words(portCommand, &checksum, 3, 9);
@@ -353,7 +357,7 @@ bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master
         return false;
 
     // Ensure device is in fact an ATAPI device.
-    if (!(result.generalConfig & ATA_IDENTIFY_GENERAL_ATAPI_DEVICE))
+    if (!(result.generalConfig.data & ATA_IDENTIFY_GENERAL_ATAPI_DEVICE))
         return false;
 
     // Ensure outputs are good.
@@ -363,6 +367,92 @@ bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master
     return true;
 }
 
-bool ata_packet(uint16_t portCommand, uint16_t portControl, bool master) {
-    
+bool ata_packet(uint16_t portCommand, uint16_t portControl, bool master, void *packet, uint16_t packetSize, uint16_t devicePacketSize, void *outResult, uint16_t resultSize) {
+    ata_check_status(portCommand, master);
+    uint8_t intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
+    kprintf("ATA: int 0x%X\n", intReason);
+
+    // Send identify command and wait for DRQ.
+    kprintf("ATA: Sending PACKET to %s on channel 0x%X...\n", master ? "master" : "slave", portCommand);
+    outb(ATA_REG_FEATURES(portCommand), 0x00);
+    ata_send_command(portCommand, 0x00, 0x00, (uint8_t)(packetSize & 0xFF), (uint8_t)(packetSize >> 8), ATA_CMD_PACKET);
+        intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
+    kprintf("ATA: int 0x%X\n", intReason);
+
+    // Wait for device.
+    if (!ata_wait_for_drq(portControl))
+       return false;
+
+    // Get packet.
+    uint8_t fullPacket[devicePacketSize];
+    memset(fullPacket, 0, devicePacketSize);
+    memcpy(fullPacket, packet, packetSize);
+
+
+    // Send packet.
+    //uint8_t packet[6] = { 0x12, 0, 0, 0, 96, 0};
+   // uint16_t *packetWords = (uint16_t*)packet;
+
+    kprintf("ATA: Sending command packet 0x%X...\n", fullPacket[0]);
+    ata_write_data_pio(portCommand, fullPacket, devicePacketSize);
+   // outw(ATA_REG_DATA(portCommand), packetWords[0]);
+   // outw(ATA_REG_DATA(portCommand), packetWords[1]);
+  //  outw(ATA_REG_DATA(portCommand), packetWords[2]);
+
+    // Pad remaining 
+  //  outw(ATA_REG_DATA(portCommand), 0x0);
+  //  outw(ATA_REG_DATA(portCommand), 0x0);
+  //  outw(ATA_REG_DATA(portCommand), 0x0);
+   // outb(ATA_REG_DATA(portCommand), packet[3]);
+    //outb(ATA_REG_DATA(portCommand), packet[4]);
+    //outb(ATA_REG_DATA(portCommand), packet[5]);
+    //outb(ATA_REG_DATA(portCommand), packet[0]);
+
+    // Wait for IRQ.
+    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri()) {
+        ata_check_status(portCommand, master);
+        ////intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
+       // kprintf("ATA: int 0x%X\n", intReason);
+        return false;
+    }
+    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec()){
+        ata_check_status(portCommand, master);
+        //intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
+      //  kprintf("ATA: int 0x%X\n", intReason);
+        return false;
+    }
+
+    ata_check_status(portCommand, master);
+    intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
+    kprintf("ATA: int 0x%X\n", intReason);
+    kprintf("ATA: Error 0x%X\n", inb(ATA_REG_ERROR(portCommand)));
+kprintf("ATA: Status: 0x%X\n", inb(ATA_REG_ALT_STATUS(portControl)));
+kprintf("ATA: Low: 0x%X\n", inb(ATA_REG_CYLINDER_LOW(portCommand)));
+    kprintf("ATA: High: 0x%X\n", inb(ATA_REG_CYLINDER_HIGH(portCommand)));
+
+    if (!ata_wait_for_drq(portControl))
+        return false;
+
+    kprintf("ATA: Getting result of command 0x%X...\n", fullPacket[0]);
+    ata_read_data_pio(portCommand, outResult, resultSize);
+
+//kprintf("ATA: Getting data...\n");
+    /*uint8_t data[96];
+    uint16_t *datPr = (uint16_t*)data;
+
+    for (uint16_t i = 0; i < 96; i+= 2) {
+        datPr[i / 2] = inw(ATA_REG_DATA(portCommand));
+    }*/
+
+    ata_check_status(portCommand, master);
+    intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
+    kprintf("ATA: int 0x%X\n", intReason);
+
+
+kprintf("ATA: Error 0x%X\n", inb(ATA_REG_ERROR(portCommand)));
+kprintf("ATA: Status: 0x%X\n", inb(ATA_REG_ALT_STATUS(portControl)));
+kprintf("ATA: Low: 0x%X\n", inb(ATA_REG_CYLINDER_LOW(portCommand)));
+    kprintf("ATA: High: 0x%X\n", inb(ATA_REG_CYLINDER_HIGH(portCommand)));
+    //intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
+   // kprintf("ATA: int 0x%X\n", intReason);
 }

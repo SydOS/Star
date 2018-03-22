@@ -5,6 +5,7 @@
 
 #define ATA_DEVICE_RESET        0x08
 
+#define ATA_CMD_PACKET          0xA0
 #define ATA_CMD_IDENTIFY_PACKET 0xA1
 #define ATA_CMD_IDENTIFY        0xEC
 
@@ -235,10 +236,24 @@ struct ata_identify_result {
 };
 typedef struct ata_identify_result ata_identify_result_t;
 
+struct ata_identify_packet_general_config {
+    uint8_t packetSize : 2;
+    uint8_t reserved1 : 3;
+    uint8_t drqResponseType : 2;
+    bool removableDevice : 1;
+    uint8_t deviceType : 5;
+    uint8_t reserved2 : 1;
+    uint8_t atapiType : 2;
+};
+typedef struct ata_identify_packet_general_config ata_identify_packet_general_config_t;
+
 // Result of IDENTIFY PACKET DEVICE command.
 struct ata_identify_packet_result {
     // General configuration bits. Word 0.
-    uint16_t generalConfig;
+    union {
+        uint16_t data;
+        ata_identify_packet_general_config_t info;
+    } generalConfig;
 
     // Specific configuration (ATAPI-5+). Word 7.
     uint16_t specificConfig;
