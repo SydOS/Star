@@ -19,7 +19,28 @@ static void ata_callback_sec() {
     kprintf("ATA: IRQ15 raised!\n");
 }
 
-bool ata_wait_for_irq_pri() {
+bool ata_check_status(uint16_t portCommand, bool master) {
+    // Get value of selected drive and ensure it is correct.
+    if (master && (inb(ATA_REG_DRIVE_SELECT(portCommand)) & 0x10))
+        return false;
+    else if (!master && !(inb(ATA_REG_DRIVE_SELECT(portCommand)) & 0x10))
+        return false;
+
+    // Ensure status flags are good.
+    uint8_t status = inb(ATA_REG_STATUS(portCommand));
+
+    // If error bit is set, print error.
+    if (status & ATA_STATUS_ERROR)
+        kprintf("ATA: Error 0x%X\n", inb(ATA_REG_ERROR(portCommand)));
+    if (status & ATA_STATUS_BUSY)
+        kprintf("ATA: Device Busy.\n");
+
+    if (status & ATA_STATUS_BUSY || status & ATA_STATUS_DRIVE_FAULT || status & ATA_STATUS_ERROR || !(status & ATA_STATUS_READY))
+        return false;
+    return true;
+}
+
+bool ata_wait_for_irq_pri(uint16_t portCommand, bool master) {
     // Wait until IRQ is triggered or we time out.
     uint16_t timeout = 200;
 	uint8_t ret = false;
@@ -35,13 +56,16 @@ bool ata_wait_for_irq_pri() {
 		ret = true;
 	else
 		kprintf("ATA: IRQ14 timeout for primary channel!\n");
-
+ata_check_status(portCommand, master);
 	// Reset triggered value.
 	irqTriggeredPri = false;
-	return ret;
+	if (ret)
+        return ata_check_status(portCommand, master);
+    else
+        return false;
 }
 
-bool ata_wait_for_irq_sec() {
+bool ata_wait_for_irq_sec(uint16_t portCommand, bool master) {
     // Wait until IRQ is triggered or we time out.
     uint16_t timeout = 200;
 	uint8_t ret = false;
@@ -60,7 +84,10 @@ bool ata_wait_for_irq_sec() {
 
 	// Reset triggered value.
 	irqTriggeredSec = false;
-	return ret;
+	if (ret)
+        return ata_check_status(portCommand, master);
+    else
+        return false;
 }
 
 uint16_t ata_read_data_word(uint16_t portCommand) {
@@ -95,11 +122,21 @@ void ata_send_command(uint16_t portCommand, uint8_t sectorCount, uint8_t sectorN
     io_wait();
 }
 
-void ata_select_device(uint16_t portCommand, uint16_t portControl, bool lba, bool master) {
-    uint8_t value = master ? 0xA0 : 0xB0;
-    if (lba)
-        value |= 0x40;
-    outb(ATA_REG_DRIVE_SELECT(portCommand), value);
+void ata_set_lba_high(uint16_t portCommand, uint8_t lbaHigh) {
+    // Get current device value.
+    uint8_t deviceFlags = inb(ATA_REG_DRIVE_SELECT(portCommand));
+
+    // Set LBA flag and add high bits of LBA address, and write back to register.
+    deviceFlags |= ATA_DEVICE_FLAGS_LBA | lbaHigh;
+    outb(ATA_REG_DRIVE_SELECT(portCommand), deviceFlags);
+    io_wait();
+}
+
+void ata_select_device(uint16_t portCommand, uint16_t portControl, bool master) {
+    uint8_t deviceFlags = ATA_DEVICE_FLAGS_ECC | ATA_DEVICE_FLAGS_SECTOR;
+    if (!master)
+        deviceFlags |= ATA_DEVICE_FLAGS_SLAVE;
+    outb(ATA_REG_DRIVE_SELECT(portCommand), deviceFlags);
     io_wait();
     inb(ATA_REG_ALT_STATUS(portControl));
     inb(ATA_REG_ALT_STATUS(portControl));
@@ -116,7 +153,7 @@ void ata_soft_reset(uint16_t portCommand, uint16_t portControl, bool *outMasterP
     sleep(500);
 
     // Select master device.
-    ata_select_device(portCommand, portControl, false, true);
+    ata_select_device(portCommand, portControl, true);
 
     // Get signature.
     uint8_t sectorCount = inb(ATA_REG_SECTOR_COUNT(portCommand));
@@ -145,7 +182,7 @@ void ata_soft_reset(uint16_t portCommand, uint16_t portControl, bool *outMasterP
     }
 
     // Select slave device.
-    ata_select_device(portCommand, portControl, false, false);
+    ata_select_device(portCommand, portControl, false);
 
     // Get signature.
     sectorCount = inb(ATA_REG_SECTOR_COUNT(portCommand));
@@ -174,26 +211,7 @@ void ata_soft_reset(uint16_t portCommand, uint16_t portControl, bool *outMasterP
     }
 }
 
-bool ata_check_status(uint16_t portCommand, bool master) {
-    // Get value of selected drive and ensure it is correct.
-    if (master && (inb(ATA_REG_DRIVE_SELECT(portCommand)) & 0x10))
-        return false;
-    else if (!master && !(inb(ATA_REG_DRIVE_SELECT(portCommand)) & 0x10))
-        return false;
 
-    // Ensure status flags are good.
-    uint8_t status = inb(ATA_REG_STATUS(portCommand));
-
-    // If error bit is set, print error.
-    if (status & ATA_STATUS_ERROR)
-        kprintf("ATA: Error 0x%X\n", inb(ATA_REG_ERROR(portCommand)));
-    if (status & ATA_STATUS_BUSY)
-        kprintf("ATA: Device Busy.\n");
-
-    if (status & ATA_STATUS_BUSY || status & ATA_STATUS_DRIVE_FAULT || status & ATA_STATUS_ERROR || !(status & ATA_STATUS_READY))
-        return false;
-    return true;
-}
 
 bool ata_data_ready(uint16_t portCommand) {
     return inb(ATA_REG_STATUS(portCommand)) & ATA_STATUS_DATA_REQUEST;
@@ -308,7 +326,7 @@ void ata_reset_identify(uint16_t portCommand, uint16_t portControl) {
     // Identify master device if present.
     if (masterPresent) {
         // Select master.
-        ata_select_device(portCommand, portControl, false, true);
+        ata_select_device(portCommand, portControl, true);
         if (atapiMaster) { // ATAPI device.
             ata_identify_packet_result_t atapiMaster;
             if (ata_identify_packet(portCommand, portControl, true, &atapiMaster)) {
@@ -379,6 +397,21 @@ void ata_reset_identify(uint16_t portCommand, uint16_t portControl) {
             if (ata_identify(portCommand, portControl, true, &ataMaster)) {
                 kprintf("ATA: Found master device on channel 0x%X!\n", portCommand);
                 ata_print_device_info(ataMaster);
+
+
+                kprintf("Writing data...\n");
+                uint8_t bytes[ATA_SECTOR_SIZE_512];
+                memset(bytes, 0, ATA_SECTOR_SIZE_512);
+                for (uint16_t i = 0; i < 256; i++)
+                    bytes[i] = i;
+                //ata_write_sector(portCommand, portControl, true, 1, bytes, 1);
+                memset(bytes, 0, ATA_SECTOR_SIZE_512);
+
+                kprintf("Reading data...\n");
+                ata_read_sector(portCommand, portControl, true, 1, bytes, 1);
+                for (uint16_t i = 0; i < ATA_SECTOR_SIZE_512; i++)
+                    kprintf(" %X", bytes[i]);
+                kprintf("\n");
             }
             else {
                 kprintf("ATA: Failed to identify master device or no device exists on channel 0x%X.\n", portCommand);
@@ -392,7 +425,7 @@ void ata_reset_identify(uint16_t portCommand, uint16_t portControl) {
     // Identify slave device if present.
     if (slavePresent) {
         // Select slave.
-        ata_select_device(portCommand, portControl, false, false);
+        ata_select_device(portCommand, portControl, false);
         if (atapiSlave) { // ATAPI device.
             ata_identify_packet_result_t atapiSlave;
             if (ata_identify_packet(portCommand, portControl, false, &atapiSlave)) {

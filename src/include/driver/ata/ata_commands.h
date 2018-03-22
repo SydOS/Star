@@ -5,6 +5,8 @@
 
 #define ATA_DEVICE_RESET        0x08
 
+#define ATA_CMD_READ_SECTOR     0x20
+#define ATA_CMD_WRITE_SECTOR    0x30
 #define ATA_CMD_PACKET          0xA0
 #define ATA_CMD_IDENTIFY_PACKET 0xA1
 #define ATA_CMD_IDENTIFY        0xEC

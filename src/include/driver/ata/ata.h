@@ -47,6 +47,12 @@ enum {
     ATA_DEVICE_CONTROL_HIGH_BYTE    = 0x80
 };
 
+enum {
+    ATA_DEVICE_FLAGS_SLAVE          = 0x10,
+    ATA_DEVICE_FLAGS_SECTOR         = 0x20,
+    ATA_DEVICE_FLAGS_LBA            = 0x40,
+    ATA_DEVICE_FLAGS_ECC            = 0x80
+};
 
 // ATA device signature.
 #define ATA_SIG_SECTOR_COUNT_ATA    0x01
@@ -59,6 +65,9 @@ enum {
 #define ATA_SIG_SECTOR_NUMBER_ATAPI 0x01
 #define ATA_SIG_CYLINDER_LOW_ATAPI  0x14
 #define ATA_SIG_CYLINDER_HIGH_ATAPI 0xEB
+
+#define ATA_SECTOR_SIZE_512         512
+#define ATA_SECTOR_SIZE_4K          4096
 
 extern void ata_init();
 

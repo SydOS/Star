@@ -4,8 +4,8 @@
 #include <driver/ata/ata_commands.h>
 
 
-extern bool ata_wait_for_irq_pri();
-extern bool ata_wait_for_irq_sec();
+extern bool ata_wait_for_irq_pri(uint16_t portCommand, bool master);
+extern bool ata_wait_for_irq_sec(uint16_t portCommand, bool master);
 
 
 static uint16_t ata_read_identify_word(uint16_t portCommand, uint8_t *checksum) {
@@ -24,14 +24,10 @@ static void ata_read_identify_words(uint16_t portCommand, uint8_t *checksum, uin
 bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_result_t *outResult) {
     // Send identify command and wait for IRQ.
     ata_send_command(portCommand, 0x00, 0x00, 0x00, 0x00, ATA_CMD_IDENTIFY);
-    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri()) {
-        ata_check_status(portCommand, master);
+    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri(portCommand, master))
         return false;
-    }
-    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec()){
-        ata_check_status(portCommand, master);
+    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec(portCommand, master))
         return false;
-    }
 
     // Ensure drive is ready and there is data to be read.
     if (!ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
@@ -229,14 +225,10 @@ bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_i
 bool ata_identify_packet(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_packet_result_t *outResult) {
     // Send identify command and wait for IRQ.
     ata_send_command(portCommand, 0x00, 0x00, 0x00, 0x00, ATA_CMD_IDENTIFY_PACKET);
-    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri()) {
-        ata_check_status(portCommand, master);
+    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri(portCommand, master))
         return false;
-    }
-    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec()){
-        ata_check_status(portCommand, master);
+    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec(portCommand, master))
         return false;
-    }
 
     // Ensure drive is ready and there is data to be read.
     if (!ata_check_status(portCommand, master) || !ata_data_ready(portCommand))
@@ -409,25 +401,17 @@ bool ata_packet(uint16_t portCommand, uint16_t portControl, bool master, void *p
     //outb(ATA_REG_DATA(portCommand), packet[0]);
 
     // Wait for IRQ.
-    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri()) {
-        ata_check_status(portCommand, master);
-        ////intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
-       // kprintf("ATA: int 0x%X\n", intReason);
+    if (portCommand == ATA_PRI_COMMAND_PORT && !ata_wait_for_irq_pri(portCommand, master))
         return false;
-    }
-    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec()){
-        ata_check_status(portCommand, master);
-        //intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
-      //  kprintf("ATA: int 0x%X\n", intReason);
+    else if (portCommand == ATA_SEC_COMMAND_PORT && !ata_wait_for_irq_sec(portCommand, master))
         return false;
-    }
 
     ata_check_status(portCommand, master);
     intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
     kprintf("ATA: int 0x%X\n", intReason);
     kprintf("ATA: Error 0x%X\n", inb(ATA_REG_ERROR(portCommand)));
-kprintf("ATA: Status: 0x%X\n", inb(ATA_REG_ALT_STATUS(portControl)));
-kprintf("ATA: Low: 0x%X\n", inb(ATA_REG_CYLINDER_LOW(portCommand)));
+    kprintf("ATA: Status: 0x%X\n", inb(ATA_REG_ALT_STATUS(portControl)));
+    kprintf("ATA: Low: 0x%X\n", inb(ATA_REG_CYLINDER_LOW(portCommand)));
     kprintf("ATA: High: 0x%X\n", inb(ATA_REG_CYLINDER_HIGH(portCommand)));
 
     if (!ata_wait_for_drq(portControl))
@@ -436,7 +420,7 @@ kprintf("ATA: Low: 0x%X\n", inb(ATA_REG_CYLINDER_LOW(portCommand)));
     kprintf("ATA: Getting result of command 0x%X...\n", fullPacket[0]);
     ata_read_data_pio(portCommand, outResult, resultSize);
 
-//kprintf("ATA: Getting data...\n");
+    //kprintf("ATA: Getting data...\n");
     /*uint8_t data[96];
     uint16_t *datPr = (uint16_t*)data;
 
@@ -449,10 +433,42 @@ kprintf("ATA: Low: 0x%X\n", inb(ATA_REG_CYLINDER_LOW(portCommand)));
     kprintf("ATA: int 0x%X\n", intReason);
 
 
-kprintf("ATA: Error 0x%X\n", inb(ATA_REG_ERROR(portCommand)));
-kprintf("ATA: Status: 0x%X\n", inb(ATA_REG_ALT_STATUS(portControl)));
-kprintf("ATA: Low: 0x%X\n", inb(ATA_REG_CYLINDER_LOW(portCommand)));
+    kprintf("ATA: Error 0x%X\n", inb(ATA_REG_ERROR(portCommand)));
+    kprintf("ATA: Status: 0x%X\n", inb(ATA_REG_ALT_STATUS(portControl)));
+    kprintf("ATA: Low: 0x%X\n", inb(ATA_REG_CYLINDER_LOW(portCommand)));
     kprintf("ATA: High: 0x%X\n", inb(ATA_REG_CYLINDER_HIGH(portCommand)));
     //intReason = inb(ATA_REG_SECTOR_COUNT(portCommand));
    // kprintf("ATA: int 0x%X\n", intReason);
+}
+
+bool ata_read_sector(uint16_t portCommand, uint16_t portControl, bool master, uint32_t startSectorLba, void *outData, uint8_t sectorCount) {
+    // Send READ SECTOR command.
+    ata_set_lba_high(portCommand, (uint8_t)((startSectorLba >> 24) & 0x0F));
+    ata_send_command(portCommand, sectorCount, (uint8_t)(startSectorLba & 0xFF),
+        (uint8_t)((startSectorLba >> 8) & 0xFF), (uint8_t)((startSectorLba >> 16) & 0xFF), ATA_CMD_READ_SECTOR);
+
+    // Wait for device.
+    if (!ata_wait_for_drq(portControl))
+       return false;
+
+    // Read data.
+    ata_read_data_pio(portCommand, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
+    return ata_check_status(portCommand, master);
+}
+
+bool ata_write_sector(uint16_t portCommand, uint16_t portControl, bool master, uint32_t startSectorLba, const void *data, uint8_t sectorCount) {
+    ata_check_status(portCommand, master);
+
+    // Send WRITE SECTOR command.
+    ata_set_lba_high(portCommand, (uint8_t)((startSectorLba >> 24) & 0x0F));
+    ata_send_command(portCommand, sectorCount, (uint8_t)(startSectorLba & 0xFF),
+        (uint8_t)((startSectorLba >> 8) & 0xFF), (uint8_t)((startSectorLba >> 16) & 0xFF), ATA_CMD_WRITE_SECTOR);
+
+    // Wait for device.
+    if (!ata_wait_for_drq(portControl))
+       return false;
+
+    // Read data.
+    ata_write_data_pio(portCommand, data, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
+    return ata_check_status(portCommand, master);
 }
