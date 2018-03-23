@@ -1,5 +1,5 @@
 CFLAGS?=-std=gnu99 -ffreestanding -ggdb -gdwarf-2 -Wall -Wextra -I./src/include
-CXXFLAGS?=-ffreestanding -ggdb -gdwarf-2 -Wall -Wextra -I./src/include
+CXXFLAGS?=-std=gnu++14 -ffreestanding -fno-rtti -fno-exceptions -ggdb -gdwarf-2 -Wall -Wextra -I./src/include
 ARCH?=i686
 TIME?=$(shell date +%s)
 
