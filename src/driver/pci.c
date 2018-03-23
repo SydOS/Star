@@ -69,7 +69,7 @@ uint16_t pci_config_read_word(struct PCIDevice* dev, uint8_t offset) {
  */
 uint32_t pci_config_read_dword(struct PCIDevice* dev, uint8_t offset) {
     uint32_t result;
-    result = (pci_config_read_word(dev, offset) << 16) + pci_config_read_word(dev, offset+2);
+    result = pci_config_read_word(dev, offset) + (pci_config_read_word(dev, offset+2) << 16);
     return result;
 }
 
@@ -143,6 +143,7 @@ void pci_check_busses(uint8_t bus) {
         if(this_device->VendorID == 0x10EC && this_device->DeviceID == 0x8139) {
             vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
             kprintf("  - DETECTED RTL8139\n");
+            rtl8139_init(this_device);
         }
         
         // If device is a PCI bridhge
