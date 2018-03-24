@@ -16,17 +16,36 @@
 #define PCI_BAR2                 0x18 // 4
 #define PCI_BAR3                 0x1C // 4
 #define PCI_BAR4                 0x20 // 4
-#define PCI_BAR5 0x24 // 4
+#define PCI_BAR5                 0x24 // 4
+
+#define PCI_INT_LINE             0x3C // 1
+#define PCI_INT_PIN              0x3D // 1
 
 #define PCI_ADDRESS_PORT 0xCF8
 #define PCI_VALUE_PORT 0xCFC
 
 
 struct PCIDevice {
+	uintptr_t ConfigurationAddress;
+
 	uint16_t VendorID;
 	uint16_t DeviceID;
+
 	uint8_t Class;
 	uint8_t Subclass;
+	uint8_t HeaderType;
+
+	uint8_t Bus;
+	uint8_t Device;
+	uint8_t Function;
+
+	uint32_t BAR[6];
+
+	uint8_t IntPIN;
+	uint8_t IntLine;
 };
 
+char* pci_class_descriptions[255];
+
 extern void pci_check_busses(uint8_t bus);
+extern void pci_init();

@@ -21,9 +21,6 @@ ASM_OBJECTS = $(subst src, build, $(ASM_SOURCES:.asm=_asm.o))
 all:
 	make clean
 
-	ARCH=i386 make build-kernel
-	ARCH=i486 make build-kernel
-	ARCH=i586 make build-kernel
 	ARCH=i686 make build-kernel
 
 	[[ -d build ]] || mkdir build
