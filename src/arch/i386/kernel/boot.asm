@@ -24,9 +24,9 @@ stack_top:
 
 section .inittables
 global MULTIBOOT_MAGIC
-MULTIBOOT_MAGIC: resb 4
+MULTIBOOT_MAGIC: dd 0
 global MULTIBOOT_INFO
-MULTIBOOT_INFO: resb 4
+MULTIBOOT_INFO: dd 0
 
 ; Start function.
 section .init

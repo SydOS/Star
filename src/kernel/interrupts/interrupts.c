@@ -189,7 +189,7 @@ void interrupts_init() {
     ioapic_init();
     useLapic = false;
 
-    if (acpi_supported() && ioapic_supported()) {
+    /*if (acpi_supported() && ioapic_supported()) {
         kprintf("INTERRUPTS: Using APICs for interrupts.\n");
 
         // Disable PIC and initialize LAPIC.
@@ -206,7 +206,7 @@ void interrupts_init() {
             ioapic_enable_interrupt(ioapic_remap_interrupt(i), IRQ_OFFSET + i);
         }
         useLapic = true;
-    }
+    }*/
 
     // Add each of the 32 exception ISRs to the IDT.
     kprintf("INTERRUPTS: Mapping exceptions...\n");

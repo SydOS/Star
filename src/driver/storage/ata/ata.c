@@ -2,9 +2,10 @@
 #include <tools.h>
 #include <io.h>
 #include <kprint.h>
-#include <driver/ata/ata.h>
-#include <driver/ata/ata_commands.h>
+#include <driver/storage/ata/ata.h>
+#include <driver/storage/ata/ata_commands.h>
 #include <kernel/interrupts/interrupts.h>
+#include <driver/storage/storage.h>
 
 static bool irqTriggeredPri = false;
 static bool irqTriggeredSec = false;
@@ -473,5 +474,5 @@ void ata_init() {
     ata_reset_identify(ATA_PRI_COMMAND_PORT, ATA_PRI_CONTROL_PORT);
     ata_reset_identify(ATA_SEC_COMMAND_PORT, ATA_SEC_CONTROL_PORT);
 
-    while(true);
+    //while(true);
 }

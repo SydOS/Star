@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define SYDOS
+
 #if defined(_WIN32) || defined(_WIN64) || \
 	defined(__linux__) || defined(__linux) || defined(linux) || \
 	defined(__unix__) || defined(__unix) || defined(unix) || \

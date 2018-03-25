@@ -1,7 +1,7 @@
 #include <main.h>
 #include <io.h>
-#include <driver/ata/ata.h>
-#include <driver/ata/ata_commands.h>
+#include <driver/storage/ata/ata.h>
+#include <driver/storage/ata/ata_commands.h>
 
 
 extern bool ata_wait_for_irq_pri(uint16_t portCommand, bool master);

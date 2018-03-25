@@ -31,13 +31,23 @@ void kputchar_hex(uint8_t num, bool capital, bool pad)
 }
 
 // Print a string.
-void kputstring(const char *str)
+void kputstring(const char *str, size_t max)
 {
     // Print out string.
-    while (*str)
-    {
-        kputchar(*str);
-        str++;
+    if (max == 0) {
+        while (*str) {
+            kputchar(*str);
+            str++;
+        }
+    }
+    else {
+        size_t len = strlen(str);
+        
+        while (*str && max) {
+            kputchar(*str);
+            str++;
+            max--;
+        }
     }
 }
 
@@ -72,7 +82,7 @@ void kprint_int(int64_t num)
         buffer[i--] = '-';
 
     // Print out numeral.
-    kputstring(&buffer[i + 1]);
+    kputstring(&buffer[i + 1], 0);
 }
 
 // Print an unsigned integer.
@@ -98,7 +108,7 @@ void kprint_uint(uint64_t num)
     }
 
     // Print out numeral.
-    kputstring(&buffer[i + 1]);
+    kputstring(&buffer[i + 1], 0);
 }
 
 // Print unsigned int as hexadecimal.
@@ -127,7 +137,7 @@ void kprint_hex(uint64_t num, bool capital, bool pad)
 }
 
 void kprintf(const char* format, ...) {
-    //spinlock_lock(&kprintf_mutex);
+    spinlock_lock(&kprintf_mutex);
 
     // Get args.
     va_list args;
@@ -136,7 +146,7 @@ void kprintf(const char* format, ...) {
     // Call va_list kprintf.
     kprintf_va(format, args);
 
-    //spinlock_release(&kprintf_mutex);
+    spinlock_release(&kprintf_mutex);
 }
 
 // https://en.wikipedia.org/wiki/Printf_format_string
@@ -157,6 +167,27 @@ void kprintf_va(const char* format, va_list args) {
         {
             // Get type of formatting.
             char f = *format++;
+
+            // Ignore justify for now.
+            if (f == '-')
+                f = *format++;
+
+            // Check width.
+            size_t width = 0;
+            if (f >= '0' && f <= '9') {
+                //width += f - '0';
+                f = *format++;
+            }
+
+            // Ignore justify for now.
+            if (f == '.')
+                f = *format++;
+
+            // Check width.
+            if (f >= '0' && f <= '9') {
+                width += f - '0';
+                f = *format++;
+            }
 
             // Do we have a long long?
             if (f == 'l' && *format++ == 'l')
@@ -202,7 +233,7 @@ void kprintf_va(const char* format, va_list args) {
 
                     // Print string.
                     case 's':
-                        kputstring((const char*)va_arg(args, const char*));
+                        kputstring((const char*)va_arg(args, const char*), width);
                         break;
 
                     // Print character.
@@ -260,7 +291,7 @@ void kprintf_va(const char* format, va_list args) {
 
                     // Print string.
                     case 's':
-                        kputstring((const char*)va_arg(args, const char*));
+                        kputstring((const char*)va_arg(args, const char*), width);
                         break;
 
                     // Print character.

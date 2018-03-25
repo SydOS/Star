@@ -98,6 +98,9 @@ void kernel_main() {
 	kprintf("Setting up PIT...\n");
     pit_init();
 
+	uint32_t d = AcpiEnableSubsystem(0);
+	d= AcpiInitializeObjects(0);
+
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
 
@@ -130,10 +133,10 @@ void kernel_late() {
 	
 	// Initialize floppy.
 	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
-	//floppy_init();
+	floppy_init();
 
 
-	ata_init();
+	//ata_init();
 
     vga_enable_cursor();
 

@@ -69,7 +69,7 @@ void ap_main() {
     kprintf("CPU%u: INTERRUPTS ENABLED.\n", cpu);
     while (true) {
         sleep(2000);
-        kprintf("Tick tock, I'm CPU %d!\n", cpu);
+       // kprintf("Tick tock, I'm CPU %d!\n", cpu);
     }
 }
 
@@ -143,7 +143,7 @@ void smp_init() {
     // Search for LAPICs (processors) in ACPI.
     cpuCount = 0;
     kprintf("SMP: Looking for processors...\n");
-    acpi_madt_entry_local_apic_t *cpu = (acpi_madt_entry_local_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_LOCAL_APIC, 8, 0);
+    /*acpi_madt_entry_local_apic_t *cpu = (acpi_madt_entry_local_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_LOCAL_APIC, 8, 0);
     while (cpu != NULL) {
         kprintf("SMP:     Found processor %u (APIC 0x%X, %s)!\n", cpu->acpiProcessorId, cpu->apicId, (cpu->flags & ACPI_MADT_ENTRY_LOCAL_APIC_ENABLED) ? "enabled" : "disabled");
 
@@ -172,7 +172,7 @@ void smp_init() {
             currentCpu++;
         }
         cpu = (acpi_madt_entry_local_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_LOCAL_APIC, 8, ((uintptr_t)cpu) + 1);
-    }
+    }*/
 
     kprintf("SMP: Waiting two seconds for verification...\n");
     sleep(2000);

@@ -2,7 +2,7 @@
 #define ACPI_H
 
 #include <main.h>
-#include <kernel/acpi/acpi_tables.h>
+//#include <kernel/acpi/acpi_tables.h>
 
 #ifdef X86_64
 #define ACPI_TEMP_ADDRESS   0xFFFFFF00FEF00000
@@ -15,7 +15,7 @@
 #endif
 
 extern bool acpi_supported();
-acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start);
+//acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start);
 extern void acpi_init();
 
 #endif
