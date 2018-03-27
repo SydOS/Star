@@ -194,22 +194,7 @@ void kernel_late() {
 
 		acpi_late_init();
 
-	ACPI_HANDLE sysHandle;
-	//AcpiNameToHandle(0, NS_SYSTEM_BUS, &sysHandle);
-	//AcpiWalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, 500000, test, NULL, NULL, NULL);
-	// Enable APIC modes.
-	//AcpiWalkNamespace(ACPI_TYPE_METHOD, ACPI_ROOT_OBJECT, -1, test2, NULL, NULL, NULL);
 
-	ACPI_OBJECT_LIST list = {};
-		ACPI_OBJECT obj = {};
-		obj.Integer.Value = 1;
-		obj.Type = ACPI_TYPE_INTEGER;
-		list.Count = 1;
-		list.Pointer = &obj;
-
-	kprintf("PIC\n");
-	//ACPI_STATUS Status = AcpiEvaluateObject(NULL, "\\_PIC", &list, NULL);
-	//kprintf("Status: 0x%X\n", Status);
 
 	AcpiGetDevices("PNP0A03", test, NULL, NULL);
 

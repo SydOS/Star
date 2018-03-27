@@ -17,7 +17,7 @@
 
 extern bool acpi_supported();
 extern ACPI_SUBTABLE_HEADER *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start);
-//acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start);
+extern bool acpi_change_pic_mode(uint32_t value);
 extern void acpi_init();
 
 #endif

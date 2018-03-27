@@ -78,6 +78,21 @@ ACPI_SUBTABLE_HEADER *acpi_search_madt(uint8_t type, uint32_t requiredLength, ui
     return NULL;
 }
 
+bool acpi_change_pic_mode(uint32_t value) {
+    kprintf("ACPI: Executing _PIC method with parameter 0x%X...\n", value);
+
+    // Build param list.
+	ACPI_OBJECT_LIST list = {};
+	ACPI_OBJECT obj = {};
+	obj.Integer.Value = value;
+	obj.Type = ACPI_TYPE_INTEGER;
+    list.Count = 1;
+	list.Pointer = &obj;
+
+    // Execute method.
+	return AcpiEvaluateObject(NULL, "\\_PIC", &list, NULL) == AE_OK;
+}
+
 void acpi_init() {
     kprintf("ACPI: Initializing...\n");
 

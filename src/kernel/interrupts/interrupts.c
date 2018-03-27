@@ -186,17 +186,22 @@ void interrupts_init() {
 
     // Initialize PIC and I/O APIC.
     pic_init();
-    //ioapic_init();
+    ioapic_init();
     useLapic = false;
 
-
-
+    // If ACPI and the I/O APIC are supported, changeover to that.
     if (acpi_supported() && ioapic_supported()) {
         kprintf("INTERRUPTS: Using APICs for interrupts.\n");
 
         // Disable PIC and initialize LAPIC.
         pic_disable();
         lapic_init();
+
+        // Change into APIC mode on ACPI.
+        if (acpi_change_pic_mode(1))
+            kprintf("INTERRUPTS: Now using APIC mode in ACPI.\n");
+        else
+            kprintf("INTERRUPTS: Couldn't change ACPI into APIC mode. The _PIC method may not exist.\n");
 
         // Enable all 15 IRQs on the I/O APIC, except for 2.
         for (uint8_t i = 0; i < IRQ_COUNT; i++) {
