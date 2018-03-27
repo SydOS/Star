@@ -149,6 +149,15 @@ void kprintf(const char* format, ...) {
     spinlock_release(&kprintf_mutex);
 }
 
+void kprintf_nlock(const char* format, ...) {
+    // Get args.
+    va_list args;
+    va_start(args, format);
+
+    // Call va_list kprintf.
+    kprintf_va(format, args);
+}
+
 // https://en.wikipedia.org/wiki/Printf_format_string
 // Printf implementation.
 void kprintf_va(const char* format, va_list args) {

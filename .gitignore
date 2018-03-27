@@ -46,4 +46,8 @@ Thumbs.db
 
 docs/
 build/
+acpcia_build/
 .vscode/
+
+# ACPICA cache
+LASTARCH

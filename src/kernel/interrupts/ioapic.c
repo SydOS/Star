@@ -3,6 +3,7 @@
 #include <io.h>
 #include <kernel/interrupts/ioapic.h>
 
+#include <acpi.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/interrupts/interrupts.h>
 #include <kernel/memory/paging.h>
@@ -120,7 +121,7 @@ void ioapic_init() {
         panic("IOAPIC: Attempting to initialize multiple times.\n");
 
     // Search for I/O APIC entry in ACPI.
-    /*acpi_madt_entry_io_apic_t *ioApicMadt = (acpi_madt_entry_io_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_IO_APIC, 12, 0);
+    ACPI_MADT_IO_APIC *ioApicMadt = (ACPI_MADT_IO_APIC*)acpi_search_madt(ACPI_MADT_TYPE_IO_APIC, sizeof(ACPI_MADT_IO_APIC), 0);
     if (ioApicMadt == NULL) {
         kprintf("IOAPIC: No I/O APIC found or ACPI is disabled. Aborting.\n");
         ioApicInitialized = false;
@@ -128,8 +129,8 @@ void ioapic_init() {
     }
 
     // Map I/O APIC to virtual memory.
-    kprintf("IOAPIC: Initializing I/O APIC %u at 0x%X...\n", ioApicMadt->ioApicId, ioApicMadt->ioApicAddress);
-    paging_map(IOAPIC_ADDRESS, ioApicMadt->ioApicAddress, true, true);
+    kprintf("IOAPIC: Initializing I/O APIC %u at 0x%X...\n", ioApicMadt->Id, ioApicMadt->Address);
+    paging_map(IOAPIC_ADDRESS, ioApicMadt->Address, true, true);
 
     // Get info about I/O APIC.
     uint8_t maxInterrupts = ioapic_max_interrupts();
@@ -143,13 +144,13 @@ void ioapic_init() {
         ioapic_disable_interrupt(i);
 
     // Search for any interrupt remappings.
-    acpi_madt_entry_interrupt_override_t *override = (acpi_madt_entry_interrupt_override_t*)acpi_search_madt(ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE, 10, 0);
+    ACPI_MADT_INTERRUPT_OVERRIDE *override = (ACPI_MADT_INTERRUPT_OVERRIDE*)acpi_search_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, 10, 0);
     while (override != NULL) {
         // Add override.
-        kprintf("IOAPIC: Mapping interrupt %u to interrupt %u.\n", override->source, override->globalSystemInterrupt);
-        interrupt_redirections[override->source] = override->globalSystemInterrupt;
-        override = (acpi_madt_entry_interrupt_override_t*)acpi_search_madt(ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE, 10, ((uintptr_t)override) + 1);
-    }*/
+        kprintf("IOAPIC: Mapping interrupt %u to interrupt %u.\n", override->SourceIrq, override->GlobalIrq);
+        interrupt_redirections[override->SourceIrq] = override->GlobalIrq;
+        override = (ACPI_MADT_INTERRUPT_OVERRIDE*)acpi_search_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, 10, ((uintptr_t)override) + 1);
+    }
 
     kprintf("IOAPIC: Initialized!\n");
     ioApicInitialized = true;

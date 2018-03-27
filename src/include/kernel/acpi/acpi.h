@@ -2,6 +2,7 @@
 #define ACPI_H
 
 #include <main.h>
+#include <acpi.h>
 //#include <kernel/acpi/acpi_tables.h>
 
 #ifdef X86_64
@@ -15,6 +16,7 @@
 #endif
 
 extern bool acpi_supported();
+extern ACPI_SUBTABLE_HEADER *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start);
 //acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start);
 extern void acpi_init();
 

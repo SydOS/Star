@@ -1,7 +1,7 @@
 #include <main.h>
 #include <kprint.h>
 #include <string.h>
-//#include <kernel/acpi/acpi.h>
+#include <kernel/acpi/acpi.h>
 //#include <kernel/acpi/acpi_tables.h>
 #include <acpi.h>
 
@@ -42,22 +42,29 @@ inline bool acpi_supported() {
 
     // No match found.
     return NULL;
-}
+}*/
 
-acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start) {
+ACPI_SUBTABLE_HEADER *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start) {
+    // Get MADT table from ACPI.
+    ACPI_TABLE_HEADER *table = NULL;
+    ACPI_STATUS status = AcpiGetTable(ACPI_SIG_MADT, 0, &table);
+    ACPI_TABLE_MADT *madt = (ACPI_TABLE_MADT*)table;
+
     // If MADT is null, we cannot search for entries.
-    if (madt == NULL)
+    if (status || madt == NULL)
         return NULL;
 
+    kprintf("Found APIC table at 0x%p to 0x%p\n", madt, (uintptr_t)madt + madt->Header.Length);
+
     // Search for the first matched entry after the start specified.
-    uintptr_t address = start == 0 ? (uintptr_t)madt->entries : (uintptr_t)start;
-    while (address >= (uintptr_t)madt->entries && address < (uintptr_t)((uintptr_t)madt->entries + (madt->header.length - sizeof(acpi_madt_entry_header_t)))) {
+    uintptr_t address = start == 0 ? (uintptr_t)madt : (uintptr_t)start;
+    while (address >= (uintptr_t)madt && address < (uintptr_t)((uintptr_t)madt + madt->Header.Length)) {
         // Get entry.
-        acpi_madt_entry_header_t *header = (acpi_madt_entry_header_t*)address;
+        ACPI_SUBTABLE_HEADER *header = (ACPI_SUBTABLE_HEADER*)address;
         
         // Ensure entry matches length and type.
-        uint8_t length = header->length;
-        if (length == requiredLength && header->type == type)
+        uint8_t length = header->Length;
+        if (length == requiredLength && header->Type == type)
             return header;
         else 
             length = 1; // Setting length to 1 will move to the next byte.
@@ -67,11 +74,16 @@ acpi_madt_entry_header_t *acpi_search_madt(uint8_t type, uint32_t requiredLength
     }
 
     // No match found.
+    kprintf("Nothing found.\n");
     return NULL;
-}*/
+}
 
 void acpi_init() {
     kprintf("ACPI: Initializing...\n");
+
+//AcpiDbgLevel = ACPI_LV_VERBOSITY1 ;
+
+
     ACPI_STATUS Status = AcpiInitializeSubsystem();
     Status = AcpiInitializeTables(NULL, 16, false);
     Status = AcpiLoadTables();
@@ -126,5 +138,87 @@ void acpi_init() {
         kprintf("ACPI: No MADT found. APICs and SMP will not be available.\n");*/
 
     kprintf("ACPI: Initialized!\n");
-    //acpiInitialized = true;
+    acpiInitialized = true;
+}
+
+static void acpi_event(ACPI_HANDLE ObjHandle, UINT32 value, void *Context) {
+    kprintf_nlock("ACPI: Notify triggered! Value: 0x%X\n", value);
+
+    ACPI_STATUS Status;
+ACPI_DEVICE_INFO *Info;
+ACPI_BUFFER Path;
+char Buffer[256];
+Path.Length = sizeof (Buffer);
+Path.Pointer = Buffer;
+
+	Status = AcpiGetName(ObjHandle, ACPI_FULL_PATHNAME, &Path);
+	Status = AcpiGetObjectInfo(ObjHandle, &Info);
+
+	kprintf_nlock ("%s\n", Path.Pointer);
+	kprintf_nlock (" HID: %s, ADR: %.8llX\n", Info->HardwareId.String, Info->Address);
+}
+
+static UINT32 acpi_button(void *Context) {
+    kprintf_nlock("ACPI: Button fixed triggered\n");
+    ACPI_STATUS status = AcpiReset();
+    kprintf_nlock("ACPI: Reset status: %d", status);
+    outb(0x64, 0xFE);
+    return 0;
+}
+
+static ACPI_STATUS acpi_pwr_btn_callback(ACPI_HANDLE Object, UINT32                          NestingLevel, void                            *Context, void                            **ReturnValue) {
+    kprintf("ACPI: Found power button!\n");
+    ACPI_STATUS status = AcpiInstallNotifyHandler(Object, ACPI_DEVICE_NOTIFY, acpi_event, NULL);
+    kprintf("ACPI: Status: %d\n", status);
+    return AE_OK;
+}
+
+void acpi_late_init() {
+    ACPI_STATUS status=AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION);
+     kprintf("ACPI: Status: %d\n", status);
+	status= AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
+     kprintf("ACPI: Status: %d\n", status);
+    status = AcpiInstallNotifyHandler(ACPI_ROOT_OBJECT, ACPI_SYSTEM_NOTIFY, acpi_event, NULL);
+    kprintf("ACPI: Status: %d\n", status);
+    //kprintf("ACPI: Status: %d\n", status);
+    //d = AcpiInstallGpeHandler(NULL, 0, ACPI_GPE_LEVEL_TRIGGERED, acpi_event, NULL);
+   // AcpiEnableGpe(NULL, 0);
+    //status=AcpiInstallGlobalEventHandler(acpi_event, NULL);
+    //status=AcpiUpdateAllGpes();
+    //status = AcpiEnableGpe(NULL, 19);
+
+    status=AcpiInstallFixedEventHandler(ACPI_EVENT_POWER_BUTTON, acpi_button, NULL);
+     kprintf("ACPI: Status: %d\n", status);
+    status=AcpiEnableEvent(ACPI_EVENT_POWER_BUTTON, 0);
+     kprintf("ACPI: Status: %d\n", status);
+    // Find any power button.
+    status=AcpiGetDevices("PNP0C0C", acpi_pwr_btn_callback, NULL, NULL);
+    kprintf("ACPI: Status: %d\n", status);
+    status=AcpiGetDevices("PNP0C0D", acpi_pwr_btn_callback, NULL, NULL);
+    kprintf("ACPI: Status: %d\n", status);
+    status=AcpiGetDevices("PNP0C0E", acpi_pwr_btn_callback, NULL, NULL);
+    kprintf("ACPI: Status: %d\n", status);
+
+   // ACPI_EVENT_STATUS testS = 0;
+   // status = AcpiGetGpeStatus(NULL, 19, &testS);
+   status = AcpiEnableAllRuntimeGpes();
+   kprintf("ACPI: Status RUN GPES: %d\n", status);
+   status = AcpiEnableAllWakeupGpes();
+    kprintf("ACPI: Status WAK GPES: %d\n", status);
+   // kprintf("ACPI: event: 0x%X\n", testS);
+uint32_t d = AcpiCurrentGpeCount;
+ACPI_EVENT_STATUS sts =0;
+status = AcpiUpdateAllGpes();
+//status = AcpiGetGpeStatus(NULL, 1, &sts);
+  // status = AcpiGetGpeDevice(0, NULL);
+
+    // Get FADT.
+    ACPI_TABLE_HEADER *table = NULL;
+    status = AcpiGetTable(ACPI_SIG_FADT, 0, &table);
+    ACPI_TABLE_FADT *fadt = (ACPI_TABLE_FADT*)table;
+
+    if (!(fadt->Flags & ACPI_FADT_POWER_BUTTON))
+        kprintf("ACPI: Fixed power button present.\n");
+    if (fadt->Flags & ACPI_FADT_DOCKING_SUPPORTED)
+        kprintf("ACPI: Docking supported.\n");
 }

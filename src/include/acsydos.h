@@ -17,6 +17,8 @@
 #include <main.h>
 #include <string.h>
 
+//#define ACPI_DEBUG_OUTPUT
+
 #ifdef __KERNEL__
 
 //#define ACPI_USE_SYSTEM_INTTYPES

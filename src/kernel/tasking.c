@@ -23,16 +23,20 @@ void schedule_noirq() {
 
 void _kill() {
 	// Kill a process
-	/*if(c->pid == 1) { pit_set_task(0); kprintf("Idle can't be killed!"); }
-	kprintf("Killing process %s (%d)\n", c->name, c->pid);
-	pit_set_task(0);
-	kheap_free((void *)c->stacktop);
-	kheap_free(c);
-	kheap_free(c->cr3);
+	taskingEnabled = false;
+	//if(c->pid == 1) { pit_set_task(0); kprintf("Idle can't be killed!"); }
+	//kprintf("Killing process %s (%d)\n", c->name, c->pid);
+	//pit_set_task(0);
+
+	//kheap_free(c->cr3);
 	c->prev->next = c->next;
 	c->next->prev = c->prev;
-	pit_set_task(1);
-	schedule_noirq();*/
+		kheap_free((void *)c->stack_bottom);
+	kheap_free(c);
+	kprintf_nlock("Killed.\n");
+	taskingEnabled = true;
+	//pit_set_task(1);
+	//schedule_noirq();
 }
 
 void __notified(int sig) {
@@ -75,26 +79,28 @@ void kernel_main_thread() {
 /* This adds a process while no others are running! */
 void __addProcess(PROCESS* p)
 {
+	taskingEnabled = false;
 	p->next = c->next;
 	p->next->prev = p;
 	p->prev = c;
 	c->next = p;
+	taskingEnabled = true;
 }
 
 PROCESS* tasking_create_process(char* name, uintptr_t addr) {
 	// Allocate memory for process.
-	kprintf("Allocating memory for process \"%s\"...\n", name);
+	//kprintf_nlock("Allocating memory for process \"%s\"...\n", name);
 	PROCESS* process = (PROCESS*)kheap_alloc(sizeof(PROCESS));
 	memset(process, 0, sizeof(PROCESS));
 
 
-	kprintf("Setting up process\n");
+	//kprintf_nlock("Setting up process\n");
 	process->name = name;
 	process->pid = ++lpid;
 	process->state = PROCESS_STATE_ALIVE;
 	process->notify = __notified;
 
-	kprintf("Allocating memory for stack\n");
+	//kprintf_nlock("Allocating memory for stack\n");
 	process->stack_bottom = (uintptr_t)kheap_alloc(4096);
 	//asm volatile("mov %%cr3, %%eax":"=a"(process->cr3));
 
@@ -104,7 +110,7 @@ PROCESS* tasking_create_process(char* name, uintptr_t addr) {
 	process->stack_top -= sizeof(registers_t);
 	process->regs = (registers_t*)process->stack_top;
 
-	kprintf("Setting up stack...\n");
+	//kprintf_nlock("Setting up stack...\n");
 #ifdef X86_64
 	process->regs->rflags = 0x00000202;
 	process->regs->cs = 0x8;

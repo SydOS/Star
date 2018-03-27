@@ -8,6 +8,7 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>
+#include <kernel/tasking.h>
 
 #include <kernel/interrupts/interrupts.h>
 
@@ -140,8 +141,22 @@ ACPI_THREAD_ID AcpiOsGetThreadId() {
     return 1;
 }
 
-ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
+ACPI_OSD_EXEC_CALLBACK functionA;
+void *ContextA;
+void acpica_thread() {
+    //kprintf_nlock("ACPI: subtread.\n");
+    functionA(ContextA);
+    _kill();
+    while(true);
+}
 
+ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
+    kprintf_nlock("ACPI: execute type: 0x%X\n", Type);
+    
+    functionA = Function;
+    ContextA = Context;
+    __addProcess(tasking_create_process("acpica", (uintptr_t)acpica_thread));
+    return (AE_OK);
 }
 
 void AcpiOsSleep(UINT64 Milliseconds) {
@@ -187,7 +202,7 @@ ACPI_STATUS AcpiOsWaitSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units, UINT16 Time
 }
 
 ACPI_STATUS AcpiOsSignalSemaphore(ACPI_SEMAPHORE Handle, UINT32 Units) {
-
+return (AE_OK);
 }
 
 ACPI_STATUS AcpiOsCreateLock(ACPI_SPINLOCK *OutHandle) {
@@ -195,19 +210,28 @@ return (AE_OK);
 }
 
 void AcpiOsDeleteLock(ACPI_HANDLE Handle) {
-
+return (AE_OK);
 }
 
 ACPI_CPU_FLAGS AcpiOsAcquireLock(ACPI_SPINLOCK Handle) {
-
+return (AE_OK);
 }
 
 void AcpiOsReleaseLock(ACPI_SPINLOCK Handle, ACPI_CPU_FLAGS Flags) {
+return (AE_OK);
+}
 
+static void *context;
+static ACPI_OSD_HANDLER handler;
+static void acpi_callback(registers_t *regs) {
+    kprintf_nlock("ACPI: SCI triggered!\n");
+    handler(context);
 }
 
 ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLER Handler, void *Context) {
-    interrupts_irq_install_handler(InterruptLevel, Handler);
+    interrupts_irq_install_handler(InterruptLevel, acpi_callback);
+    handler = Handler;
+    context = Context;
     return (AE_OK);
 }
 
@@ -217,10 +241,12 @@ ACPI_STATUS AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, ACPI_OSD_HANDLE
 }
 
 ACPI_STATUS AcpiOsReadMemory ( ACPI_PHYSICAL_ADDRESS Address, UINT64 *Value, UINT32 Width) {
+    kprintf("ACPI: read memory\n");
     return;
 }
 
 ACPI_STATUS AcpiOsWriteMemory ( ACPI_PHYSICAL_ADDRESS Address, UINT64 Value, UINT32 Width)  {
+    kprintf("ACPI: write memory\n");
     return;
 }
 
@@ -264,7 +290,7 @@ AcpiOsReadPciConfiguration (
     UINT32                  Reg,
     UINT64                  *Value,
     UINT32                  Width) {
-
+        kprintf("ACPI: Attempted to read PCI.\n");
     }
 
 ACPI_STATUS
@@ -273,7 +299,7 @@ AcpiOsWritePciConfiguration (
     UINT32                  Reg,
     UINT64                  Value,
     UINT32                  Width) {
-
+kprintf("ACPI: Attempted to write PCI.\n");
     }
 
 void ACPI_INTERNAL_VAR_XFACE AcpiOsPrintf ( const char *Format, ...) {
@@ -288,11 +314,11 @@ void AcpiOsVprintf ( const char *Format, va_list Args) {
 }
 
 UINT64 AcpiOsGetTimer ( void) {
-
+    return pit_ticks() * 10;
 }
 
 ACPI_STATUS AcpiOsSignal ( UINT32 Function,  void *Info) {
-
+    panic("ACPI: signal\n");
 }
 
 ACPI_STATUS
@@ -300,5 +326,5 @@ AcpiOsEnterSleep (
     UINT8                   SleepState,
     UINT32                  RegaValue,
     UINT32                  RegbValue) {
-
+        return (AE_OK);
     }

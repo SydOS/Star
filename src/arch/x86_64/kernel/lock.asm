@@ -7,11 +7,11 @@ section .text
 global spinlock_lock
 spinlock_lock:
     ; Get lock object.
-    mov rax, [rsp+8]
+    mov rax, rdi
 
 .loop:
     ; Attemp to lock object.
-    lock bts dword [rax], 0
+    lock bts qword [rax], 0
     pause
 	jc .loop
 	ret
@@ -19,8 +19,8 @@ spinlock_lock:
 global spinlock_release
 spinlock_release:
     ; Get lock object.
-    mov rax, [rsp+8]
+    mov rax, rdi
 
     ; Release lock.
-    mov dword [rax], 0
+    mov qword [rax], 0
     ret

@@ -7,6 +7,7 @@ extern void* memmove(void *str1, const void *str2, size_t n);
 extern void* memset(void *str, int32_t c, size_t n);
 extern void* memset16 (void *ptr, uint16_t value, size_t num);
 extern char* strcat(char *dest, const char *src);
+extern char* strncat(char *dest, const char *src, size_t n);
 extern int32_t strcmp(const char *str1, const char *str2);
 extern int32_t strncmp(const char *str1, const char *str2, size_t n);
 extern char* strcpy(char *dest, const char *src);

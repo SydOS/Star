@@ -5,6 +5,7 @@
 #include <tools.h>
 #include <kernel/interrupts/smp.h>
 
+#include <acpi.h>
 #include <kernel/gdt.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/interrupts/idt.h>
@@ -69,7 +70,7 @@ void ap_main() {
     kprintf("CPU%u: INTERRUPTS ENABLED.\n", cpu);
     while (true) {
         sleep(2000);
-       // kprintf("Tick tock, I'm CPU %d!\n", cpu);
+        kprintf("Tick tock, I'm CPU %d!\n", cpu);
     }
 }
 
@@ -140,17 +141,22 @@ void smp_init() {
     if (smpInitialized)
         panic("SMP: Attempting to initialize multiple times!\n");
 
+    if (!acpi_supported() || !ioapic_supported()) {
+        kprintf("SMP: ACPI or the I/O APIC is not enabled! Aborting.\n");
+        return;
+    }
+
     // Search for LAPICs (processors) in ACPI.
     cpuCount = 0;
     kprintf("SMP: Looking for processors...\n");
-    /*acpi_madt_entry_local_apic_t *cpu = (acpi_madt_entry_local_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_LOCAL_APIC, 8, 0);
+    ACPI_MADT_LOCAL_APIC *cpu = (ACPI_MADT_LOCAL_APIC*)acpi_search_madt(ACPI_MADT_TYPE_LOCAL_APIC, 8, 0);
     while (cpu != NULL) {
-        kprintf("SMP:     Found processor %u (APIC 0x%X, %s)!\n", cpu->acpiProcessorId, cpu->apicId, (cpu->flags & ACPI_MADT_ENTRY_LOCAL_APIC_ENABLED) ? "enabled" : "disabled");
+        kprintf("SMP:     Found processor %u (APIC 0x%X, %s)!\n", cpu->ProcessorId, cpu->Id, (cpu->LapicFlags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
 
         // Add to count.
-        if (cpu->flags & ACPI_MADT_ENTRY_LOCAL_APIC_ENABLED)
+        if (cpu->LapicFlags & ACPI_MADT_ENABLED)
             cpuCount++;
-        cpu = (acpi_madt_entry_local_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_LOCAL_APIC, 8, ((uintptr_t)cpu) + 1);
+        cpu = (ACPI_MADT_LOCAL_APIC*)acpi_search_madt(ACPI_MADT_TYPE_LOCAL_APIC, 8, ((uintptr_t)cpu) + 1);
     }
 
     // If none or only one CPU was found in ACPI, no need to further intialize SMP.
@@ -164,15 +170,15 @@ void smp_init() {
     cpus = kheap_alloc(sizeof(uint8_t) * cpuCount);
 
     // Search for processors again, this time saving the APIC IDs.
-    cpu = (acpi_madt_entry_local_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_LOCAL_APIC, 8, 0);
+    cpu = (ACPI_MADT_LOCAL_APIC*)acpi_search_madt(ACPI_MADT_TYPE_LOCAL_APIC, 8, 0);
     uint32_t currentCpu = 0;
     while (cpu != NULL && currentCpu < cpuCount) {
-        if (cpu->flags & ACPI_MADT_ENTRY_LOCAL_APIC_ENABLED) {
-            cpus[currentCpu] = cpu->apicId;
+        if (cpu->LapicFlags & ACPI_MADT_ENABLED) {
+            cpus[currentCpu] = cpu->Id;
             currentCpu++;
         }
-        cpu = (acpi_madt_entry_local_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_LOCAL_APIC, 8, ((uintptr_t)cpu) + 1);
-    }*/
+        cpu = (ACPI_MADT_LOCAL_APIC*)acpi_search_madt(ACPI_MADT_TYPE_LOCAL_APIC, 8, ((uintptr_t)cpu) + 1);
+    }
 
     kprintf("SMP: Waiting two seconds for verification...\n");
     sleep(2000);

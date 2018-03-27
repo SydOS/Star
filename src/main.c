@@ -24,6 +24,8 @@
 #include <driver/ps2/ps2.h>
 #include <driver/rtc.h>
 
+#include <acpi.h>
+
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
 	// Disable interrupts.
@@ -34,7 +36,7 @@ void panic(const char *format, ...) {
 	va_start(args, format);
 
 	// Show panic.
-	kprintf("\nPANIC:\n");
+	kprintf_nlock("\nPANIC:\n");
 	kprintf_va(format, args);
 	kprintf("\n\nHalted.");
 
@@ -98,8 +100,7 @@ void kernel_main() {
 	kprintf("Setting up PIT...\n");
     pit_init();
 
-	uint32_t d = AcpiEnableSubsystem(0);
-	d= AcpiInitializeObjects(0);
+
 
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
@@ -122,10 +123,95 @@ void hmmm_thread() {
 	 }
 }
 
+void *test2(ACPI_HANDLE ObjHandle,
+UINT32 Level,
+void *Context) {
+	ACPI_STATUS Status;
+ACPI_DEVICE_INFO *Info;
+ACPI_BUFFER Path;
+char Buffer[256];
+Path.Length = sizeof (Buffer);
+Path.Pointer = Buffer;
+
+	Status = AcpiGetName(ObjHandle, ACPI_SINGLE_NAME, &Path);
+	Status = AcpiGetObjectInfo(ObjHandle, &Info);
+
+	if (strcmp(Buffer, "_PIC") == 0) {
+		kprintf("Found _PIC\n");
+
+		ACPI_OBJECT_LIST list = {};
+		ACPI_OBJECT obj = {};
+		obj.Integer.Value = 1;
+		obj.Type = ACPI_TYPE_INTEGER;
+		list.Count = 1;
+		list.Pointer = &obj;
+
+		Status = AcpiGetName(ObjHandle, ACPI_FULL_PATHNAME, &Path);
+		kprintf("Status: 0x%X\n", Status);
+		Status = AcpiEvaluateObject(ObjHandle, Buffer, &list, NULL);
+		kprintf("Status: 0x%X\n", Status);
+	}
+	return NULL;
+}
+
+void *test(ACPI_HANDLE ObjHandle,
+UINT32 Level,
+void *Context) {
+	ACPI_STATUS Status;
+ACPI_DEVICE_INFO *Info;
+ACPI_BUFFER Path;
+char Buffer[256];
+Path.Length = sizeof (Buffer);
+Path.Pointer = Buffer;
+
+	Status = AcpiGetName(ObjHandle, ACPI_FULL_PATHNAME, &Path);
+	Status = AcpiGetObjectInfo(ObjHandle, &Info);
+
+	kprintf ("%s\n", Path.Pointer);
+	kprintf (" HID: %s, ADR: %.8llX\n", Info->HardwareId.String, Info->Address);
+
+	//AcpiWalkNamespace(ACPI_TYPE_INTEGER, ObjHandle, 300, test2, NULL, NULL, NULL);
+
+	ACPI_BUFFER bufer = {};
+	bufer.Length = ACPI_ALLOCATE_BUFFER;
+	//bufer.Pointer = kheap_alloc(ACPI_ALLOCATE_BUFFER);
+	Status = AcpiGetIrqRoutingTable(ObjHandle, &bufer);
+
+	for (ACPI_PCI_ROUTING_TABLE *table = bufer.Pointer; ((uintptr_t)table < (uintptr_t)bufer.Pointer + bufer.Length) && table->Length; table = (uintptr_t)table + table->Length) {
+		kprintf("IRQ: Pin 0x%X, Address 0x%llX, Source index: %d, Source: 0x%X\n", table->Pin, table->Address, table->SourceIndex, table->Source[3]);
+	}
+
+	ACPI_PCI_ROUTING_TABLE *first = bufer.Pointer;
+	ACPI_PCI_ROUTING_TABLE *second = bufer.Pointer + first->Length;
+
+	return NULL;
+}
+
 void kernel_late() {
 	kprintf("Adding second task...\n");
 	__addProcess(tasking_create_process("hmmm", (uintptr_t)hmmm_thread));
 	kprintf("Starting tasking...\n");
+
+		acpi_late_init();
+
+	ACPI_HANDLE sysHandle;
+	//AcpiNameToHandle(0, NS_SYSTEM_BUS, &sysHandle);
+	//AcpiWalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, 500000, test, NULL, NULL, NULL);
+	// Enable APIC modes.
+	//AcpiWalkNamespace(ACPI_TYPE_METHOD, ACPI_ROOT_OBJECT, -1, test2, NULL, NULL, NULL);
+
+	ACPI_OBJECT_LIST list = {};
+		ACPI_OBJECT obj = {};
+		obj.Integer.Value = 1;
+		obj.Type = ACPI_TYPE_INTEGER;
+		list.Count = 1;
+		list.Pointer = &obj;
+
+	kprintf("PIC\n");
+	//ACPI_STATUS Status = AcpiEvaluateObject(NULL, "\\_PIC", &list, NULL);
+	//kprintf("Status: 0x%X\n", Status);
+
+	AcpiGetDevices("PNP0A03", test, NULL, NULL);
 
 	// Initialize PS/2.
 	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	
@@ -133,7 +219,7 @@ void kernel_late() {
 	
 	// Initialize floppy.
 	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
-	floppy_init();
+	//floppy_init();
 
 
 	//ata_init();
