@@ -410,8 +410,9 @@ _isr_exit:
     pop es
     pop ds
     popad
-    add esp, 8
-    iret
+
+    add esp, 8 ; Move past the error code and interrupt number.
+    iretd
 
 global _isr_empty
 _isr_empty:

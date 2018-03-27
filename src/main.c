@@ -116,7 +116,7 @@ void kernel_main() {
 	panic("Tasking failed to start!\n");
 }
 
-void hmmm_thread() {
+void hmmm_thread(void) {
 	while (1) { 
 		kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
 		sleep(2000);
@@ -189,7 +189,7 @@ Path.Pointer = Buffer;
 
 void kernel_late() {
 	kprintf("Adding second task...\n");
-	tasking_add_process(tasking_create_process("hmmm", (uintptr_t)hmmm_thread));
+	tasking_add_process(tasking_create_process("hmmm", (uintptr_t)hmmm_thread, 0, 0));
 	kprintf("Starting tasking...\n");
 
 		acpi_late_init();
@@ -259,7 +259,7 @@ void kernel_late() {
 
     // Ring serial and VGA terminals.
 	serial_write('\a');
-	vga_putchar('\a');
+	//vga_putchar('\a');
   
 	// If serial isn't present, just loop.
 	if (!serial_present()) {

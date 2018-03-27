@@ -80,5 +80,5 @@ void rtc_init() {
 	rtc_settings = rtc_get_settings();
 	rtc_get_time();
 
-	tasking_add_process(tasking_create_process("rtc", (uintptr_t)rtc_thread));
+	tasking_add_process(tasking_create_process("rtc", (uintptr_t)rtc_thread, 0, 0));
 }

@@ -141,21 +141,31 @@ ACPI_THREAD_ID AcpiOsGetThreadId() {
     return 1;
 }
 
-ACPI_OSD_EXEC_CALLBACK functionA;
-void *ContextA;
-void acpica_thread() {
-    //kprintf_nlock("ACPI: subtread.\n");
-    functionA(ContextA);
+//ACPI_OSD_EXEC_CALLBACK functionA;
+//void *ContextA;
+void acpica_thread(void) {
+    // Function is in ECX/RCX, and the context in EDX/RDX.
+    uintptr_t Function = 0;
+    uintptr_t Context = 0;
+
+#ifdef X86_64
+    asm volatile ("movq %%rcx, %0" : "=r"(Function));
+    asm volatile ("movq %%rdx, %0" : "=r"(Context));
+#else
+    asm volatile ("movl %%ecx, %0" : "=r"(Function));
+    asm volatile ("movl %%edx, %0" : "=r"(Context));
+#endif
+
+    ACPI_OSD_EXEC_CALLBACK FunctionPtr = (ACPI_OSD_EXEC_CALLBACK)Function;
+    void *ContextPtr = (void*)Context;
+
+    FunctionPtr(Context);
     _kill();
     while(true);
 }
 
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
-    //kprintf_nlock("ACPI: execute type: 0x%X\n", Type);
-    
-    functionA = Function;
-    ContextA = Context;
-    tasking_add_process(tasking_create_process("acpica", (uintptr_t)acpica_thread));
+    tasking_add_process(tasking_create_process("acpica", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context));
     return (AE_OK);
 }
 
