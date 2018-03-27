@@ -31,7 +31,7 @@ typedef struct Process {
 } Process;
 
 
-extern int tasking_add_process(Process* p);
+extern int tasking_add_process(Process* newProcess);
 extern Process* tasking_create_process(char* name, uintptr_t addr);
 extern void tasking_tick(registers_t *regs);
 extern void tasking_init();
