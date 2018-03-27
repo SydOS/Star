@@ -142,7 +142,7 @@ void acpi_init() {
 }
 
 static void acpi_event(ACPI_HANDLE ObjHandle, UINT32 value, void *Context) {
-    kprintf_nlock("ACPI: Notify triggered! Value: 0x%X\n", value);
+    kprintf("ACPI: Notify triggered! Value: 0x%X\n", value);
 
     ACPI_STATUS Status;
 ACPI_DEVICE_INFO *Info;
@@ -154,8 +154,23 @@ Path.Pointer = Buffer;
 	Status = AcpiGetName(ObjHandle, ACPI_FULL_PATHNAME, &Path);
 	Status = AcpiGetObjectInfo(ObjHandle, &Info);
 
-	kprintf_nlock ("%s\n", Path.Pointer);
-	kprintf_nlock (" HID: %s, ADR: %.8llX\n", Info->HardwareId.String, Info->Address);
+	kprintf ("%s\n", Path.Pointer);
+	kprintf(" HID: %s, ADR: %.8llX\n", Info->HardwareId.String, Info->Address);
+
+    if (strcmp(Info->HardwareId.String, "PNP0C0C") == 0 && value == 0x80) {
+        kprintf("ACPI: Power button pressed, entering S5!\n");
+        sleep(1000);
+        AcpiEnterSleepStatePrep(5);
+        interrupts_disable();
+        AcpiEnterSleepState(5);
+    }
+    else if (strcmp(Info->HardwareId.String, "PNP0C0E") == 0 && value == 0x80) {
+        kprintf("ACPI: Sleep button pressed, entering S3!\n");
+        sleep(1000);
+        AcpiEnterSleepStatePrep(3);
+        interrupts_disable();
+        AcpiEnterSleepState(3);
+    }
 }
 
 static UINT32 acpi_button(void *Context) {
