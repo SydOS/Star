@@ -9,34 +9,25 @@
 
 extern void _isr_exit();
 
-PROCESS* c = 0;
+// Current process.
+Process* currentProcess = 0;
 uint32_t lpid = 0;
 bool taskingEnabled = false;
 
-// -----------------------------------------------------------------------------
-
-void schedule_noirq() {
-	if(!taskingEnabled) return;
-	asm volatile("int $0x2e");
-	return;
-}
-
 void _kill() {
-	// Kill a process
-	taskingEnabled = false;
-	//if(c->pid == 1) { pit_set_task(0); kprintf("Idle can't be killed!"); }
-	//kprintf("Killing process %s (%d)\n", c->name, c->pid);
-	//pit_set_task(0);
+	// Pause tasking.
+	tasking_freeze();
 
-	//kheap_free(c->cr3);
-	c->prev->next = c->next;
-	c->next->prev = c->prev;
-		kheap_free((void *)c->stack_bottom);
-	kheap_free(c);
-	kprintf_nlock("Killed.\n");
-	taskingEnabled = true;
-	//pit_set_task(1);
-	//schedule_noirq();
+	// Remove task.
+	currentProcess->Prev->Next = currentProcess->Next;
+	currentProcess->Next->Prev = currentProcess->Prev;
+
+	// Free memory.
+	kheap_free((void *)currentProcess->StackBottom);
+	kheap_free(currentProcess);
+
+	// Resume tasking.
+	tasking_unfreeze();
 }
 
 void __notified(int sig) {
@@ -62,77 +53,84 @@ void __notified(int sig) {
 
 // -----------------------------------------------------------------------------
 
-/* add process but take care of others also! */
-int tasking_add_process(PROCESS* p)
-{
+inline void tasking_freeze() {
 	taskingEnabled = false;
-	__addProcess(p);
+}
+
+inline void tasking_unfreeze() {
 	taskingEnabled = true;
-	return p->pid;
+}
+
+int tasking_add_process(Process* newProcess) {
+	// Pause tasking.
+	tasking_freeze();
+
+	// Add process into mix.
+	newProcess->Next = currentProcess->Next;
+	newProcess->Next->Prev = newProcess;
+	newProcess->Prev = currentProcess;
+	currentProcess->Next = newProcess;
+
+	// Resume tasking.
+	tasking_unfreeze();
+
+	// Return the PID.
+	return newProcess->Pid;
 }
 
 void kernel_main_thread() {
-	taskingEnabled = true;
+	tasking_unfreeze();
 	kernel_late();
 }
 
-/* This adds a process while no others are running! */
-void __addProcess(PROCESS* p)
-{
-	taskingEnabled = false;
-	p->next = c->next;
-	p->next->prev = p;
-	p->prev = c;
-	c->next = p;
-	taskingEnabled = true;
+Process* tasking_create_process(char* name, uintptr_t addr) {
+	// Allocate memory for process.
+	Process* process = (Process*)kheap_alloc(sizeof(Process));
+	memset(process, 0, sizeof(Process));
+
+	// Set up process fields.
+	process->Name = name;
+	process->Pid = ++lpid;
+	process->State = PROCESS_STATE_ALIVE;
+	process->Notify = __notified;
+
+	// Allocate space for stack.
+	process->StackBottom = (uintptr_t)kheap_alloc(4096);
+	process->StackTop = process->StackBottom + 4096;
+	memset((void*)process->StackBottom, 0, 4096);
+
+	// Set up registers.
+	process->StackTop -= sizeof(registers_t);
+	process->Regs = (registers_t*)process->StackTop;
+#ifdef X86_64
+	process->Regs->rflags = 0x00000202;
+	process->Regs->rip = addr;
+	process->Regs->rbp = process->StackTop;
+	process->Regs->rsp = process->StackTop;
+#else
+	process->Regs->eflags = 0x00000202;
+	process->Regs->eip = addr;
+	process->Regs->ebp = process->StackTop;
+	process->Regs->esp = process->StackTop;
+#endif
+
+	process->Regs->cs = 0x8;
+	process->Regs->ds = 0x10;
+	process->Regs->fs = 0x10;
+	process->Regs->es = 0x10;
+	process->Regs->gs = 0x10;
+	return process;
 }
 
-PROCESS* tasking_create_process(char* name, uintptr_t addr) {
-	// Allocate memory for process.
-	//kprintf_nlock("Allocating memory for process \"%s\"...\n", name);
-	PROCESS* process = (PROCESS*)kheap_alloc(sizeof(PROCESS));
-	memset(process, 0, sizeof(PROCESS));
-
-
-	//kprintf_nlock("Setting up process\n");
-	process->name = name;
-	process->pid = ++lpid;
-	process->state = PROCESS_STATE_ALIVE;
-	process->notify = __notified;
-
-	//kprintf_nlock("Allocating memory for stack\n");
-	process->stack_bottom = (uintptr_t)kheap_alloc(4096);
-	//asm volatile("mov %%cr3, %%eax":"=a"(process->cr3));
-
-	process->stack_top = process->stack_bottom + 4096;
-	memset((void*)process->stack_bottom, 0, 4096);
-
-	process->stack_top -= sizeof(registers_t);
-	process->regs = (registers_t*)process->stack_top;
-
-	//kprintf_nlock("Setting up stack...\n");
+static void tasking_exec() {
+	// Send EOI and change out stacks.
+	interrupts_eoi(0);
 #ifdef X86_64
-	process->regs->rflags = 0x00000202;
-	process->regs->cs = 0x8;
-	process->regs->rip = addr;
-	process->regs->rbp = process->stack_top;
-	process->regs->rsp = process->stack_top;
-	process->regs->ds = 0x10;
-	process->regs->fs = 0x10;
-	process->regs->es = 0x10;
-	process->regs->gs = 0x10;
+	asm volatile ("mov %0, %%rsp" : : "r"(currentProcess->Regs));
 #else
-	process->regs->eflags = 0x00000202;
-	process->regs->cs = 0x8;
-	process->regs->eip = addr;
-	process->regs->ebp = process->stack_top;
-	process->regs->esp = process->stack_top;
-	process->regs->ds = 0x10;
-	process->regs->fs = 0x10;
-	process->regs->es = 0x10;
-	process->regs->gs = 0x10;
+	asm volatile ("mov %0, %%esp" : : "r"(currentProcess->Regs));
 #endif
-	return process;
+	asm volatile ("jmp _isr_exit");
 }
 
 void tasking_tick(registers_t *regs) {
@@ -141,36 +139,20 @@ void tasking_tick(registers_t *regs) {
 		return;
 
 	// Save registers and move to next task.
-	c->regs = regs;
-	c = c->next;
+	currentProcess->Regs = regs;
+	currentProcess = currentProcess->Next;
 
-	// Send EOI and change out stack.
-	interrupts_eoi(0);
-#ifdef X86_64
-	asm volatile ("mov %0, %%rsp" : : "r"(c->regs));
-#else
-	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
-#endif
-	asm volatile ("jmp _isr_exit");
-}
-
-void tasking_exec() {
-	interrupts_eoi(0);
-#ifdef X86_64
-	asm volatile ("mov %0, %%rsp" : : "r"(c->regs));
-#else
-	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
-#endif
-	asm volatile ("jmp _isr_exit");
+	// Jump to next task.
+	tasking_exec();
 }
 
 void tasking_init() {
-	// Start up kernel task.
+	// Set up kernel task.
 	asm volatile ("cli");
 	kprintf("Creating kernel task...\n");
-	c = tasking_create_process("kernel", (uintptr_t)kernel_main_thread);
-	c->next = c;
-	c->prev = c;
+	currentProcess = tasking_create_process("kernel", (uintptr_t)kernel_main_thread);
+	currentProcess->Next = currentProcess;
+	currentProcess->Prev = currentProcess;
 	asm volatile ("sti");
 
 	// Start tasking!

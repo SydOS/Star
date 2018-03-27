@@ -189,7 +189,7 @@ Path.Pointer = Buffer;
 
 void kernel_late() {
 	kprintf("Adding second task...\n");
-	__addProcess(tasking_create_process("hmmm", (uintptr_t)hmmm_thread));
+	tasking_add_process(tasking_create_process("hmmm", (uintptr_t)hmmm_thread));
 	kprintf("Starting tasking...\n");
 
 		acpi_late_init();

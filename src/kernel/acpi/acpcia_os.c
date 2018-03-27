@@ -151,11 +151,11 @@ void acpica_thread() {
 }
 
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
-    kprintf_nlock("ACPI: execute type: 0x%X\n", Type);
+    //kprintf_nlock("ACPI: execute type: 0x%X\n", Type);
     
     functionA = Function;
     ContextA = Context;
-    __addProcess(tasking_create_process("acpica", (uintptr_t)acpica_thread));
+    tasking_add_process(tasking_create_process("acpica", (uintptr_t)acpica_thread));
     return (AE_OK);
 }
 
