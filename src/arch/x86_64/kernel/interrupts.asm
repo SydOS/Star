@@ -388,8 +388,17 @@ extern interrupts_isr_handler
 isr_common_stub:
     ; The processor has already pushed SS, RSP, RFLAGS, CS, and RIP to the stack.
     ; The interrupt-specific handler also pushed the interrupt number, and an empty error code if needed.
-    ; Save registers.
+    
+    ; Push general registers (RAX, RCX, RDX, RBX, RBP, RSI, and RDI) to stack.
+    push rax
+    push rcx
+    push rdx
+    push rbx
     push rbp
+    push rsi
+    push rdi
+
+    ; Push x64 registers (R15, R14, R13, R12, R11, R10, R9, and R8) to stack.
     push r15
     push r14
     push r13
@@ -398,14 +407,9 @@ isr_common_stub:
     push r10
     push r9
     push r8
-    push rdi
-    push rsi
-    push rdx
-    push rcx
-    push rbx
-    push rax
 
-    ; Save segments.
+    ; Push segments to stack.
+    ; DS and ES cannot be directly pushed, so we must copy them to RAX first.
     mov rax, ds
     push rax
     mov rax, es
@@ -413,35 +417,29 @@ isr_common_stub:
     push fs
     push gs
 
-    ; Restore kernel segments.
+    ; Set up kernel segments.
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    ; Call interrupt handler.
+    ; Call C handler.
     mov rdi, rsp
     call interrupts_isr_handler
 
 global _isr_exit
 _isr_exit:
     ; Restore segments.
+    ; DS and ES cannot be directly restored, so we must copy them to RAX first.
     pop gs
     pop fs
     pop rax
     mov es, ax
-
     pop rax
     mov ds, ax
 
-    ; Restore registers.
-    pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-    pop rsi
-    pop rdi
+    ; Restore x64 registers (R8, R9, R10, R11, R12, R13, R14, R15) to stack.
     pop r8
     pop r9
     pop r10
@@ -450,8 +448,17 @@ _isr_exit:
     pop r13
     pop r14
     pop r15
-    pop rbp
 
+    ; Restore general registers (RDI, RSI, RBP, RBX, RDX, RCX, and RAX).
+    pop rdi
+    pop rsi
+    pop rbp
+    pop rbx
+    pop rdx
+    pop rcx
+    pop rax
+
+    ; Move past the error code and interrupt number and continue execution.
     add rsp, 16
     iretq
 

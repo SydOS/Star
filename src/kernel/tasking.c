@@ -103,21 +103,14 @@ Process* tasking_create_process(char* name, uintptr_t addr, uintptr_t ecx, uintp
     // Set up registers.
     process->StackTop -= sizeof(registers_t);
     process->Regs = (registers_t*)process->StackTop;
-#ifdef X86_64
-    process->Regs->rflags = 0x00000202;
-    process->Regs->rip = addr;
-    process->Regs->rbp = process->StackTop;
-    process->Regs->rsp = process->StackTop;
-    process->Regs->rcx = ecx;	
-    process->Regs->rdx = edx;	
-#else
-    process->Regs->eflags = 0x00000202;
-    process->Regs->eip = addr;
-    process->Regs->ebp = stackTop;
-    process->Regs->esp = process->StackTop;
-    process->Regs->ecx = ecx;	
-    process->Regs->edx = edx;	
-#endif
+
+
+    process->Regs->flags = 0x00000202;
+    process->Regs->ip = addr;
+    process->Regs->bp = stackTop;
+    process->Regs->sp = process->StackTop;
+    process->Regs->cx = ecx;	
+    process->Regs->dx = edx;	
 
     process->Regs->cs = 0x8;
     process->Regs->ds = 0x10;

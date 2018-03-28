@@ -52,19 +52,40 @@ enum {
 
 // Defines registers for ISR callbacks.
 struct registers {
+    // Extra segments and data segment.
+    uintptr_t gs, fs, es, ds;
+
 #ifdef X86_64
-    uint64_t gs, fs, es, ds;
-    uint64_t rax, rbx, rcx, rdx, rsi, rdi;
+    // Extra x64 registers.
     uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
-    uint64_t rbp;
-    uint64_t intNum, errorCode;
-    uint64_t rip, cs, rflags, rsp, ss;
-#else
-    uint32_t gs, fs, es, ds;
-    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
-    uint32_t intNum, errorCode;
-    uint32_t eip, cs, eflags, useresp, ss;    
 #endif
+    // Destination index, source index, base pointer.
+    uintptr_t di, si, bp;
+
+#ifndef X86_64
+    // Stack pointer (only in 32-bit).
+    uintptr_t sp;
+#endif
+
+    // Base, data, counter, and accumulator registers.
+    uintptr_t bx, dx, cx, ax;
+
+    // Interrupt number and error code.
+    uintptr_t intNum, errorCode;
+
+    // Instruction pointer, code segment, and flags.
+    uintptr_t ip, cs, flags;
+    
+#ifdef X86_64
+    // Stack pointer (only in 64-bit).
+    uintptr_t sp;
+#else
+    // Stack pointer used when changing rings (only in 32-bit).
+    uintptr_t usersp;
+#endif
+    
+    
+    uintptr_t ss;   
 } __attribute__((packed));
 typedef struct registers registers_t;
 

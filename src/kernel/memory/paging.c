@@ -138,7 +138,7 @@ void paging_unmap_region_phys(uintptr_t startAddress, uintptr_t endAddress) {
 static void paging_pagefault_handler(registers_t *regs) {
     page_t addr;
     asm volatile ("mov %%cr2, %0" : "=r"(addr));
-#ifdef X86_64
+/*#ifdef X86_64
     kprintf("RAX: 0x%p, RBX: 0x%p, RCX: 0x%p, RDX: 0x%p\n", regs->rax, regs->rbx, regs->rcx, regs->rdx);
     kprintf("RSI: 0x%p, RDI: 0x%p, RBP: 0x%p, RSP: 0x%p\n", regs->rsi, regs->rdi, regs->rbp, regs->rsp);
     kprintf("RIP: 0x%p, RFLAGS: 0x%p\n", regs->rip, regs->rflags);
@@ -146,7 +146,7 @@ static void paging_pagefault_handler(registers_t *regs) {
     kprintf("EAX: 0x%p, EBX: 0x%p, ECX: 0x%p, EDX: 0x%p\n", regs->eax, regs->ebx, regs->ecx, regs->edx);
     kprintf("ESI: 0x%p, EDI: 0x%p, EBP: 0x%p, ESP: 0x%p\n", regs->esi, regs->edi, regs->ebp, regs->esp);
     kprintf("EIP: 0x%p, EFLAGS: 0x%p\n", regs->eip, regs->eflags);
-#endif
+#endif*/
     panic("PAGING: Page fault at 0x%X!\n", addr);
 }
 

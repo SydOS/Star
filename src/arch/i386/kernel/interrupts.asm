@@ -386,34 +386,48 @@ _irq15:
 ; ISR common stub. This calls the handler defined in interrupts.c.
 extern interrupts_isr_handler
 isr_common_stub:
+    ; The processor has already pushed SS, user ESP, EFLAGS, CS, and EIP to the stack.
+    ; The interrupt-specific handler also pushed the interrupt number, and an empty error code if needed.
+    
+    ; Push general registers (EAX, ECX, EDX, EBX, EBP, ESP, ESI, and EDI) to stack.
     pushad
+
+    ; Push segments to stack.
     push ds
     push es
     push fs
     push gs
 
+    ; Set up kernel segments.
     mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
+    ; Push stack for use in C handler.
     mov eax, esp
-    push eax ; Push stack for use in handler.
+    push eax
+
+    ; Call C handler.
     call interrupts_isr_handler
     pop eax
 
 global _isr_exit
 _isr_exit:
+    ; Restore segments.
     pop gs
     pop fs
     pop es
     pop ds
+
+    ; Restore general registers (EDI, ESI, ESP, EBP, EBX, EDX, ECX, and EAX).
     popad
 
-    add esp, 8 ; Move past the error code and interrupt number.
+    ; Move past the error code and interrupt number and continue execution.
+    add esp, 8
     iretd
 
 global _isr_empty
 _isr_empty:
-    iret
+    iretd
