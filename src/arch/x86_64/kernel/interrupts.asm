@@ -383,6 +383,35 @@ _irq15:
     push byte 47
     jmp isr_common_stub
 
+; 47: IRQ15
+global _irq16
+_irq16:
+    cli
+    push byte 0
+    push byte 48
+    jmp test_stub
+
+global _irq17
+_irq17:
+    cli
+    push byte 0
+    push byte 49
+    jmp test_stub
+
+global _irq18
+_irq18:
+    cli
+    push byte 0
+    push byte 50
+    jmp test_stub
+
+global _irq19
+_irq19:
+    cli
+    push byte 0
+    push byte 51
+    jmp test_stub
+
 ; ISR common stub. This calls the handler defined in interrupts.c.
 extern interrupts_isr_handler
 isr_common_stub:
@@ -430,6 +459,83 @@ isr_common_stub:
 
 global _isr_exit
 _isr_exit:
+    ; Restore segments.
+    ; DS and ES cannot be directly restored, so we must copy them to RAX first.
+    pop gs
+    pop fs
+    pop rax
+    mov es, ax
+    pop rax
+    mov ds, ax
+
+    ; Restore x64 registers (R8, R9, R10, R11, R12, R13, R14, R15) to stack.
+    pop r8
+    pop r9
+    pop r10
+    pop r11
+    pop r12
+    pop r13
+    pop r14
+    pop r15
+
+    ; Restore general registers (RDI, RSI, RBP, RBX, RDX, RCX, and RAX).
+    pop rdi
+    pop rsi
+    pop rbp
+    pop rbx
+    pop rdx
+    pop rcx
+    pop rax
+
+    ; Move past the error code and interrupt number and continue execution.
+    add rsp, 16
+    iretq
+
+    ; ISR common stub. This calls the handler defined in interrupts.c.
+extern test_handler
+test_stub:
+    ; The processor has already pushed SS, RSP, RFLAGS, CS, and RIP to the stack.
+    ; The interrupt-specific handler also pushed the interrupt number, and an empty error code if needed.
+    
+    ; Push general registers (RAX, RCX, RDX, RBX, RBP, RSI, and RDI) to stack.
+    push rax
+    push rcx
+    push rdx
+    push rbx
+    push rbp
+    push rsi
+    push rdi
+
+    ; Push x64 registers (R15, R14, R13, R12, R11, R10, R9, and R8) to stack.
+    push r15
+    push r14
+    push r13
+    push r12
+    push r11
+    push r10
+    push r9
+    push r8
+
+    ; Push segments to stack.
+    ; DS and ES cannot be directly pushed, so we must copy them to RAX first.
+    mov rax, ds
+    push rax
+    mov rax, es
+    push rax
+    push fs
+    push gs
+
+    ; Set up kernel segments.
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    ; Call C handler.
+    mov rdi, rsp
+    call test_handler
+
     ; Restore segments.
     ; DS and ES cannot be directly restored, so we must copy them to RAX first.
     pop gs

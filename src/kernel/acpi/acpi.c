@@ -54,8 +54,6 @@ ACPI_SUBTABLE_HEADER *acpi_search_madt(uint8_t type, uint32_t requiredLength, ui
     if (status || madt == NULL)
         return NULL;
 
-    kprintf("Found APIC table at 0x%p to 0x%p\n", madt, (uintptr_t)madt + madt->Header.Length);
-
     // Search for the first matched entry after the start specified.
     uintptr_t address = start == 0 ? (uintptr_t)madt : (uintptr_t)start;
     while (address >= (uintptr_t)madt && address < (uintptr_t)((uintptr_t)madt + madt->Header.Length)) {
@@ -74,8 +72,118 @@ ACPI_SUBTABLE_HEADER *acpi_search_madt(uint8_t type, uint32_t requiredLength, ui
     }
 
     // No match found.
-    kprintf("Nothing found.\n");
     return NULL;
+}
+
+static ACPI_STATUS acpi_get_prt_method_callback(ACPI_HANDLE object, UINT32 nestingLevel, void *context, void **returnValue) {
+    ACPI_STATUS status = AE_OK;
+    ACPI_HANDLE *handle = (ACPI_HANDLE)context;
+
+    // Get parent.
+    ACPI_HANDLE parentHandle;
+    status = AcpiGetParent(object, &parentHandle);
+    if (status) {
+        *returnValue = false;
+        return status;
+    }
+
+    // Get name.
+    ACPI_BUFFER path = { ACPI_ALLOCATE_BUFFER };
+    status = AcpiGetName(object, ACPI_SINGLE_NAME, &path);
+    if (status) {
+        if (path.Pointer)
+            ACPI_FREE(path.Pointer);
+        *returnValue = false;
+        return status;
+    }
+
+    // Verify name is _PRT.
+    if (strcmp((char*)path.Pointer, "_PRT") == 0 && *handle == parentHandle) {
+        *returnValue = true;
+        status = AE_CTRL_TERMINATE;
+    }
+
+    // Free name object and return status.
+    if (path.Pointer)
+        ACPI_FREE(path.Pointer);
+    return status;
+}
+
+static ACPI_STATUS acpi_get_prt_device_callback(ACPI_HANDLE object, UINT32 nestingLevel, void *context, void **returnValue) {
+    // Terminate the walk when done.
+    ACPI_STATUS status = AE_OK;
+    uint32_t *busAddress = (uint32_t*)context;
+
+    // Get device info.
+    ACPI_DEVICE_INFO *info;
+	status = AcpiGetObjectInfo(object, &info);
+    UINT64 address = 0;
+    if (status == AE_OK)
+        address = info->Address;
+
+    // Free device object.
+    if (info)
+        ACPI_FREE(info);
+
+    // Ensure command completed.
+    if (status == AE_OK) {
+        // Ensure device has a _PRT method.
+        bool hasPrt = false;
+        kprintf("ACPI: Checking _PRT on device ADR 0x%X...\n", address);
+        status = AcpiWalkNamespace(ACPI_TYPE_METHOD, object, 1, acpi_get_prt_method_callback, NULL, &object, &hasPrt);
+
+        // Is the device the one we want?
+        if (status == AE_OK && hasPrt && address == *busAddress) {
+            kprintf("ACPI: Found our PCI device: 0x%llX\n", address);
+            status = AE_CTRL_TERMINATE;
+            *returnValue = object;
+        }
+    }
+
+
+
+    // Return status.
+    return status;
+}
+
+ACPI_STATUS acpi_get_prt(uint32_t busAddress, ACPI_BUFFER *outBuffer) {
+    // Get handle to root PCI bus.
+    ACPI_HANDLE rootHandle = 0;
+    uint32_t rootAddress = 0;
+    kprintf("ACPI: Finding root PCI bus device...\n");
+    ACPI_STATUS status = AcpiGetDevices("PNP0A03", acpi_get_prt_device_callback, &rootAddress, &rootHandle);
+    if (status)
+        return status;
+
+    // Get handle to PCI bus.
+    ACPI_HANDLE handle = 0;
+
+    if (busAddress != 0) {
+        kprintf("ACPI: Finding PCI bus device 0x%X...\n", busAddress);
+        status = AcpiWalkNamespace(ACPI_TYPE_DEVICE, rootHandle, -1, acpi_get_prt_device_callback, NULL, &busAddress, &handle);
+        if (status)
+            return status;
+    }
+    else {
+        // We already have the root bus handle.
+        handle = rootHandle;
+    }
+
+    // Get name of device for debug.
+    ACPI_BUFFER path = { ACPI_ALLOCATE_BUFFER };
+    status = AcpiGetName(handle, ACPI_FULL_PATHNAME, &path);
+    if (!status)
+        kprintf("ACPI: Got PCI bus %s!\n", (char*)path.Pointer);
+    if (path.Pointer)
+        ACPI_FREE(path.Pointer);
+
+    // Get routing table.
+    ACPI_BUFFER buffer = { ACPI_ALLOCATE_BUFFER };
+    status = AcpiGetIrqRoutingTable(handle, &buffer);
+
+    // Return buffer and status.
+    *outBuffer = buffer;
+    return status;
 }
 
 bool acpi_change_pic_mode(uint32_t value) {

@@ -13,7 +13,14 @@
 static bool ioApicInitialized = false;
 
 #define INTERRUPT_MAP_MAGIC 0xDEADBEEF
-static uint32_t interrupt_redirections[IRQ_COUNT] = {
+static uint32_t interrupt_redirections[24] = {
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC,
@@ -98,6 +105,24 @@ void ioapic_enable_interrupt(uint8_t interrupt, uint8_t vector) {
     entry.interruptVector = vector;
     entry.deliveryMode = IOAPIC_DELIVERY_FIXED;
     entry.destinationMode = IOAPIC_DEST_MODE_PHYSICAL;
+    entry.interruptMask = false;
+    entry.destinationField = 0;
+
+    // Save entry to I/O APIC.
+    ioapic_set_redirection_entry(interrupt, entry);
+    kprintf("IOAPIC: Mapped interrupt %u to 0x%X\n", interrupt, vector);
+}
+
+void ioapic_enable_interrupt_pci(uint8_t interrupt, uint8_t vector) {
+    // Get entry for interrupt.
+    ioapic_redirection_entry_t entry = ioapic_get_redirection_entry(interrupt);
+
+    // Set entry fields.
+    entry.interruptVector = vector;
+    entry.deliveryMode = IOAPIC_DELIVERY_FIXED;
+    entry.destinationMode = IOAPIC_DEST_MODE_PHYSICAL;
+    entry.triggerMode = 1;
+    entry.interruptInputPolarity = 1;
     entry.interruptMask = false;
     entry.destinationField = 0;
 

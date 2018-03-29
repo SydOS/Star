@@ -5,6 +5,8 @@
 #include <driver/vga.h>
 #include <driver/pci.h>
 
+#include <acpi.h>
+
 /**
  * Print the description for a PCI device
  * @param dev PCIDevice struct with PCI device info
@@ -59,6 +61,24 @@ uint16_t pci_config_read_word(struct PCIDevice* dev, uint8_t offset) {
     return (tmp);
 }
 
+void pci_config_write_word(struct PCIDevice* dev, uint8_t offset, uint16_t data) {
+    uint32_t address;
+    uint32_t lbus  = (uint32_t)dev->Bus;
+    uint32_t lslot = (uint32_t)dev->Device;
+    uint32_t lfunc = (uint32_t)dev->Function;
+    uint16_t tmp = 0;
+ 
+    /* create configuration address as per Figure 1 */
+    address = (uint32_t)((lbus << 16) | (lslot << 11) |
+        (lfunc << 8) | (offset & 0xfc) | ((uint32_t)0x80000000));
+ 
+    /* write out the address */
+    outl(PCI_ADDRESS_PORT, address);
+    /* read in the data */
+    /* (offset & 2) * 8) = 0 will choose the first word of the 32 bits register */
+    outw(PCI_VALUE_PORT + (offset & 0x3), data);
+}
+
 /**
  * Read a DWORD (32 bits) from a PCIDevice's config space. Quite hacky, but
  * it works
@@ -80,7 +100,7 @@ uint32_t pci_config_read_dword(struct PCIDevice* dev, uint8_t offset) {
  * @param  function PCI card function to read from
  * @return          A PCIDevice struct with the info filled
  */
-struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function) {
+struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function, ACPI_BUFFER *routingBuffer) {
     // Define our PCIDevice
     struct PCIDevice *this_device = (struct PCIDevice*)kheap_alloc(sizeof(struct PCIDevice));
 
@@ -112,6 +132,25 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     // Return if vendor is none
     if (this_device->VendorID == 0xFFFF) return this_device;
 
+    // Find device in ACPI PRT table.
+    ACPI_PCI_ROUTING_TABLE *table = routingBuffer->Pointer;
+    while (((uintptr_t)table < (uintptr_t)routingBuffer->Pointer + routingBuffer->Length) && table->Length) {
+        // Did we find our device and interrupt pin? ACPI starts at 0, PCI starts at 1.
+        if (table->Pin == (this_device->IntPIN - 1) && (table->Address >> 16) == this_device->Device) {
+            if (table->Source[0]) {
+                kprintf("IRQ: Pin 0x%X, Address 0x%llX, Source: %s, Index: %d\n", table->Pin, table->Address, (char*)table->Source, table->SourceIndex);
+            }
+            else {
+                kprintf("IRQ: Pin 0x%X, Address 0x%llX, Global interrupt: 0x%X\n", table->Pin, table->Address, table->SourceIndex);
+                this_device->apicLine = (uint8_t)table->SourceIndex;
+            }
+            break;
+        }        
+
+        // Move to next entry.
+        table = (uintptr_t)table + table->Length;
+    }
+
     pci_print_info(this_device);
 
     // If the card reports more than one function, let's scan those too
@@ -120,7 +159,7 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
         kprintf("  - Scanning other functions on multifunction device!\n");
         // Check each function on the device
         for (int t_function = 1; t_function < 8; t_function++) {
-            struct PCIDevice *func_device = pci_check_device(bus, device, t_function);
+            struct PCIDevice *func_device = pci_check_device(bus, device, t_function, routingBuffer);
             kheap_free(func_device);
         }
     }
@@ -133,11 +172,15 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
  * Check a bus for PCI devices
  * @param bus The bus number to scan
  */
-void pci_check_busses(uint8_t bus) {
+void pci_check_busses(uint8_t bus, uint8_t device) {
+    ACPI_BUFFER buffer;
+    kprintf("Getting _PRT for bus %d on device %d...\n", bus ,device);
+    ACPI_STATUS status = acpi_get_prt(device << 16, &buffer);
+
     // Check each device on bus
     for (int device = 0; device < 32; device++) {
         // Get info on the device and print info
-        struct PCIDevice *this_device = pci_check_device(bus, device, 0);
+        struct PCIDevice *this_device = pci_check_device(bus, device, 0, &buffer);
 
         // Check if the device is the RTL8139
         if(this_device->VendorID == 0x10EC && this_device->DeviceID == 0x8139) {
@@ -153,7 +196,7 @@ void pci_check_busses(uint8_t bus) {
             uint16_t primaryBus = (seconaryBus & ~0xFF00);
             seconaryBus = (seconaryBus & ~0x00FF) >> 8;
             kprintf("  - PCI bridge, Primary %X Seconary %X, scanning now.\n", primaryBus, seconaryBus);
-            pci_check_busses(seconaryBus);
+            pci_check_busses(seconaryBus, device);
 
         // If device is a different kind of bridge
         } else if(this_device->Class == 6) {
@@ -164,6 +207,10 @@ void pci_check_busses(uint8_t bus) {
         // Free object
         kheap_free(this_device);
     }
+
+    // Free interrupt table.
+    if (buffer.Pointer)
+        ACPI_FREE(buffer.Pointer);
 
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 }

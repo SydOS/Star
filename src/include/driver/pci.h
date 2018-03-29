@@ -43,9 +43,11 @@ struct PCIDevice {
 
 	uint8_t IntPIN;
 	uint8_t IntLine;
+
+	uint8_t apicLine;
 };
 
 char* pci_class_descriptions[255];
 
-extern void pci_check_busses(uint8_t bus);
+extern void pci_check_busses(uint8_t bus, uint8_t device);
 extern void pci_init();
