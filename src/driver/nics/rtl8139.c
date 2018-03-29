@@ -6,10 +6,10 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/interrupts.h>
 
-extern void _irq16();
-extern void _irq17();
-extern void _irq18();
-extern void _irq19();
+//extern void _irq16();
+//extern void _irq17();
+//extern void _irq18();
+//extern void _irq19();
 
 void test_handler(registers_t *regs) {
 kprintf_nlock("Test: APIC INT %d\n", regs->intNum);
@@ -82,14 +82,14 @@ void rtl8139_init(struct PCIDevice* dev) {
 	//idt_set_gate(IRQ_OFFSET + dev->apicLine, (uintptr_t)_irqT, 0x08, 0x8E);
 	//ioapic_enable_interrupt(ioapic_remap_interrupt(dev->apicLine), dev->apicLine);
 
-	idt_set_gate(IRQ_OFFSET + 16, (uintptr_t)_irq16, 0x08, 0x8E);
-	ioapic_enable_interrupt_pci(ioapic_remap_interrupt(16), IRQ_OFFSET + 16);
-	idt_set_gate(IRQ_OFFSET + 17, (uintptr_t)_irq17, 0x08, 0x8E);
-	ioapic_enable_interrupt_pci(ioapic_remap_interrupt(17), IRQ_OFFSET + 17);
-	idt_set_gate(IRQ_OFFSET + 18, (uintptr_t)_irq18, 0x08, 0x8E);
-	ioapic_enable_interrupt_pci(ioapic_remap_interrupt(18), IRQ_OFFSET + 18);
-	idt_set_gate(IRQ_OFFSET + 19, (uintptr_t)_irq19, 0x08, 0x8E);
-	ioapic_enable_interrupt_pci(ioapic_remap_interrupt(19), IRQ_OFFSET + 19);
+	//idt_set_gate(IRQ_OFFSET + 16, (uintptr_t)_irq16, 0x08, 0x8E);
+	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(16), IRQ_OFFSET + 16);
+	//idt_set_gate(IRQ_OFFSET + 17, (uintptr_t)_irq17, 0x08, 0x8E);
+	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(17), IRQ_OFFSET + 17);
+	//idt_set_gate(IRQ_OFFSET + 18, (uintptr_t)_irq18, 0x08, 0x8E);
+	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(18), IRQ_OFFSET + 18);
+	//idt_set_gate(IRQ_OFFSET + 21, (uintptr_t)_irq19, 0x08, 0x8E);
+	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(21), IRQ_OFFSET + 21);
 
 
 

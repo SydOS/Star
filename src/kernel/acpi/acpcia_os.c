@@ -9,6 +9,7 @@
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
+#include <driver/pci.h>
 
 #include <kernel/interrupts/interrupts.h>
 
@@ -294,14 +295,30 @@ ACPI_STATUS AcpiOsWritePort ( ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Widt
     return (AE_ERROR);
 }
 
-ACPI_STATUS
-AcpiOsReadPciConfiguration (
-    ACPI_PCI_ID             *PciId,
-    UINT32                  Reg,
-    UINT64                  *Value,
-    UINT32                  Width) {
-        kprintf("ACPI: Attempted to read PCI.\n");
+ACPI_STATUS AcpiOsReadPciConfiguration (ACPI_PCI_ID *PciId, UINT32 Reg, UINT64 *Value, UINT32 Width) {
+    /* create configuration address as per Figure 1 */
+    uint32_t address = (uint32_t)((PciId->Bus << 16) | (PciId->Device << 11) |
+        (PciId->Function << 8) | (Reg & 0xfc) | ((uint32_t)0x80000000));
+ 
+    /* write out the address */
+    outl(PCI_ADDRESS_PORT, address);
+
+    switch (Width) {
+        case 8:
+            *Value = inb(PCI_VALUE_PORT);
+            return AE_OK;
+
+        case 16:
+            *Value = inw(PCI_VALUE_PORT);
+            return AE_OK;
+
+        case 32:
+            *Value = inl(PCI_VALUE_PORT);
+            return AE_OK;
     }
+
+    return AE_ERROR;
+}
 
 ACPI_STATUS
 AcpiOsWritePciConfiguration (

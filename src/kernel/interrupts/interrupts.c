@@ -215,62 +215,47 @@ void interrupts_init() {
         useLapic = true;
     }
 
-    // Add each of the 32 exception ISRs to the IDT.
+    // Add exception ISRs to the IDT.
     kprintf("INTERRUPTS: Mapping exceptions...\n");
-    idt_set_gate(0, (uintptr_t)_isr0, 0x08, 0x8E);
-    idt_set_gate(1, (uintptr_t)_isr1, 0x08, 0x8E);
-    idt_set_gate(2, (uintptr_t)_isr2, 0x08, 0x8E);
-    idt_set_gate(3, (uintptr_t)_isr3, 0x08, 0x8E);
-    idt_set_gate(4, (uintptr_t)_isr4, 0x08, 0x8E);
-    idt_set_gate(5, (uintptr_t)_isr5, 0x08, 0x8E);
-    idt_set_gate(6, (uintptr_t)_isr6, 0x08, 0x8E);
-    idt_set_gate(7, (uintptr_t)_isr7, 0x08, 0x8E);
+    idt_open_interrupt_gate(0, (uintptr_t)_isr0);
+    idt_open_interrupt_gate(1, (uintptr_t)_isr1);
+    idt_open_interrupt_gate(2, (uintptr_t)_isr2);
+    idt_open_interrupt_gate(3, (uintptr_t)_isr3);
+    idt_open_interrupt_gate(4, (uintptr_t)_isr4);
+    idt_open_interrupt_gate(5, (uintptr_t)_isr5);
+    idt_open_interrupt_gate(6, (uintptr_t)_isr6);
+    idt_open_interrupt_gate(7, (uintptr_t)_isr7);
+    idt_open_interrupt_gate(8, (uintptr_t)_isr8);
+    idt_open_interrupt_gate(9, (uintptr_t)_isr9);
+    idt_open_interrupt_gate(10, (uintptr_t)_isr10);
+    idt_open_interrupt_gate(11, (uintptr_t)_isr11);
+    idt_open_interrupt_gate(12, (uintptr_t)_isr12);
+    idt_open_interrupt_gate(13, (uintptr_t)_isr13);
+    idt_open_interrupt_gate(14, (uintptr_t)_isr14);
+    idt_open_interrupt_gate(16, (uintptr_t)_isr16);
+    idt_open_interrupt_gate(17, (uintptr_t)_isr17);
+    idt_open_interrupt_gate(18, (uintptr_t)_isr18);
+    idt_open_interrupt_gate(19, (uintptr_t)_isr19);
+    idt_open_interrupt_gate(20, (uintptr_t)_isr20);
 
-    idt_set_gate(8, (uintptr_t)_isr8, 0x08, 0x8E);
-    idt_set_gate(9, (uintptr_t)_isr9, 0x08, 0x8E);
-    idt_set_gate(10, (uintptr_t)_isr10, 0x08, 0x8E);
-    idt_set_gate(11, (uintptr_t)_isr11, 0x08, 0x8E);
-    idt_set_gate(12, (uintptr_t)_isr12, 0x08, 0x8E);
-    idt_set_gate(13, (uintptr_t)_isr13, 0x08, 0x8E);
-    idt_set_gate(14, (uintptr_t)_isr14, 0x08, 0x8E);
-    idt_set_gate(15, (uintptr_t)_isr15, 0x08, 0x8E);
-
-    idt_set_gate(16, (uintptr_t)_isr16, 0x08, 0x8E);
-    idt_set_gate(17, (uintptr_t)_isr17, 0x08, 0x8E);
-    idt_set_gate(18, (uintptr_t)_isr18, 0x08, 0x8E);
-    idt_set_gate(19, (uintptr_t)_isr19, 0x08, 0x8E);
-    idt_set_gate(20, (uintptr_t)_isr20, 0x08, 0x8E);
-    idt_set_gate(21, (uintptr_t)_isr21, 0x08, 0x8E);
-    idt_set_gate(22, (uintptr_t)_isr22, 0x08, 0x8E);
-
-    idt_set_gate(23, (uintptr_t)_isr23, 0x08, 0x8E);
-    idt_set_gate(24, (uintptr_t)_isr24, 0x08, 0x8E);
-    idt_set_gate(25, (uintptr_t)_isr25, 0x08, 0x8E);
-    idt_set_gate(26, (uintptr_t)_isr26, 0x08, 0x8E);
-    idt_set_gate(27, (uintptr_t)_isr27, 0x08, 0x8E);
-    idt_set_gate(28, (uintptr_t)_isr28, 0x08, 0x8E);
-    idt_set_gate(29, (uintptr_t)_isr29, 0x08, 0x8E);
-    idt_set_gate(30, (uintptr_t)_isr30, 0x08, 0x8E);
-    idt_set_gate(31, (uintptr_t)_isr31, 0x08, 0x8E);
-
-    // Add the 16 IRQ ISRs to the IDT.
+    // Add IRQ ISRs to the IDT.
     kprintf("INTERRUPTS: Mapping IRQs...\n");
-    idt_set_gate(32, (uintptr_t)_irq0, 0x08, 0x8E);
-    idt_set_gate(33, (uintptr_t)_irq1, 0x08, 0x8E);
-    idt_set_gate(34, (uintptr_t)_irq2, 0x08, 0x8E);
-    idt_set_gate(35, (uintptr_t)_irq3, 0x08, 0x8E);
-    idt_set_gate(36, (uintptr_t)_irq4, 0x08, 0x8E);
-    idt_set_gate(37, (uintptr_t)_irq5, 0x08, 0x8E);
-    idt_set_gate(38, (uintptr_t)_irq6, 0x08, 0x8E);
-    idt_set_gate(39, (uintptr_t)_irq7, 0x08, 0x8E);
-    idt_set_gate(40, (uintptr_t)_irq8, 0x08, 0x8E);
-    idt_set_gate(41, (uintptr_t)_irq9, 0x08, 0x8E);
-    idt_set_gate(42, (uintptr_t)_irq10, 0x08, 0x8E);
-    idt_set_gate(43, (uintptr_t)_irq11, 0x08, 0x8E);
-    idt_set_gate(44, (uintptr_t)_irq12, 0x08, 0x8E);
-    idt_set_gate(45, (uintptr_t)_irq13, 0x08, 0x8E);
-    idt_set_gate(46, (uintptr_t)_irq14, 0x08, 0x8E);
-    idt_set_gate(47, (uintptr_t)_irq15, 0x08, 0x8E);
+    idt_open_interrupt_gate(32, (uintptr_t)_irq0);
+    idt_open_interrupt_gate(33, (uintptr_t)_irq1);
+    idt_open_interrupt_gate(34, (uintptr_t)_irq2);
+    idt_open_interrupt_gate(35, (uintptr_t)_irq3);
+    idt_open_interrupt_gate(36, (uintptr_t)_irq4);
+    idt_open_interrupt_gate(37, (uintptr_t)_irq5);
+    idt_open_interrupt_gate(38, (uintptr_t)_irq6);
+    idt_open_interrupt_gate(39, (uintptr_t)_irq7);
+    idt_open_interrupt_gate(40, (uintptr_t)_irq8);
+    idt_open_interrupt_gate(41, (uintptr_t)_irq9);
+    idt_open_interrupt_gate(42, (uintptr_t)_irq10);
+    idt_open_interrupt_gate(43, (uintptr_t)_irq11);
+    idt_open_interrupt_gate(44, (uintptr_t)_irq12);
+    idt_open_interrupt_gate(45, (uintptr_t)_irq13);
+    idt_open_interrupt_gate(46, (uintptr_t)_irq14);
+    idt_open_interrupt_gate(47, (uintptr_t)_irq15);
 
     kprintf("INTERRUPTS: Initialized!\n");
 }
