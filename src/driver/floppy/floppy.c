@@ -8,7 +8,7 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 
 static bool irqTriggered = false;
 static bool implied_seeks = false;
@@ -18,7 +18,7 @@ extern bool floppy_init_dma();
 /**
  * Handles IRQ6 firings
  */
-static void floppy_callback(registers_t* regs) {
+static void floppy_callback(IrqRegisters_t* regs, uint8_t irq) {
 	// Set our trigger value.
 	irqTriggered = true;
 }
@@ -259,7 +259,7 @@ void floppy_init() {
 	}
 
 	// Install hander for IRQ6.
-	interrupts_irq_install_handler(FLOPPY_IRQ, floppy_callback);
+	irqs_install_handler(FLOPPY_IRQ, floppy_callback);
 
 	// Reset controller and get version.
 	floppy_reset();

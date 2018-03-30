@@ -4,7 +4,7 @@
 #include <string.h>
 #include <kernel/memory/paging.h>
 
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/exceptions.h>
 #include <kernel/memory/pmm.h>
 
 // http://www.rohitab.com/discuss/topic/31139-tutorial-paging-memory-mapping-with-a-recursive-page-directory/
@@ -135,7 +135,7 @@ void paging_unmap_region_phys(uintptr_t startAddress, uintptr_t endAddress) {
         paging_unmap(startAddress + (i * PAGE_SIZE_4K));
 }
 
-static void paging_pagefault_handler(registers_t *regs) {
+static void paging_pagefault_handler(ExceptionRegisters_t *regs) {
     page_t addr;
     asm volatile ("mov %%cr2, %0" : "=r"(addr));
 /*#ifdef X86_64
@@ -157,7 +157,7 @@ void paging_init() {
     kprintf("PAGING: Initializing...\n");
 
     // Wire up page fault handler.
-    interrupts_isr_install_handler(ISR_EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
+    exceptions_install_handler(EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
 
 #ifdef X86_64
     // Setup 4-level (long mode) paging.

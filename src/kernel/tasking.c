@@ -6,6 +6,7 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/main.h>
 #include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 
 extern void _isr_exit();
 
@@ -101,8 +102,8 @@ Process* tasking_create_process(char* name, uintptr_t addr, uintptr_t ecx, uintp
     memset((void*)process->StackBottom, 0, 4096);
 
     // Set up registers.
-    process->StackTop -= sizeof(registers_t);
-    process->Regs = (registers_t*)process->StackTop;
+    process->StackTop -= sizeof(IrqRegisters_t);
+    process->Regs = (IrqRegisters_t*)process->StackTop;
 
 
     process->Regs->flags = 0x00000202;
@@ -122,16 +123,16 @@ Process* tasking_create_process(char* name, uintptr_t addr, uintptr_t ecx, uintp
 
 static void tasking_exec() {
     // Send EOI and change out stacks.
-    interrupts_eoi(0);
+    irqs_eoi(0);
 #ifdef X86_64
     asm volatile ("mov %0, %%rsp" : : "r"(currentProcess->Regs));
 #else
     asm volatile ("mov %0, %%esp" : : "r"(currentProcess->Regs));
 #endif
-    asm volatile ("jmp _isr_exit");
+    asm volatile ("jmp _irq_exit");
 }
 
-void tasking_tick(registers_t *regs) {
+void tasking_tick(IrqRegisters_t *regs) {
     // Is tasking enabled?
     if (!taskingEnabled)
         return;
@@ -146,12 +147,12 @@ void tasking_tick(registers_t *regs) {
 
 void tasking_init() {
     // Set up kernel task.
-    asm volatile ("cli");
+    interrupts_disable();
     kprintf("Creating kernel task...\n");
     currentProcess = tasking_create_process("kernel", (uintptr_t)kernel_main_thread, 0, 0);
     currentProcess->Next = currentProcess;
     currentProcess->Prev = currentProcess;
-    asm volatile ("sti");
+    interrupts_enable();
 
     // Start tasking!
     tasking_exec();

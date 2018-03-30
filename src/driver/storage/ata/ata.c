@@ -4,7 +4,7 @@
 #include <kprint.h>
 #include <driver/storage/ata/ata.h>
 #include <driver/storage/ata/ata_commands.h>
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 #include <driver/storage/storage.h>
 
 static bool irqTriggeredPri = false;
@@ -467,8 +467,8 @@ void ata_init() {
     kprintf("ATA: Initializing...\n");
 
     // Register interrupt handlers.
-    interrupts_irq_install_handler(IRQ_PRI_ATA, ata_callback_pri);
-    interrupts_irq_install_handler(IRQ_SEC_ATA, ata_callback_sec);
+    irqs_install_handler(IRQ_PRI_ATA, ata_callback_pri);
+    irqs_install_handler(IRQ_SEC_ATA, ata_callback_sec);
 
     // Reset and identify both channels.
     ata_reset_identify(ATA_PRI_COMMAND_PORT, ATA_PRI_CONTROL_PORT);

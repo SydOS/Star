@@ -1,7 +1,7 @@
 #ifndef TASKING_H
 #define TASKING_H
 
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 
 #define PROCESS_STATE_ALIVE 0
 #define PROCESS_STATE_ZOMBIE 1
@@ -22,7 +22,7 @@ typedef struct Process {
 
 	uintptr_t StackBottom;
 	uintptr_t StackTop;
-	registers_t *Regs;
+	IrqRegisters_t *Regs;
 	/* open() */
 	uint16_t num_open_files;
 	char **open_files;
@@ -33,7 +33,7 @@ typedef struct Process {
 
 extern int tasking_add_process(Process* newProcess);
 extern Process* tasking_create_process(char* name, uintptr_t addr, uintptr_t ecx, uintptr_t edx);
-extern void tasking_tick(registers_t *regs);
+extern void tasking_tick(IrqRegisters_t* regs);
 extern void tasking_init();
 
 #endif

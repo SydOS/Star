@@ -47,6 +47,8 @@
 #define LAPIC_REG_TIMER_CURRENT_COUNT   0x390
 #define LAPIC_REG_TIMER_DIVIDE_CONF     0x3E0
 
+#define LAPIC_SPURIOUS_INT              0xFF
+
 // Delivery mode.
 enum LAPIC_DELIVERY_MODE {
     // Delivers the interrupt specified in the vector field to the target processor or processors.
@@ -148,17 +150,17 @@ struct lapic_icr {
 } __attribute__((packed));
 typedef struct lapic_icr lapic_icr_t;
 
-extern bool lapic_supported();
-extern bool lapic_x2apic();
-extern bool lapic_enabled();
+extern bool lapic_supported(void);
+extern bool lapic_x2apic(void);
+extern bool lapic_enabled(void);
 extern void lapic_send_init(uint8_t apic);
 extern void lapic_send_startup(uint8_t apic, uint8_t vector);
-extern uint32_t lapic_id();
-extern uint8_t lapic_version();
-extern uint8_t lapic_max_lvt();
-extern void lapic_eoi();
-extern void lapic_create_spurious_interrupt(uint8_t interrupt);
-extern void lapic_setup();
-extern void lapic_init();
+extern uint32_t lapic_id(void);
+extern uint8_t lapic_version(void);
+extern uint8_t lapic_max_lvt(void);
+extern void lapic_eoi(void);
+extern int16_t lapic_get_irq(void);
+extern void lapic_setup(void);
+extern void lapic_init(void);
 
 #endif

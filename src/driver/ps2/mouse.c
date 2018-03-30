@@ -4,7 +4,7 @@
 #include <driver/ps2/mouse.h>
 
 #include <driver/ps2/ps2.h>
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 
 // https://wiki.osdev.org/Mouse
 // https://wiki.osdev.org/PS/2_Mouse
@@ -274,7 +274,7 @@ static void ps2_mouse_callback()
 void ps2_mouse_init()
 {
     // Register IRQ12 for the mouse.
-    interrupts_irq_install_handler(12, ps2_mouse_callback);
+    irqs_install_handler(IRQ_MOUSE, ps2_mouse_callback);
 
     // Reset mouse.
     ps2_mouse_send_cmd(PS2_DATA_RESET);

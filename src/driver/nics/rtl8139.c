@@ -4,15 +4,15 @@
 #include <driver/pci.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 
 //extern void _irq16();
 //extern void _irq17();
 //extern void _irq18();
 //extern void _irq19();
 
-void test_handler(registers_t *regs) {
-kprintf_nlock("Test: APIC INT %d\n", regs->intNum);
+void test_handler(IrqRegisters_t* regs, uint8_t irq) {
+kprintf_nlock("Test: APIC INT %d\n", irq);
 
 	// Send EOI
     lapic_eoi();
@@ -26,8 +26,8 @@ struct RTL8139 {
 	uint8_t MACAddress[6];
 };
 
-static void rtl_callbac(registers_t *regs) {
-	kprintf_nlock("Test: INT %d\n", regs->intNum);
+static void rtl_callbac(IrqRegisters_t* regs, uint8_t irq) {
+	kprintf_nlock("Test: INT %d\n", irq);
 }
 
 void rtl8139_init(struct PCIDevice* dev) {
@@ -75,8 +75,8 @@ void rtl8139_init(struct PCIDevice* dev) {
 	outl(rtl->BaseAddress + 0x30, recDma - memInfo.kernelVirtualOffset);
 	outw(rtl->BaseAddress + 0x3C, 0xFFFF);
 	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
-	interrupts_irq_install_handler(dev->IntLine, rtl_callbac);
-	interrupts_irq_install_handler(4, rtl_callbac);
+	//interrupts_irq_install_handler(dev->IntLine, rtl_callbac);
+	//interrupts_irq_install_handler(4, rtl_callbac);
 
 
 	//idt_set_gate(IRQ_OFFSET + dev->apicLine, (uintptr_t)_irqT, 0x08, 0x8E);

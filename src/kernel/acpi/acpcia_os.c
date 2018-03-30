@@ -11,7 +11,7 @@
 #include <kernel/tasking.h>
 #include <driver/pci.h>
 
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 
 #ifdef X86_64
 #define ACPI_TEMP_ADDRESS   0xFFFFFF00FEF00000
@@ -234,20 +234,20 @@ return (AE_OK);
 
 static void *context;
 static ACPI_OSD_HANDLER handler;
-static void acpi_callback(registers_t *regs) {
+static void acpi_callback(IrqRegisters_t *regs, uint8_t irqNum) {
     kprintf_nlock("ACPI: SCI triggered!\n");
     handler(context);
 }
 
 ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLER Handler, void *Context) {
-    interrupts_irq_install_handler(InterruptLevel, acpi_callback);
+    irqs_install_handler(InterruptLevel, acpi_callback);
     handler = Handler;
     context = Context;
     return (AE_OK);
 }
 
 ACPI_STATUS AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber, ACPI_OSD_HANDLER Handler) {
-    interrupts_irq_remove_handler(InterruptNumber);
+    irqs_remove_handler(InterruptNumber);
     return (AE_OK);
 }
 

@@ -6,7 +6,7 @@
 
 #include <driver/ps2/ps2.h>
 #include <driver/vga.h>
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 
 // http://www.computer-engineering.org/ps2keyboard/scancodes2.html
 
@@ -301,7 +301,7 @@ static void ps2_keyboard_callback()
 void ps2_keyboard_init()
 {
     // Register IRQ1 for the keyboard.
-    interrupts_irq_install_handler(1, ps2_keyboard_callback);
+    irqs_install_handler(IRQ_KEYBOARD, ps2_keyboard_callback);
 
     // Restore keyboard defaults and enable it.
     ps2_send_data_response(PS2_DATA_SET_DEFAULTS);

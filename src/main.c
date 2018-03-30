@@ -4,11 +4,8 @@
 #include <string.h>
 #include <kprint.h>
 #include <kernel/gdt.h>
-#include <kernel/interrupts/idt.h>
 #include <kernel/interrupts/interrupts.h>
 #include <kernel/acpi/acpi.h>
-#include <kernel/interrupts/lapic.h>
-#include <kernel/nmi.h>
 #include <kernel/pit.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
@@ -83,18 +80,9 @@ void kernel_main() {
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
-	// Initialize IDT, ACPI, and interrupts.
-	idt_init();
+	// Initialize ACPI and interrupts.
 	acpi_init();
 	interrupts_init();
-	kprintf("Enabling NMI...\n");
-	NMI_enable();
-    
-    // Enable interrupts.
-	interrupts_enable();
-    vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
-    kprintf("INTERRUPTS ARE ENABLED\n");
-    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 
 	kprintf("Setting up PIT...\n");

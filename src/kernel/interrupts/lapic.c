@@ -5,13 +5,13 @@
 
 #include <kernel/cpuid.h>
 #include <kernel/interrupts/idt.h>
-#include <kernel/interrupts/pic.h>
+#include <kernel/interrupts/irqs.h>
 #include <kernel/memory/paging.h>
 
-extern void _isr_empty();
+extern void _irq_empty(void);
 
 
-bool lapic_supported() {
+bool lapic_supported(void) {
     // Check for the APIC feature.
     uint32_t result, unused;
     if (cpuid_query(CPUID_GETFEATURES, &unused, &unused, &unused, &result))
@@ -20,17 +20,17 @@ bool lapic_supported() {
     return false;
 }
 
-uint32_t lapic_get_base() {
+uint32_t lapic_get_base(void) {
     // Get LAPIC base physical address.
     return (((uint32_t)cpu_msr_read(IA32_APIC_BASE_MSR)) & LAPIC_BASE_ADDR_MASK);
 }
 
-bool lapic_x2apic() {
+bool lapic_x2apic(void) {
     // Determine if LAPIC is an x2APIC.
     return (((uint32_t)cpu_msr_read(IA32_APIC_BASE_MSR)) & IA32_APIC_BASE_MSR_X2APIC);
 }
 
-bool lapic_enabled() {
+bool lapic_enabled(void) {
     // Determine if LAPIC is enabled.
     return (((uint32_t)cpu_msr_read(IA32_APIC_BASE_MSR)) & IA32_APIC_BASE_MSR_ENABLE);
 }
@@ -85,7 +85,7 @@ void lapic_send_startup(uint8_t apic, uint8_t vector) {
     lapic_send_icr(icr);
 }
 
-void lapic_send_nmi_all() {
+void lapic_send_nmi_all(void) {
     // Send NMI to all LAPICs but ourself.
     lapic_icr_t icr = {};
     icr.deliveryMode = LAPIC_DELIVERY_NMI;
@@ -97,32 +97,40 @@ void lapic_send_nmi_all() {
     lapic_send_icr(icr);
 }
 
-uint32_t lapic_id() {
+uint32_t lapic_id(void) {
     // Get ID.
     return lapic_read(LAPIC_REG_ID) >> 24;
 }
 
-uint8_t lapic_version() {
+uint8_t lapic_version(void) {
     // Get version.
     return (uint8_t)(lapic_read(LAPIC_REG_VERSION) & 0xFF);
 }
 
-uint8_t lapic_max_lvt() {
+uint8_t lapic_max_lvt(void) {
     // Get max LVTs.
     return (uint8_t)((lapic_read(LAPIC_REG_VERSION) >> 16) & 0xFF);
 }
 
-void lapic_eoi() {
+void lapic_eoi(void) {
     // Send EOI to LAPIC.
     lapic_write(LAPIC_REG_EOI, 0);
 }
 
-void lapic_create_spurious_interrupt(uint8_t interrupt) {
-    // Create spurious vector.
-    lapic_write(LAPIC_REG_SPURIOUS_INT_VECTOR, interrupt | 0x100);
+int16_t lapic_get_irq(void) {
+    // Check each ISR register for a bit set.
+    for (uint8_t i = 0; i < 8; i++) {
+        // Read In-Service register and check for bits.
+        uint32_t isr = lapic_read(LAPIC_REG_INSERVICE + (i * 0x10));
+        if (isr)
+            return ((i * 32) + __builtin_ctz(isr)) - IRQ_OFFSET;
+    }
+
+    // No IRQs are set.
+    return -1;
 }
 
-void lapic_setup() {
+void lapic_setup(void) {
     // Map LAPIC and get info.
     kprintf("LAPIC: Mapped to 0x%p\n", LAPIC_ADDRESS);
     kprintf("LAPIC: x2 APIC: %s\n", lapic_x2apic() ? "yes" : "no");
@@ -136,15 +144,15 @@ void lapic_setup() {
     lapic_write(LAPIC_REG_LOGICAL_DEST, 1 << 24);
 
     // Create spurious interrupt.
-    lapic_create_spurious_interrupt(0xFF);
+    lapic_write(LAPIC_REG_SPURIOUS_INT_VECTOR, LAPIC_SPURIOUS_INT | 0x100);
 }
 
-void lapic_init() {
+void lapic_init(void) {
     // Get the base address of the local APIC and map it.
     uint32_t base = lapic_get_base();
     paging_map(LAPIC_ADDRESS, base, true, true);
     kprintf("LAPIC: Initializing LAPIC at 0x%p...\n", base);
-    idt_set_gate(0xFF, (uintptr_t)_isr_empty, 0x08, 0x8E);
+    idt_open_interrupt_gate(LAPIC_SPURIOUS_INT, (uintptr_t)_irq_empty);
 
     lapic_setup();
     kprintf("LAPIC: Initialized!\n");

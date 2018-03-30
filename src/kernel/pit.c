@@ -4,7 +4,7 @@
 #include <kprint.h>
 #include <kernel/pit.h>
 
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 #include <kernel/tasking.h>
 
 // https://wiki.osdev.org/Programmable_Interval_Timer
@@ -50,7 +50,7 @@ void pit_startcounter(uint32_t freq, uint8_t counter, uint8_t mode) {
 }
 
 // Callback for PIT channel 0 on IRQ0.
-static void pit_callback(registers_t *regs) {	
+static void pit_callback(IrqRegisters_t *regs, uint8_t irqNum) {	
 	// Increment the number of ticks.
 	ticks++;
 
@@ -65,7 +65,7 @@ void pit_init() {
 	pit_startcounter(1000, PIT_CMD_COUNTER0, PIT_CMD_MODE_SQUAREWAVEGEN);
 
 	// Register the handler with IRQ 0.
-    interrupts_irq_install_handler(0, pit_callback);
+    irqs_install_handler(IRQ_PIT, pit_callback);
 
     // Wait for a tick to happen
     kprintf("Waiting for PIT test...\n");
