@@ -68,7 +68,7 @@ void irqs_init(void) {
 
     // Initialize PIC and I/O APIC.
     pic_init();
-    //ioapic_init();
+    ioapic_init();
     useLapic = false;
     irqCount = IRQ_ISA_COUNT;
 

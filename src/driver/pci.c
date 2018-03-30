@@ -4,8 +4,13 @@
 #include <kernel/memory/kheap.h>
 #include <driver/vga.h>
 #include <driver/pci.h>
+#include <kernel/interrupts/irqs.h>
 
 #include <acpi.h>
+
+static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
+    kprintf_nlock("IRQ %u raised!\n", irqNum);
+}
 
 /**
  * Print the description for a PCI device
@@ -143,6 +148,7 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
             else {
                 kprintf("IRQ: Pin 0x%X, Address 0x%llX, Global interrupt: 0x%X\n", table->Pin, table->Address, table->SourceIndex);
                 this_device->apicLine = (uint8_t)table->SourceIndex;
+                irqs_install_handler(this_device->apicLine, pci_irq_callback);
             }
             break;
         }        
