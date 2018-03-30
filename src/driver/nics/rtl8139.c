@@ -98,7 +98,7 @@ void rtl8139_init(struct PCIDevice* dev) {
 
 	kprintf("MEdia statudsfsd: 0x%X", inb(rtl->BaseAddress + 0x58));
 
-	while(true);
+	//while(true);
 
 	// Free device for now
 	kheap_free(rtl);

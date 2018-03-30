@@ -9,40 +9,10 @@
 #include <kernel/interrupts/interrupts.h>
 
 static bool acpiInitialized;
-/*static acpi_rsdp_t *rsdp;
-static acpi_rsdt_t *rsdt;
-static acpi_fadt_t *fadt;
-static acpi_madt_t *madt;*/
 
 inline bool acpi_supported() {
     return acpiInitialized;
 }
-
-/*static acpi_sdt_header_t *acpi_search_rsdt(const char *signature, uint32_t index) {
-    // Run through entries and attempt to find the first match after the index specified.
-    for (uint32_t entry = index; entry < (rsdt->header.length - sizeof(acpi_sdt_header_t)) / sizeof(uint32_t); entry++) {
-        // Map header.
-        acpi_sdt_header_t *header = acpi_map_header_temp(rsdt->entries[entry]);
-
-        // Does signature match?
-        if (memcmp(header->signature, signature, 4) == 0) {
-            // Unmap header and map table.
-            acpi_unmap_header_temp();
-            uintptr_t page = acpi_map_table(rsdt->entries[entry]);
-
-            // Attempt to get table.
-            acpi_sdt_header_t *table = acpi_get_table(page, signature);
-            if (table != NULL)
-                return table;
-
-            // Table is invalid, unmap it.
-            acpi_unmap_table(table);
-        }        
-    }
-
-    // No match found.
-    return NULL;
-}*/
 
 ACPI_SUBTABLE_HEADER *acpi_search_madt(uint8_t type, uint32_t requiredLength, uintptr_t start) {
     // Get MADT table from ACPI.
@@ -55,8 +25,8 @@ ACPI_SUBTABLE_HEADER *acpi_search_madt(uint8_t type, uint32_t requiredLength, ui
         return NULL;
 
     // Search for the first matched entry after the start specified.
-    uintptr_t address = start == 0 ? (uintptr_t)madt : (uintptr_t)start;
-    while (address >= (uintptr_t)madt && address < (uintptr_t)((uintptr_t)madt + madt->Header.Length)) {
+    uintptr_t address = start == 0 ? ((uintptr_t)madt + sizeof(ACPI_TABLE_MADT)) : (uintptr_t)start;
+    while (address >= ((uintptr_t)madt + sizeof(ACPI_TABLE_MADT)) && address < (uintptr_t)((uintptr_t)madt + madt->Header.Length)) {
         // Get entry.
         ACPI_SUBTABLE_HEADER *header = (ACPI_SUBTABLE_HEADER*)address;
         
@@ -133,14 +103,12 @@ static ACPI_STATUS acpi_get_prt_device_callback(ACPI_HANDLE object, UINT32 nesti
         status = AcpiWalkNamespace(ACPI_TYPE_METHOD, object, 1, acpi_get_prt_method_callback, NULL, &object, &hasPrt);
 
         // Is the device the one we want?
-        if (status == AE_OK && hasPrt && address == *busAddress) {
+        if (status == AE_OK && hasPrt && (busAddress == NULL || address == *busAddress)) {
             kprintf("ACPI: Found our PCI device: 0x%llX\n", address);
             status = AE_CTRL_TERMINATE;
             *returnValue = object;
         }
     }
-
-
 
     // Return status.
     return status;
@@ -149,20 +117,22 @@ static ACPI_STATUS acpi_get_prt_device_callback(ACPI_HANDLE object, UINT32 nesti
 ACPI_STATUS acpi_get_prt(uint32_t busAddress, ACPI_BUFFER *outBuffer) {
     // Get handle to root PCI bus.
     ACPI_HANDLE rootHandle = 0;
-    uint32_t rootAddress = 0;
     kprintf("ACPI: Finding root PCI bus device...\n");
-    ACPI_STATUS status = AcpiGetDevices("PNP0A03", acpi_get_prt_device_callback, &rootAddress, &rootHandle);
+    ACPI_STATUS status = AcpiGetDevices("PNP0A03", acpi_get_prt_device_callback, NULL, &rootHandle);
     if (status)
         return status;
+    if (rootHandle == 0)
+        return AE_ERROR;
 
     // Get handle to PCI bus.
     ACPI_HANDLE handle = 0;
-
     if (busAddress != 0) {
         kprintf("ACPI: Finding PCI bus device 0x%X...\n", busAddress);
         status = AcpiWalkNamespace(ACPI_TYPE_DEVICE, rootHandle, -1, acpi_get_prt_device_callback, NULL, &busAddress, &handle);
         if (status)
             return status;
+        if (handle == 0)
+            return AE_ERROR;
     }
     else {
         // We already have the root bus handle.
@@ -178,6 +148,7 @@ ACPI_STATUS acpi_get_prt(uint32_t busAddress, ACPI_BUFFER *outBuffer) {
         ACPI_FREE(path.Pointer);
 
     // Get routing table.
+    kprintf("ACPI: Getting IRQ routing table...\n");
     ACPI_BUFFER buffer = { ACPI_ALLOCATE_BUFFER };
     status = AcpiGetIrqRoutingTable(handle, &buffer);
 
@@ -312,6 +283,7 @@ static ACPI_STATUS acpi_pwr_btn_callback(ACPI_HANDLE Object, UINT32             
 }
 
 void acpi_late_init() {
+    kprintf("ACPI: LATE\n");
     ACPI_STATUS status=AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION);
      kprintf("ACPI: Status: %d\n", status);
 	status= AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);

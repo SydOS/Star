@@ -52,7 +52,7 @@ ACPI_PHYSICAL_ADDRESS AcpiOsGetRootPointer() {
                 continue;
 
             // Return pointer.
-            return ((ACPI_PHYSICAL_ADDRESS)block) - memInfo.kernelVirtualOffset;
+            return (ACPI_PHYSICAL_ADDRESS)((uintptr_t)block - memInfo.kernelVirtualOffset);
         }      
     }
 
@@ -296,6 +296,7 @@ ACPI_STATUS AcpiOsWritePort ( ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Widt
 }
 
 ACPI_STATUS AcpiOsReadPciConfiguration (ACPI_PCI_ID *PciId, UINT32 Reg, UINT64 *Value, UINT32 Width) {
+    kprintf_nlock("ACPI: read pci.\n");
     /* create configuration address as per Figure 1 */
     uint32_t address = (uint32_t)((PciId->Bus << 16) | (PciId->Device << 11) |
         (PciId->Function << 8) | (Reg & 0xfc) | ((uint32_t)0x80000000));

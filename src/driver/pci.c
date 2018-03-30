@@ -12,6 +12,8 @@ static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
     kprintf_nlock("PCI: IRQ %u raised!\n", irqNum);
 }
 
+
+
 static void pci_install_irq_handler_apic(uint8_t irq) {
     if (irqs_handler_mapped(irq)) {
         // Map to APIC and add handler.
@@ -146,23 +148,25 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
     if (this_device->VendorID == 0xFFFF) return this_device;
 
     // Find device in ACPI PRT table.
-    ACPI_PCI_ROUTING_TABLE *table = routingBuffer->Pointer;
-    while (((uintptr_t)table < (uintptr_t)routingBuffer->Pointer + routingBuffer->Length) && table->Length) {
-        // Did we find our device and interrupt pin? ACPI starts at 0, PCI starts at 1.
-        if (table->Pin == (this_device->IntPIN - 1) && (table->Address >> 16) == this_device->Device) {
-            if (table->Source[0]) {
-                kprintf("IRQ: Pin 0x%X, Address 0x%llX, Source: %s, Index: %d\n", table->Pin, table->Address, (char*)table->Source, table->SourceIndex);
-            }
-            else {
-                kprintf("IRQ: Pin 0x%X, Address 0x%llX, Global interrupt: 0x%X\n", table->Pin, table->Address, table->SourceIndex);
-                this_device->apicLine = (uint8_t)table->SourceIndex;
-                pci_install_irq_handler_apic(this_device->apicLine);
-            }
-            break;
-        }        
+    if (routingBuffer->Pointer != NULL) {
+        ACPI_PCI_ROUTING_TABLE *table = routingBuffer->Pointer;
+        while (((uintptr_t)table < (uintptr_t)routingBuffer->Pointer + routingBuffer->Length) && table->Length) {
+            // Did we find our device and interrupt pin? ACPI starts at 0, PCI starts at 1.
+            if (table->Pin == (this_device->IntPIN - 1) && (table->Address >> 16) == this_device->Device) {
+                if (table->Source[0]) {
+                    kprintf("IRQ: Pin 0x%X, Address 0x%llX, Source: %s, Index: %d\n", table->Pin, table->Address, (char*)table->Source, table->SourceIndex);
+                }
+                else {
+                    kprintf("IRQ: Pin 0x%X, Address 0x%llX, Global interrupt: 0x%X\n", table->Pin, table->Address, table->SourceIndex);
+                    this_device->apicLine = (uint8_t)table->SourceIndex;
+                    pci_install_irq_handler_apic(this_device->apicLine);
+                }
+                break;
+            }        
 
-        // Move to next entry.
-        table = (uintptr_t)table + table->Length;
+            // Move to next entry.
+            table = (uintptr_t)table + table->Length;
+        }
     }
 
     pci_print_info(this_device);
@@ -187,11 +191,18 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
  * @param bus The bus number to scan
  */
 void pci_check_busses(uint8_t bus, uint8_t device) {
-    ACPI_BUFFER buffer;
-    kprintf("Getting _PRT for bus %d on device %d...\n", bus ,device);
+    ACPI_BUFFER buffer = {};
+    kprintf("Getting _PRT for bus %u on device %u...\n", bus, device);
     ACPI_STATUS status = acpi_get_prt(device << 16, &buffer);
+    if (status) {
+        kprintf("PCI: An error occurred getting the IRQ routing table: 0x%X!\n", status);
+        if (buffer.Pointer)
+            ACPI_FREE(buffer.Pointer);
+        buffer.Pointer = NULL;
+    }
 
     // Check each device on bus
+    kprintf("PCI: Enumerating devices on bus %u...\n", bus);
     for (int device = 0; device < 32; device++) {
         // Get info on the device and print info
         struct PCIDevice *this_device = pci_check_device(bus, device, 0, &buffer);
