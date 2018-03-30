@@ -61,9 +61,10 @@ typedef struct {
 
 typedef void (*irq_handler)(IrqRegisters_t *regs, uint8_t irqNum);
 
-extern void irqs_eoi(uint8_t irqNum);
+extern void irqs_eoi(uint8_t irq);
 extern void irqs_install_handler(uint8_t irq, irq_handler handler);
 extern void irqs_remove_handler(uint8_t irq);
+extern bool irqs_handler_mapped(uint8_t irq);
 extern void irqs_init(void);
 
 #endif

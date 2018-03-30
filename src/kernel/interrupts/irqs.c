@@ -20,12 +20,12 @@ static irq_handler *irqHandlers;
 // Do we send EOIs to the LAPIC instead of the PIC?
 static bool useLapic = false;
 
-void irqs_eoi(uint8_t irqNum) {
+void irqs_eoi(uint8_t irq) {
     // Send EOI to LAPIC or PIC.
     if (useLapic)
         lapic_eoi();
     else
-        pic_eoi(irqNum);
+        pic_eoi(irq);
 }
 
 // Installs an IRQ handler.
@@ -50,18 +50,23 @@ void irqs_remove_handler(uint8_t irq) {
     kprintf("IRQS: Handler for IRQ%u removed!\n", irq);
 }
 
+bool irqs_handler_mapped(uint8_t irq) {
+    // Check if handler is present.
+    return irqHandlers[irq] != 0;
+}
+
 // Handler for IRQss.
 void irqs_handler(IrqRegisters_t *regs) {
     // Get IRQ number.
-    uint8_t irqNum = useLapic ? lapic_get_irq() : pic_get_irq();
+    uint8_t irq = useLapic ? lapic_get_irq() : pic_get_irq();
 
     // Invoke any handler registered.
-    irq_handler handler = irqHandlers[irqNum];
+    irq_handler handler = irqHandlers[irq];
     if (handler)
-        handler(regs, irqNum);
+        handler(regs, irq);
 
     // Send EOI.
-    irqs_eoi(irqNum);
+    irqs_eoi(irq);
 }
 
 void irqs_init(void) {

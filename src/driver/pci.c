@@ -12,6 +12,14 @@ static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
     kprintf_nlock("PCI: IRQ %u raised!\n", irqNum);
 }
 
+static void pci_install_irq_handler_apic(uint8_t irq) {
+    if (irqs_handler_mapped(irq)) {
+        // Map to APIC and add handler.
+        ioapic_enable_interrupt_pci(ioapic_remap_interrupt(irq), IRQ_OFFSET + irq);
+        irqs_install_handler(irq, pci_irq_callback);
+    }
+}
+
 /**
  * Print the description for a PCI device
  * @param dev PCIDevice struct with PCI device info
@@ -148,8 +156,7 @@ struct PCIDevice* pci_check_device(uint8_t bus, uint8_t device, uint8_t function
             else {
                 kprintf("IRQ: Pin 0x%X, Address 0x%llX, Global interrupt: 0x%X\n", table->Pin, table->Address, table->SourceIndex);
                 this_device->apicLine = (uint8_t)table->SourceIndex;
-                ioapic_enable_interrupt_pci(ioapic_remap_interrupt(this_device->apicLine), IRQ_OFFSET + this_device->apicLine);
-                irqs_install_handler(this_device->apicLine, pci_irq_callback);
+                pci_install_irq_handler_apic(this_device->apicLine);
             }
             break;
         }        
