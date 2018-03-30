@@ -36,7 +36,7 @@ void irqs_install_handler(uint8_t irq, irq_handler handler) {
 
     // Add handler for IRQ to array.
     irqHandlers[irq] = handler;
-    kprintf("Interrupt for IRQ%u installed!\n", irq);
+    kprintf("IRQS: Handler for IRQ%u installed!\n", irq);
 }
 
 // Removes an IRQ handler.
@@ -47,6 +47,7 @@ void irqs_remove_handler(uint8_t irq) {
 
     // Null out handler for IRQ in array.
     irqHandlers[irq] = 0;
+    kprintf("IRQS: Handler for IRQ%u removed!\n", irq);
 }
 
 // Handler for IRQss.

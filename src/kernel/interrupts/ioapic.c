@@ -36,6 +36,7 @@ static uint32_t interrupt_redirections[24] = {
     INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC
 };
 
