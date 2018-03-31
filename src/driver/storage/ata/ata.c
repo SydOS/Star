@@ -6,6 +6,7 @@
 #include <driver/storage/ata/ata_commands.h>
 #include <kernel/interrupts/irqs.h>
 #include <driver/storage/storage.h>
+#include <driver/pci.h>
 
 static bool irqTriggeredPri = false;
 static bool irqTriggeredSec = false;
@@ -463,7 +464,7 @@ void ata_reset_identify(uint16_t portCommand, uint16_t portControl) {
     }
 }
 
-void ata_init() {
+void ata_init(PciDevice *device) {
     kprintf("ATA: Initializing...\n");
 
     // Register interrupt handlers.

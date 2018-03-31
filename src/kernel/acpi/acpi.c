@@ -99,7 +99,7 @@ static ACPI_STATUS acpi_get_prt_device_callback(ACPI_HANDLE object, UINT32 nesti
     if (status == AE_OK) {
         // Ensure device has a _PRT method.
         bool hasPrt = false;
-        kprintf("ACPI: Checking _PRT on device ADR 0x%X...\n", address);
+        //kprintf("ACPI: Checking _PRT on device ADR 0x%X...\n", address);
         status = AcpiWalkNamespace(ACPI_TYPE_METHOD, object, 1, acpi_get_prt_method_callback, NULL, &object, &hasPrt);
 
         // Is the device the one we want?

@@ -30,7 +30,7 @@ static void rtl_callbac(IrqRegisters_t* regs, uint8_t irq) {
 	kprintf_nlock("Test: INT %d\n", irq);
 }
 
-void rtl8139_init(struct PCIDevice* dev) {
+void rtl8139_init(PciDevice* dev) {
 	// Allocate RTL8139 struct
 	struct RTL8139 *rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
 
@@ -49,9 +49,9 @@ void rtl8139_init(struct PCIDevice* dev) {
 	kprintf("RTL8139: using BAR 0x%X\n", rtl->BaseAddress);
 
 // bus master
-		uint16_t cmd = pci_config_read_word(dev, PCI_COMMAND);
-	pci_config_write_word(dev, PCI_COMMAND, cmd | 0x04);
-	cmd = pci_config_read_word(dev, PCI_COMMAND);
+		uint16_t cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
+	pci_config_write_word(dev, PCI_REG_COMMAND, cmd | 0x04);
+	cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
 
 	// Bring card out of low power mode
 	outb(rtl->BaseAddress + 0x52, 0x00);

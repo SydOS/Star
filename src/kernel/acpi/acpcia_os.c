@@ -297,24 +297,27 @@ ACPI_STATUS AcpiOsWritePort ( ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Widt
 
 ACPI_STATUS AcpiOsReadPciConfiguration (ACPI_PCI_ID *PciId, UINT32 Reg, UINT64 *Value, UINT32 Width) {
     kprintf_nlock("ACPI: read pci.\n");
-    /* create configuration address as per Figure 1 */
-    uint32_t address = (uint32_t)((PciId->Bus << 16) | (PciId->Device << 11) |
-        (PciId->Function << 8) | (Reg & 0xfc) | ((uint32_t)0x80000000));
+
+    uint32_t address = PCI_PORT_ENABLE_BIT | (uint32_t)(PciId->Bus << 16) | (uint32_t)(PciId->Device << 11) |
+        (uint32_t)(PciId->Function << 8) | (uint8_t)(Reg & 0xfc);
  
-    /* write out the address */
-    outl(PCI_ADDRESS_PORT, address);
+    // Send address to PCI system.
+    outl(PCI_PORT_ADDRESS, address);
+
+    // Read 32-bit data value from PCI system.
+    uint32_t value = inl(PCI_PORT_DATA);
 
     switch (Width) {
         case 8:
-            *Value = inb(PCI_VALUE_PORT);
+            *Value = (value >> ((Reg & 0x3) * 8) & 0xFF);
             return AE_OK;
 
         case 16:
-            *Value = inw(PCI_VALUE_PORT);
+            *Value = (value >> ((Reg & 0x2) * 8) & 0xFFFF);
             return AE_OK;
 
         case 32:
-            *Value = inl(PCI_VALUE_PORT);
+            *Value = value;
             return AE_OK;
     }
 

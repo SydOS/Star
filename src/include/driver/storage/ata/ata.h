@@ -76,6 +76,6 @@ enum {
 #define ATA_CHK_STATUS_DEVICE_MISMATCH  -10
 #define ATA_CHK_STATUS_ERROR            1
 
-extern void ata_init();
+//extern void ata_init();
 
 #endif
