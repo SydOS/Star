@@ -69,6 +69,13 @@ typedef struct {
 
 char* pci_class_descriptions[255];
 
+extern uint32_t pci_config_read_dword(PciDevice *device, uint8_t reg);
+extern uint16_t pci_config_read_word(PciDevice *device, uint8_t reg);
+extern uint8_t pci_config_read_byte(PciDevice *device, uint8_t reg);
+extern void pci_config_write_dword(PciDevice *device, uint8_t reg, uint32_t value);
+extern void pci_config_write_word(PciDevice *device, uint8_t reg, uint16_t value);
+extern void pci_config_write_byte(PciDevice *device, uint8_t reg, uint8_t value);
+
 extern void pci_check_busses(uint8_t bus, uint8_t device);
 extern void pci_init();
 

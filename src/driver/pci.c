@@ -172,6 +172,34 @@ PciDevice *pci_check_device(uint8_t bus, uint8_t device, uint8_t function, ACPI_
         }
     }
 
+    // Check if the device is the RTL8139
+        if(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8139) {
+            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+            kprintf("  - DETECTED RTL8139\n");
+            rtl8139_init(pciDevice);
+        }
+
+        if (pciDevice->Class == 1 && pciDevice->Subclass == 1) {
+            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+            kprintf("  - DETECTED ATA CONTROLLER\n");
+            ata_init(pciDevice);
+        }
+        
+        // If device is a PCI bridhge
+        if(pciDevice->Class == 6 && pciDevice->Subclass == 4) {
+            vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
+            uint16_t seconaryBus = pci_config_read_word(pciDevice, PCI_REG_BAR2);
+            uint16_t primaryBus = (seconaryBus & ~0xFF00);
+            seconaryBus = (seconaryBus & ~0x00FF) >> 8;
+            kprintf("  - PCI bridge, Primary %X Seconary %X, scanning now.\n", primaryBus, seconaryBus);
+            pci_check_busses(seconaryBus, device);
+
+        // If device is a different kind of bridge
+        } else if(pciDevice->Class == 6) {
+            vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
+            kprintf("  - Ignoring non-PCI bridge\n");
+        }
+
     // If the card reports more than one function, let's scan those too.
     if ((pciDevice->HeaderType & PCI_HEADER_TYPE_MULTIFUNC) != 0 && function == 0) {
         vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
@@ -210,34 +238,6 @@ void pci_check_busses(uint8_t bus, uint8_t device) {
         PciDevice *pciDevice = pci_check_device(bus, device, 0, &buffer);
         if (pciDevice == NULL)
             continue;
-
-        // Check if the device is the RTL8139
-        if(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8139) {
-            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-            kprintf("  - DETECTED RTL8139\n");
-            rtl8139_init(pciDevice);
-        }
-
-        if (pciDevice->Class == 1 && pciDevice->Subclass == 1) {
-            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-            kprintf("  - DETECTED ATA CONTROLLER\n");
-            ata_init(pciDevice);
-        }
-        
-        // If device is a PCI bridhge
-        if(pciDevice->Class == 6 && pciDevice->Subclass == 4) {
-            vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
-            uint16_t seconaryBus = pci_config_read_word(pciDevice, PCI_REG_BAR2);
-            uint16_t primaryBus = (seconaryBus & ~0xFF00);
-            seconaryBus = (seconaryBus & ~0x00FF) >> 8;
-            kprintf("  - PCI bridge, Primary %X Seconary %X, scanning now.\n", primaryBus, seconaryBus);
-            pci_check_busses(seconaryBus, device);
-
-        // If device is a different kind of bridge
-        } else if(pciDevice->Class == 6) {
-            vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
-            kprintf("  - Ignoring non-PCI bridge\n");
-        }
 
         // Free object
         kheap_free(pciDevice);
