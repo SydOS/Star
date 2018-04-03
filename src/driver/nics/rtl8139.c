@@ -26,13 +26,19 @@ struct RTL8139 {
 	uint8_t MACAddress[6];
 };
 
-static void rtl_callbac(IrqRegisters_t* regs, uint8_t irq) {
-	kprintf_nlock("Test: INT %d\n", irq);
+void rtl_callbac(PciDevice *device) {
+	
+kprintf_nlock("Clearing RTL8139 interrupt\n");
+struct RTL8139 *rtl = (struct RTL8139*)device->DriverObject;
+outw(rtl->BaseAddress + 0x3E, 0xFFFF);
+	
 }
 
 void rtl8139_init(PciDevice* dev) {
 	// Allocate RTL8139 struct
 	struct RTL8139 *rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
+	dev->DriverObject = rtl;
+	dev->InterruptHandler = rtl_callbac;
 
 	// Setup base address
 	for(uint8_t i = 0; i < 6; i++)
@@ -49,9 +55,9 @@ void rtl8139_init(PciDevice* dev) {
 	kprintf("RTL8139: using BAR 0x%X\n", rtl->BaseAddress);
 
 // bus master
-		uint16_t cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
-	pci_config_write_word(dev, PCI_REG_COMMAND, cmd | 0x04);
-	cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
+//		uint16_t cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
+//	pci_config_write_word(dev, PCI_REG_COMMAND, cmd | 0x04);
+//	cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
 
 	// Bring card out of low power mode
 	outb(rtl->BaseAddress + 0x52, 0x00);
@@ -101,5 +107,5 @@ void rtl8139_init(PciDevice* dev) {
 	//while(true);
 
 	// Free device for now
-	kheap_free(rtl);
+	//kheap_free(rtl);
 }

@@ -311,6 +311,31 @@ void kheap_free(void *ptr) {
     kheap_add_node(kheap_get_bin_index(header->size), header);
 }
 
+void *kheap_realloc(void *oldPtr, size_t newSize) {
+    // Allocate new space using the new size.
+    void *newPtr = kheap_alloc(newSize);
+    if (newPtr == NULL)
+        return NULL;
+
+    // If the old space is a valid pointer, copy data and free old space when done.
+    if (oldPtr != NULL) {
+        // Get header of existing node.
+        kheap_node_t *header = (kheap_node_t*)((uint8_t*)oldPtr - KHEAP_HEADER_OFFSET);
+
+        // Copy data.
+        size_t copySize = header->size;
+        if (newSize < header->size)
+            copySize = newSize;
+        memcpy(newPtr, oldPtr, copySize);
+
+        // Free old node.
+        kheap_free(oldPtr);
+    }
+
+    // Return new node.
+    return newPtr;
+}
+
 void kheap_init() {
     kprintf("KHEAP: Initializing at 0x%p...\n", KHEAP_START);
 

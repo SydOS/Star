@@ -8,14 +8,42 @@
 
 #include <acpi.h>
 
+// PCI devices array.
+static PciDevice *pciDevices = NULL;
+static size_t pciDevicesSize = 0;
+
 static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
     kprintf_nlock("PCI: IRQ %u raised!\n", irqNum);
+
+    // Search through PCI devices until we find the device that raised the interrupt.
+    for (uint16_t i = 0; i < pciDevicesSize / sizeof(PciDevice); i++) {
+        // Get pointer to device.
+        PciDevice *device = &pciDevices[i];
+
+        if (device->InterruptLine == irqNum) {
+            kprintf_nlock("%X:%X status: 0x%X\n", device->VendorId, device->DeviceId, pci_config_read_word(device, PCI_REG_STATUS));
+            pci_handler handler = (pci_handler)device->InterruptHandler;
+            if (handler)
+                handler(device);
+
+            // Get IRQ status bit.
+          /*  if ( & PCI_STATUS_INTERRUPT) {
+                kprintf_nlock("Found PCI device that raised interrupt: %X:%X\n", device->VendorId, device->DeviceId);
+                while(true);
+            }*/
+        }
+    }
 }
+
+static uintptr_t *pciIrqs;
+
+
+
 
 
 
 static void pci_install_irq_handler_apic(uint8_t irq) {
-    if (irqs_handler_mapped(irq)) {
+    if (!(irqs_handler_mapped(irq))) {
         // Map to APIC and add handler.
         ioapic_enable_interrupt_pci(ioapic_remap_interrupt(irq), IRQ_OFFSET + irq);
         irqs_install_handler(irq, pci_irq_callback);
@@ -113,56 +141,56 @@ void pci_print_info(PciDevice* dev) {
  * @param  function PCI card function to read from
  * @return          A PCIDevice struct with the info filled
  */
-PciDevice *pci_check_device(uint8_t bus, uint8_t device, uint8_t function, ACPI_BUFFER *routingBuffer) {
+bool pci_check_device(uint8_t bus, uint8_t device, uint8_t function, ACPI_BUFFER *routingBuffer) {
     // Create PciDevice object.
-    PciDevice *pciDevice = (PciDevice*)kheap_alloc(sizeof(PciDevice));
+    PciDevice pciDevice = {};
 
     // Set base configuration address and other base info for our PciDevice.
-    pciDevice->Bus = bus;
-    pciDevice->Device = device;
-    pciDevice->Function = function;
+    pciDevice.Bus = bus;
+    pciDevice.Device = device;
+    pciDevice.Function = function;
 
     // Get device vendor. If vendor is 0xFFFF, the device doesn't exist.
-    pciDevice->VendorId = pci_config_read_word(pciDevice, PCI_REG_VENDOR_ID);
-    if (pciDevice->VendorId == PCI_DEVICE_VENDOR_NONE) {
+    pciDevice.VendorId = pci_config_read_word(&pciDevice, PCI_REG_VENDOR_ID);
+    if (pciDevice.VendorId == PCI_DEVICE_VENDOR_NONE) {
         // Free object and return nothing.
-        kheap_free(pciDevice);
-        return NULL;
+        //kheap_free(pciDevice);
+        return false;
     }
 
     // Get rest of PCI identification variables.
-    pciDevice->DeviceId = pci_config_read_word(pciDevice, PCI_REG_DEVICE_ID);
-    pciDevice->SubVendorId = pci_config_read_word(pciDevice, PCI_REG_SUB_VENDOR_ID);
-    pciDevice->SubDeviceId = pci_config_read_word(pciDevice, PCI_REG_SUB_DEVICE_ID);
-    pciDevice->RevisionId = pci_config_read_byte(pciDevice, PCI_REG_REVISION_ID);
-    pciDevice->Class = pci_config_read_byte(pciDevice, PCI_REG_CLASS);
-    pciDevice->Subclass = pci_config_read_byte(pciDevice, PCI_REG_SUBCLASS);
-    pciDevice->HeaderType = pci_config_read_byte(pciDevice, PCI_REG_HEADER_TYPE);
+    pciDevice.DeviceId = pci_config_read_word(&pciDevice, PCI_REG_DEVICE_ID);
+    pciDevice.SubVendorId = pci_config_read_word(&pciDevice, PCI_REG_SUB_VENDOR_ID);
+    pciDevice.SubDeviceId = pci_config_read_word(&pciDevice, PCI_REG_SUB_DEVICE_ID);
+    pciDevice.RevisionId = pci_config_read_byte(&pciDevice, PCI_REG_REVISION_ID);
+    pciDevice.Class = pci_config_read_byte(&pciDevice, PCI_REG_CLASS);
+    pciDevice.Subclass = pci_config_read_byte(&pciDevice, PCI_REG_SUBCLASS);
+    pciDevice.HeaderType = pci_config_read_byte(&pciDevice, PCI_REG_HEADER_TYPE);
 
     // Get interrupt info.
-    pciDevice->InterruptPin = pci_config_read_byte(pciDevice, PCI_REG_INTERRUPT_PIN);
-    pciDevice->InterruptLine = pci_config_read_byte(pciDevice, PCI_REG_INTERRUPT_LINE);
+    pciDevice.InterruptPin = pci_config_read_byte(&pciDevice, PCI_REG_INTERRUPT_PIN);
+    pciDevice.InterruptLine = pci_config_read_byte(&pciDevice, PCI_REG_INTERRUPT_LINE);
 
     // Get base address registers.
     for (uint8_t i = 0; i < PCI_BAR_COUNT; i++)
-        pciDevice->BAR[i] = pci_config_read_dword(pciDevice, PCI_REG_BAR0 + (i * sizeof(uint32_t)));
+        pciDevice.BAR[i] = pci_config_read_dword(&pciDevice, PCI_REG_BAR0 + (i * sizeof(uint32_t)));
 
     // Print info.
-    pci_print_info(pciDevice);
+    //pci_print_info(pciDevice);
 
     // Find device in ACPI PRT table.
     if (routingBuffer->Pointer != NULL) {
         ACPI_PCI_ROUTING_TABLE *table = routingBuffer->Pointer;
         while (((uintptr_t)table < (uintptr_t)routingBuffer->Pointer + routingBuffer->Length) && table->Length) {
             // Did we find our device and interrupt pin? ACPI starts at 0, PCI starts at 1.
-            if (table->Pin == (pciDevice->InterruptPin - 1) && (table->Address >> 16) == pciDevice->Device) {
+            if (table->Pin == (pciDevice.InterruptPin - 1) && (table->Address >> 16) == pciDevice.Device) {
                 if (table->Source[0]) {
                     kprintf("IRQ: Pin 0x%X, Address 0x%llX, Source: %s, Index: %d\n", table->Pin, table->Address, (char*)table->Source, table->SourceIndex);
                 }
                 else {
                     kprintf("IRQ: Pin 0x%X, Address 0x%llX, Global interrupt: 0x%X\n", table->Pin, table->Address, table->SourceIndex);
-                    pciDevice->InterruptApic = (uint8_t)table->SourceIndex;
-                    pci_install_irq_handler_apic(pciDevice->InterruptApic);
+                    pciDevice.InterruptLine = (uint8_t)table->SourceIndex;
+                    pci_install_irq_handler_apic(pciDevice.InterruptLine);
                 }
                 break;
             }        
@@ -172,48 +200,53 @@ PciDevice *pci_check_device(uint8_t bus, uint8_t device, uint8_t function, ACPI_
         }
     }
 
+
+
     // Check if the device is the RTL8139
-        if(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8139) {
+        if(pciDevice.VendorId == 0x10EC && pciDevice.DeviceId == 0x8139) {
             vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
             kprintf("  - DETECTED RTL8139\n");
-            rtl8139_init(pciDevice);
+            rtl8139_init(&pciDevice);
         }
 
-        if (pciDevice->Class == 1 && pciDevice->Subclass == 1) {
+        /*if (pciDevice.Class == 1 && pciDevice.Subclass == 1) {
             vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
             kprintf("  - DETECTED ATA CONTROLLER\n");
-            ata_init(pciDevice);
-        }
+            ata_init(&pciDevice);
+        }*/
         
         // If device is a PCI bridhge
-        if(pciDevice->Class == 6 && pciDevice->Subclass == 4) {
+        if(pciDevice.Class == 6 && pciDevice.Subclass == 4) {
             vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
-            uint16_t seconaryBus = pci_config_read_word(pciDevice, PCI_REG_BAR2);
+            uint16_t seconaryBus = pci_config_read_word(&pciDevice, PCI_REG_BAR2);
             uint16_t primaryBus = (seconaryBus & ~0xFF00);
             seconaryBus = (seconaryBus & ~0x00FF) >> 8;
             kprintf("  - PCI bridge, Primary %X Seconary %X, scanning now.\n", primaryBus, seconaryBus);
             pci_check_busses(seconaryBus, device);
 
         // If device is a different kind of bridge
-        } else if(pciDevice->Class == 6) {
+        } else if(pciDevice.Class == 6) {
             vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
             kprintf("  - Ignoring non-PCI bridge\n");
         }
 
+
     // If the card reports more than one function, let's scan those too.
-    if ((pciDevice->HeaderType & PCI_HEADER_TYPE_MULTIFUNC) != 0 && function == 0) {
+    if ((pciDevice.HeaderType & PCI_HEADER_TYPE_MULTIFUNC) != 0 && function == 0) {
         vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
         kprintf("  - Scanning other functions on multifunction device!\n");
         // Check each function on the device
         for (int t_function = 1; t_function < 8; t_function++) {
-            PciDevice *funcDevice = pci_check_device(bus, device, t_function, routingBuffer);
-            if (funcDevice != NULL)
-                kheap_free(funcDevice);
+            pci_check_device(bus, device, t_function, routingBuffer);
+           // if (funcDevice != NULL)
+              //  kheap_free(funcDevice);
         }
     }
-    
-    // Return the device object.
-    return pciDevice;
+
+        // Add device to array.
+    pciDevicesSize += sizeof(PciDevice);
+    pciDevices = (PciDevice**)kheap_realloc(pciDevices, pciDevicesSize);
+    pciDevices[(pciDevicesSize / sizeof(PciDevice)) - 1] = pciDevice;
 }
 
 /**
@@ -235,12 +268,12 @@ void pci_check_busses(uint8_t bus, uint8_t device) {
     kprintf("PCI: Enumerating devices on bus %u...\n", bus);
     for (int device = 0; device < 32; device++) {
         // Get info on the device and print info
-        PciDevice *pciDevice = pci_check_device(bus, device, 0, &buffer);
-        if (pciDevice == NULL)
-            continue;
+        pci_check_device(bus, device, 0, &buffer);
+        //if (pciDevice == NULL)
+        //    continue;
 
         // Free object
-        kheap_free(pciDevice);
+       // kheap_free(pciDevice);
     }
 
     // Free interrupt table.
@@ -248,6 +281,16 @@ void pci_check_busses(uint8_t bus, uint8_t device) {
         ACPI_FREE(buffer.Pointer);
 
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+}
+
+void pci_display() {
+    for (uint16_t i = 0; i < pciDevicesSize / sizeof(PciDevice); i++)
+    {
+        PciDevice device = pciDevices[i];
+        kprintf("Device %u: status: 0x%X\n", i, pci_config_read_word(&device, PCI_REG_STATUS));
+        pci_print_info(&device);
+    }
+    kprintf("%u total PCI devices\n", pciDevicesSize / sizeof(PciDevice));
 }
 
 /**
@@ -276,4 +319,12 @@ void pci_init() {
     pci_class_descriptions[0x13] = "Non-Essential Instrumentation";
     pci_class_descriptions[0x40] = "Coprocessor";
     pci_class_descriptions[0xFF] = "Unassigned class";
+
+    // Ensure array is reset.
+    pciDevices = NULL;
+    pciDevicesSize = 0;
+
+    // Begin scanning at bus 0.
+    pci_check_busses(0, 0);
+	pci_display();
 }

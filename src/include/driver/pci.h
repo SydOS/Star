@@ -2,6 +2,7 @@
 #define PCI_H
 
 #include <main.h>
+#include <kernel/interrupts/irqs.h>
 
 // PCI configuration space registers.
 #define PCI_REG_VENDOR_ID           0x00 // 2
@@ -43,6 +44,11 @@
 #define PCI_HEADER_TYPE_MULTIFUNC	0x80
 #define PCI_BAR_COUNT				6
 
+#define PCI_BAR_PORT_MASK			0xFFFFFFFC
+#define PCI_BAR_MEMORY_MASK			0xFFFFFFF8
+
+
+
 // PCI device structure.
 typedef struct {
 	uintptr_t ConfigurationAddress;
@@ -65,7 +71,13 @@ typedef struct {
 	uint8_t InterruptPin;
 	uint8_t InterruptLine;
 	uint8_t InterruptApic;
+
+	// Interrupt handler.
+	void *InterruptHandler;
+	void *DriverObject;
 } PciDevice;
+
+typedef void (*pci_handler)(PciDevice *device);
 
 char* pci_class_descriptions[255];
 
