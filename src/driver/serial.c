@@ -64,6 +64,9 @@ void serial_writes(const char* data) {
 }
 
 int serial_received() {
+    if (!serialPresent)
+        return 0;
+
    return inb(SERIAL_REG_LSR(PORT)) & SERIAL_LSR_DATA_READY;
 }
  

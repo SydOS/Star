@@ -10,9 +10,13 @@
 
 // http://www.computer-engineering.org/ps2keyboard/scancodes2.html
 
+#define PS2_KEYBOARD_SCANCODE_EXTENDED1     0xE0
+#define PS2_KEYBOARD_SCANCODE_EXTENDED2     0xE1
+
 // Translation table from set 1 to our internal keyset.
 static const uint8_t ps2_scancodes[] =
 {
+    [0x00] = KEYBOARD_KEY_UNKNOWN,
     [0x01] = KEYBOARD_KEY_ESC,
     [0x02] = KEYBOARD_KEY_1,
     [0x03] = KEYBOARD_KEY_2,
@@ -102,9 +106,10 @@ static const uint8_t ps2_scancodes[] =
     [0x52] = KEYBOARD_KEY_NUM_0,
     [0x53] = KEYBOARD_KEY_NUM_PERIOD,
     [0x54] = KEYBOARD_KEY_SYSREQ,
+    [0x55] = KEYBOARD_KEY_UNKNOWN,
+    [0x56] = KEYBOARD_KEY_UNKNOWN,
     [0x57] = KEYBOARD_KEY_F11,
-    [0x58] = KEYBOARD_KEY_F12,
-    
+    [0x58] = KEYBOARD_KEY_F12
 };
 
 struct key_mapping
@@ -115,8 +120,7 @@ struct key_mapping
 };
 
 // US QWERTY ASCII mappings.
-const struct key_mapping keyboard_layout_us[] =
-{
+const struct key_mapping keyboard_layout_us[] = {
     // Letters.
     [KEYBOARD_KEY_A] = { KEYBOARD_KEY_A, 'a', 'A' },
     [KEYBOARD_KEY_B] = { KEYBOARD_KEY_B, 'b', 'B' },
@@ -195,21 +199,22 @@ const struct key_mapping keyboard_layout_us[] =
 
 
 // Keyboard LEDs.
-enum
-{
+enum {
     PS2_KEYBOARD_LED_SCROLL_LOCK    = 0x01,
     PS2_KEYBOARD_LED_NUM_LOCK       = 0x02,
     PS2_KEYBOARD_LED_CAPS_LOCK      = 0x04
 };
 
+static uint16_t lastKeyCode = KEYBOARD_KEY_UNKNOWN;
 
-static bool num_lock = false;
-static bool caps_lock = false;
-static bool scroll_lock = false;
+static bool numLock = false;
+static bool capsLock = false;
+static bool scrollLock = false;
 
-static bool shift_pressed = false;
+static bool ctrlPressed = false;
+static bool shiftPressed = false;
+static bool altPressed = false;
 
-// Sends a command to the mouse.
 uint8_t ps2_keyboard_send_cmd(uint8_t cmd)
 {
     // Send command to keyboard. 
@@ -227,15 +232,27 @@ uint8_t ps2_keyboard_send_cmd(uint8_t cmd)
     return response;
 }
 
-static void ps2_keyboard_set_leds()
-{
+void ps2_keyboard_set_leds(bool num, bool caps, bool scroll) {
     // Update LEDs on keyboard.
+    uint8_t data = (scroll ? PS2_KEYBOARD_LED_SCROLL_LOCK : 0) |
+        (num ? PS2_KEYBOARD_LED_NUM_LOCK : 0) | (caps ? PS2_KEYBOARD_LED_CAPS_LOCK : 0);
     ps2_keyboard_send_cmd(PS2_DATA_SET_KEYBOARD_LEDS);
-    ps2_keyboard_send_cmd((scroll_lock ? PS2_KEYBOARD_LED_SCROLL_LOCK : 0) |
-        (num_lock ? PS2_KEYBOARD_LED_NUM_LOCK : 0) | (caps_lock ? PS2_KEYBOARD_LED_CAPS_LOCK : 0));
-    ps2_keyboard_send_cmd(PS2_DATA_SET_KEYBOARD_LEDS);
-    ps2_keyboard_send_cmd((scroll_lock ? PS2_KEYBOARD_LED_SCROLL_LOCK : 0) |
-        (num_lock ? PS2_KEYBOARD_LED_NUM_LOCK : 0) | (caps_lock ? PS2_KEYBOARD_LED_CAPS_LOCK : 0));
+    ps2_keyboard_send_cmd(data);
+  //  ps2_keyboard_send_cmd(PS2_DATA_SET_KEYBOARD_LEDS);
+    //ps2_keyboard_send_cmd(data);
+}
+
+uint16_t ps2_keyboard_get_last_key(void) {
+    uint16_t key = lastKeyCode;
+    if (lastKeyCode != KEYBOARD_KEY_UNKNOWN)
+        lastKeyCode = KEYBOARD_KEY_UNKNOWN;
+    return key;
+}
+
+char ps2_keyboard_get_ascii(uint16_t key) {
+    if (key > KEYBOARD_KEY_NUM_PERIOD)
+        return 0;
+    return keyboard_layout_us[key].ascii;
 }
 
 // Callback for keyboard on IRQ1.
@@ -243,68 +260,120 @@ static void ps2_keyboard_callback()
 {	
     // Read data from keyboard.
     uint8_t data = ps2_get_data();
+    static bool extended = false;
 
     // If the data is just an ACK, throw it out.
     if (data == PS2_DATA_RESPONSE_ACK)
         return;
 
-    bool press = !(data & 0x80);
+    // Do we have an extended code? If so, return and handle the actual code the next time around.
+    if (data == PS2_KEYBOARD_SCANCODE_EXTENDED1 || data == PS2_KEYBOARD_SCANCODE_EXTENDED2) {
+        extended = true;
+        return;
+    }
+
+    // Reset extended status.
+    extended = false;
+
+    // Get keycode.
     uint16_t key = ps2_scancodes[data & ~0x80];
 
-    if (key == KEYBOARD_KEY_CAPS_LOCK && press)
-    {
-        // Toggle caps lock.
-        caps_lock = !caps_lock;
-        ps2_keyboard_set_leds();
-        return;
+    // Is the incoming code a make (press), or a break (release)?
+    if (data & 0x80) { // Break code.
+        // Handle special keys.
+        switch (key) {
+            case KEYBOARD_KEY_LEFT_CTRL:
+            case KEYBOARD_KEY_RIGHT_CTRL:
+                // Control key is released.
+                ctrlPressed = false;
+                break;
+
+            case KEYBOARD_KEY_LEFT_SHIFT:
+            case KEYBOARD_KEY_RIGHT_SHIFT:
+                // Shift key is released.
+                shiftPressed = false;
+                break;
+
+            case KEYBOARD_KEY_LEFT_ALT:
+            case KEYBOARD_KEY_RIGHT_ALT:
+                // Alt key is released.
+                altPressed = false;
+                break;
+        }
     }
-    else if (key == KEYBOARD_KEY_SCROLL_LOCK && press)
-    {
-        // Toggle scroll lock.
-        scroll_lock = !scroll_lock;
-        ps2_keyboard_set_leds();
-        return;
-    }
-    else if (key == KEYBOARD_KEY_NUM_LOCK && press)
-    {
-        // Toggle num lock.
-        num_lock = !num_lock;
-        ps2_keyboard_set_leds();
-        return;
-    }
-    else if (key == KEYBOARD_KEY_LEFT_SHIFT || key == KEYBOARD_KEY_RIGHT_SHIFT)
-    {
-        shift_pressed = press;
+    else { // Make code.
+        // Save key.
+        lastKeyCode = key;
+
+        // Handle special keys.
+        switch (key) {
+            case KEYBOARD_KEY_LEFT_CTRL:
+            case KEYBOARD_KEY_RIGHT_CTRL:
+                // Control key is pressed.
+                ctrlPressed = true;
+                break;
+
+            case KEYBOARD_KEY_LEFT_SHIFT:
+            case KEYBOARD_KEY_RIGHT_SHIFT:
+                // Shift key is pressed.
+                shiftPressed = true;
+                break;
+
+            case KEYBOARD_KEY_LEFT_ALT:
+            case KEYBOARD_KEY_RIGHT_ALT:
+                // Alt key is pressed.
+                altPressed = true;
+                break;
+
+            case KEYBOARD_KEY_CAPS_LOCK:
+                // Toggle caps lock.
+                capsLock = !capsLock;
+                ps2_keyboard_set_leds(numLock, capsLock, scrollLock);
+                break;
+
+            case KEYBOARD_KEY_SCROLL_LOCK:
+                // Toggle scroll lock.
+                scrollLock = !scrollLock;
+                ps2_keyboard_set_leds(numLock, capsLock, scrollLock);
+                break;
+
+            case KEYBOARD_KEY_NUM_LOCK:
+                // Toggle num lock.
+                numLock = !numLock;
+                ps2_keyboard_set_leds(numLock, capsLock, scrollLock);
+                break;
+        }
     }
 
-    if(key == KEYBOARD_KEY_ESC)
-        outb(0x64, 0xFE);
+  //  if(key == KEYBOARD_KEY_ESC)
+     //   outb(0x64, 0xFE);
 
-    /*char* tmp;
-    log("Scancode: 0x");
-    log(utoa(data, tmp, 16));
-    log("\n");*/
-
-    if (data & 0x80)
-        return;
-
-    if (key >= KEYBOARD_KEY_LEFT_CTRL)
+    /*if (key >= KEYBOARD_KEY_LEFT_CTRL)
         return;
 
     if ((shift_pressed && key <= KEYBOARD_KEY_SLASH) || (caps_lock && key <= KEYBOARD_KEY_Z) || (num_lock && key >= KEYBOARD_KEY_NUM_1 && key <= KEYBOARD_KEY_NUM_PERIOD))
         vga_putchar(keyboard_layout_us[key].shift_ascii);
     else
-        vga_putchar(keyboard_layout_us[key].ascii);
+        vga_putchar(keyboard_layout_us[key].ascii);*/
 }
 
 // Initializes the keyboard.
-void ps2_keyboard_init()
-{
+void ps2_keyboard_init(void) {
+    kprintf("PS/2 KEYBOARD: Initializing!\n");
+
     // Register IRQ1 for the keyboard.
     irqs_install_handler(IRQ_KEYBOARD, ps2_keyboard_callback);
 
     // Restore keyboard defaults and enable it.
     ps2_send_data_response(PS2_DATA_SET_DEFAULTS);
     ps2_send_data_response(PS2_DATA_ENABLE);
-    kprintf("PS/2 keyboard initialized!\n");
+
+    // Reset LEDs.
+    numLock = capsLock = scrollLock = false;
+    ps2_keyboard_set_leds(false, false, false);
+    ps2_keyboard_set_leds(false, false, false);
+    ps2_keyboard_set_leds(false, false, false);
+    ps2_keyboard_set_leds(false, false, false);
+    lastKeyCode = KEYBOARD_KEY_UNKNOWN;
+    kprintf("PS/2 KEYBOARD: Initialized!\n");
 }

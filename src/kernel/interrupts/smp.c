@@ -70,7 +70,7 @@ void ap_main() {
     kprintf("CPU%u: INTERRUPTS ENABLED.\n", cpu);
     while (true) {
         sleep(2000);
-        kprintf("Tick tock, I'm CPU %d!\n", cpu);
+       // kprintf("Tick tock, I'm CPU %d!\n", cpu);
     }
 }
 

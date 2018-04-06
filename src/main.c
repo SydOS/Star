@@ -19,6 +19,7 @@
 #include <driver/pci.h>
 #include <driver/speaker.h>
 #include <driver/ps2/ps2.h>
+#include <driver/ps2/keyboard.h>
 #include <driver/rtc.h>
 
 #include <acpi.h>
@@ -55,18 +56,7 @@ void kernel_main() {
 	serial_init();
 
 	vga_initialize();
-	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-	vga_writes("   _____           _  ____   _____ \n");
-	vga_writes("  / ____|         | |/ __ \\ / ____|\n");
-	vga_writes(" | (___  _   _  __| | |  | | (___  \n");
-	vga_writes("  \\___ \\| | | |/ _` | |  | |\\___ \\ \n");
-	vga_writes("  ____) | |_| | (_| | |__| |____) |\n");
-	vga_writes(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
-	vga_writes("          __/ |                    \n");
-	vga_writes("         |___/                     \n");
-	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
 
-	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 	gdt_init();
 
 	// -------------------------------------------------------------------------
@@ -106,7 +96,7 @@ void kernel_main() {
 
 void hmmm_thread(void) {
 	while (1) { 
-		kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
+		//kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
 		sleep(2000);
 	 }
 }
@@ -135,6 +125,7 @@ void kernel_late() {
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
+	pci_init();
 
 	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
 	
@@ -151,25 +142,120 @@ void kernel_late() {
 	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
-	pci_init();
 
-    vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-	kprintf("root@sydos ~: ");
-	serial_writes("root@sydos ~: ");
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
+	vga_writes("   _____           _  ____   _____ \n");
+	vga_writes("  / ____|         | |/ __ \\ / ____|\n");
+	vga_writes(" | (___  _   _  __| | |  | | (___  \n");
+	vga_writes("  \\___ \\| | | |/ _` | |  | |\\___ \\ \n");
+	vga_writes("  ____) | |_| | (_| | |__| |____) |\n");
+	vga_writes(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
+	vga_writes("          __/ |                    \n");
+	vga_writes("         |___/                     \n");
+	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
+
+
+    
 
     // Ring serial and VGA terminals.
 	serial_write('\a');
 	//vga_putchar('\a');
   
 	// If serial isn't present, just loop.
-	if (!serial_present()) {
-		kprintf("No serial port present for logging, waiting here.");
-		while (true);
-	}
+	//if (!serial_present()) {
+		//kprintf("No serial port present for logging, waiting here.");
+	//	while (true);
+	//}
 
-	for(;;) {
-		char c = serial_read();
+	char buffer[100];
+
+	while (true) {
+		vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+		kprintf("root@sydos ~: ");
+		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+		uint16_t i = 0;
+		while (i < 98) {
+			uint16_t k = ps2_keyboard_get_last_key();
+			while (k == KEYBOARD_KEY_UNKNOWN && serial_received() == 0)
+				k = ps2_keyboard_get_last_key();
+
+			if (serial_received() != 0) {
+				char c = serial_read();
+				if (c == '\r' || c == '\n')
+					break;
+				else if (c == '\b' || c == 127) {
+					if (i > 0) {
+						i--;
+						kprintf("\b \b");
+					}
+				}
+				else {
+					kprintf("%c", c);
+					buffer[i++] = c;
+				}
+			}
+			else {
+				if (k == KEYBOARD_KEY_ENTER)
+					break;
+				else if (k == KEYBOARD_KEY_BACKSPACE) {
+					if (i > 0) {
+						i--;
+						kprintf("\b \b");
+					}
+				}
+				else {
+					char c = ps2_keyboard_get_ascii(k);
+					if (c) {
+						kprintf("%c", c);
+						buffer[i++] = c;
+					}
+				}
+			}		
+		}
+
+		// Terminate.
+		buffer[i] = '\0';
+		kprintf("\n");
+
+
+		if (strcmp(buffer, "exit") == 0)
+			ps2_reset_system();
+
+		else if (strcmp(buffer, "uptime") == 0)
+			kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
+
+		else if (strcmp(buffer, "corp") == 0)
+			kprintf("Hacking CorpNewt's computer and installing SydOS.....\n");
+		else if (strncmp(buffer, "beep ", 4) == 0) {
+			// Get hertz.
+			char* hzStr = buffer + 5;
+			char* msStr = hzStr;
+			uint32_t hzLen = strlen(hzStr);
+			for (uint16_t i = 0; i < hzLen; i++) {
+				if (hzStr[i] == ' ') {
+					hzLen = i;
+					msStr = hzStr + hzLen + 1;
+					break;
+				}
+			}
+			uint32_t msLen = strlen(msStr);
+
+			uint32_t hz = 0;
+			uint32_t ms = 0;
+			for (uint16_t i = 0; i < hzLen; i++)
+				hz = hz * 10 + (hzStr[i] - '0');
+			for (uint16_t i = 0; i < msLen; i++)
+				ms = ms * 10 + (msStr[i] - '0');
+
+			kprintf("Beeping at %u hertz for %u ms...\n", hz, ms);
+			speaker_play_tone(hz, ms);
+		}
+
+
+
+		/*char c = serial_read();
 
 		if (c == '\r' || c == '\n') {
 			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
@@ -180,6 +266,6 @@ void kernel_late() {
 			vga_putchar(c);
 			serial_write(c);
 			vga_trigger_cursor_update();
-		}
+		}*/
 	}
 }

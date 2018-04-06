@@ -481,7 +481,7 @@ void ata_init(PciDevice *device) {
 
     // ===== DEMO ======
     // Select masters on channels.
-    kprintf("ATA: Selecting masters....\n");
+  /*  kprintf("ATA: Selecting masters....\n");
     ata_select_device(&ataDevice->Primary, true);
     ata_select_device(&ataDevice->Secondary, true);
     uint8_t *data = (uint8_t*)kheap_alloc(ATA_SECTOR_SIZE_512);
@@ -507,5 +507,5 @@ void ata_init(PciDevice *device) {
     kprintf("ATA: Status %d\n", status);
     for (int i = 0; i < 25; i++)
         kprintf("%X ", data[i]);
-    kprintf("\n\n");
+    kprintf("\n\n");*/
 }

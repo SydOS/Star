@@ -1,7 +1,7 @@
-// https://wiki.osdev.org/Keyboard
+#ifndef PS2_KEYBOARD_H
+#define PS2_KEYBOARD_H
 
-enum
-{
+enum {
     KEYBOARD_KEY_A = 0x00,
     KEYBOARD_KEY_B,
     KEYBOARD_KEY_C,
@@ -96,10 +96,15 @@ enum
     KEYBOARD_KEY_RIGHT_CTRL,
     KEYBOARD_KEY_RIGHT_SHIFT,
     KEYBOARD_KEY_RIGHT_ALT,
-    KEYBOARD_KEY_SYSREQ
+    KEYBOARD_KEY_SYSREQ,
+
+    KEYBOARD_KEY_UNKNOWN
 };
 
 
 
+extern void ps2_keyboard_set_leds(bool numLock, bool capsLock, bool scrollLock);
+extern uint16_t ps2_keyboard_get_last_key(void);
+extern void ps2_keyboard_init(void);
 
-extern void ps2_keyboard_init();
+#endif
