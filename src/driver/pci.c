@@ -20,27 +20,18 @@ static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
         // Get pointer to device.
         PciDevice *device = &pciDevices[i];
 
+        // Does the device match the IRQ raised?
         if (device->InterruptLine == irqNum) {
             kprintf_nlock("%X:%X status: 0x%X\n", device->VendorId, device->DeviceId, pci_config_read_word(device, PCI_REG_STATUS));
+
+            // Call any handler registered.
             pci_handler handler = (pci_handler)device->InterruptHandler;
             if (handler)
-                handler(device);
-
-            // Get IRQ status bit.
-          /*  if ( & PCI_STATUS_INTERRUPT) {
-                kprintf_nlock("Found PCI device that raised interrupt: %X:%X\n", device->VendorId, device->DeviceId);
-                while(true);
-            }*/
+                if (handler(device))
+                    return;
         }
     }
 }
-
-static uintptr_t *pciIrqs;
-
-
-
-
-
 
 static void pci_install_irq_handler_apic(uint8_t irq) {
     if (!(irqs_handler_mapped(irq))) {
@@ -199,21 +190,6 @@ bool pci_check_device(uint8_t bus, uint8_t device, uint8_t function, ACPI_BUFFER
             table = (uintptr_t)table + table->Length;
         }
     }
-
-
-
-    // Check if the device is the RTL8139
-        if(pciDevice.VendorId == 0x10EC && pciDevice.DeviceId == 0x8139) {
-            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-            kprintf("  - DETECTED RTL8139\n");
-            rtl8139_init(&pciDevice);
-        }
-
-        /*if (pciDevice.Class == 1 && pciDevice.Subclass == 1) {
-            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-            kprintf("  - DETECTED ATA CONTROLLER\n");
-            ata_init(&pciDevice);
-        }*/
         
         // If device is a PCI bridhge
         if(pciDevice.Class == 6 && pciDevice.Subclass == 4) {
@@ -286,9 +262,23 @@ void pci_check_busses(uint8_t bus, uint8_t device) {
 void pci_display() {
     for (uint16_t i = 0; i < pciDevicesSize / sizeof(PciDevice); i++)
     {
-        PciDevice device = pciDevices[i];
-        kprintf("Device %u: status: 0x%X\n", i, pci_config_read_word(&device, PCI_REG_STATUS));
-        pci_print_info(&device);
+        PciDevice *device = pciDevices+i;
+        kprintf("Device %u: status: 0x%X\n", i, pci_config_read_word(device, PCI_REG_STATUS));
+        pci_print_info(device);
+
+        
+    // Check if the device is the RTL8139
+        if(device->VendorId == 0x10EC && device->DeviceId == 0x8139) {
+            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+            kprintf("  - DETECTED RTL8139\n");
+            rtl8139_init(device);
+        }
+
+        if (device->Class == 1 && device->Subclass == 1) {
+            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+            kprintf("  - DETECTED ATA CONTROLLER\n");
+            ata_init(device);
+        }
     }
     kprintf("%u total PCI devices\n", pciDevicesSize / sizeof(PciDevice));
 }

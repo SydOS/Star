@@ -77,7 +77,7 @@ typedef struct {
 	void *DriverObject;
 } PciDevice;
 
-typedef void (*pci_handler)(PciDevice *device);
+typedef bool (*pci_handler)(PciDevice *device);
 
 char* pci_class_descriptions[255];
 

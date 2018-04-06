@@ -5,33 +5,24 @@
 #include <driver/storage/ata/ata.h>
 #include <driver/storage/ata/ata_commands.h>
 #include <kernel/interrupts/irqs.h>
+#include <kernel/memory/kheap.h>
 #include <driver/storage/storage.h>
 #include <driver/pci.h>
 
-static bool irqTriggeredPri = false;
-static bool irqTriggeredSec = false;
+ata_channel_t *isaPrimary;
+ata_channel_t *isaSecondary;
 
-static void ata_callback_pri() {
-    irqTriggeredPri = true;
-    kprintf("ATA: IRQ14 raised!\n");
-}
-
-static void ata_callback_sec() {
-    irqTriggeredSec = true;
-    kprintf("ATA: IRQ15 raised!\n");
-}
-
-int16_t ata_check_status(uint16_t portCommand, bool master) {
+int16_t ata_check_status(ata_channel_t *channel, bool master) {
     // Get value of selected drive and ensure it is correct.
-    if (master && (inb(ATA_REG_DRIVE_SELECT(portCommand)) & 0x10))
+    if (master && (inb(ATA_REG_DRIVE_SELECT(channel->CommandPort)) & 0x10))
         return ATA_CHK_STATUS_DEVICE_MISMATCH;
-    else if (!master && !(inb(ATA_REG_DRIVE_SELECT(portCommand)) & 0x10))
+    else if (!master && !(inb(ATA_REG_DRIVE_SELECT(channel->CommandPort)) & 0x10))
         return ATA_CHK_STATUS_DEVICE_MISMATCH;
 
     // Get status flag. If status is not ready, return error.
-    uint8_t status = inb(ATA_REG_STATUS(portCommand));
+    uint8_t status = inb(ATA_REG_STATUS(channel->CommandPort));
     if (status & ATA_STATUS_ERROR)
-        return inb(ATA_REG_ERROR(portCommand));
+        return inb(ATA_REG_ERROR(channel->CommandPort));
     else if (status & ATA_STATUS_DRIVE_FAULT)
         return ATA_CHK_STATUS_DEVICE_FAULT;
     else if ((status & ATA_STATUS_BUSY) || !(status & ATA_STATUS_READY))
@@ -41,11 +32,53 @@ int16_t ata_check_status(uint16_t portCommand, bool master) {
     return ATA_CHK_STATUS_OK;
 }
 
-bool ata_wait_for_irq_pri(uint16_t portCommand, bool master) {
+static void ata_callback_isa(IrqRegisters_t *regs, uint8_t irqNum) {
+    kprintf_nlock("ATA: ISA IRQ%u raised!\n", irqNum);
+    if (irqNum == IRQ_PRI_ATA)
+        isaPrimary->InterruptTriggered = true;
+    else if (irqNum == IRQ_SEC_ATA)
+        isaSecondary->InterruptTriggered = true;
+}
+
+static bool ata_callback_pci(PciDevice *device) {
+    // Is the interrupt bit in the PCI status register set?
+    if (pci_config_read_word(device, PCI_REG_STATUS) & ATA_PCI_STATUS_INTERRUPT) {
+        kprintf_nlock("ATA: PCI interrupt raised!\n");
+        ata_device_t *ataDevice = (ata_device_t*)device->DriverObject;
+
+        // Is busmastering enabled on primary channel?
+        if (ataDevice->Primary.BusMasterCapable) {
+            // Check if interrupt bit is set.
+            if (inb(ataDevice->Primary.BusMasterStatusPort) & ATA_PCI_BUSMASTER_STATUS_INTERRUPT)
+                ataDevice->Primary.InterruptTriggered = true;
+
+            // Reset interrupt bit.
+            outb(ataDevice->Primary.BusMasterStatusPort, ATA_PCI_BUSMASTER_STATUS_INTERRUPT);
+        }
+
+        // Is busmastering enabled on secondary channel?
+        if (ataDevice->Secondary.BusMasterCapable) {
+            // Check if interrupt bit is set.
+            if (inb(ataDevice->Secondary.BusMasterStatusPort) & ATA_PCI_BUSMASTER_STATUS_INTERRUPT)
+                ataDevice->Secondary.InterruptTriggered = true;
+
+            // Reset interrupt bit.
+            outb(ataDevice->Secondary.BusMasterStatusPort, ATA_PCI_BUSMASTER_STATUS_INTERRUPT);
+        }
+
+        // Interrupt is handled.
+        return true;
+    }
+
+    // Device didn't have interrupt bit set, interrupt not handled.
+    return false;
+}
+
+int16_t ata_wait_for_irq(ata_channel_t *channel, bool master) {
     // Wait until IRQ is triggered or we time out.
     uint16_t timeout = 200;
 	bool ret = false;
-	while (!irqTriggeredPri) {
+	while (!channel->InterruptTriggered) {
 		if(!timeout)
 			break;
 		timeout--;
@@ -53,183 +86,152 @@ bool ata_wait_for_irq_pri(uint16_t portCommand, bool master) {
 	}
 
 	// Did we hit the IRQ?
-	if(irqTriggeredPri)
+
+	if(channel->InterruptTriggered)
 		ret = true;
 	else
-		kprintf("ATA: IRQ14 timeout for primary channel!\n");
+		kprintf("ATA: IRQ timeout for channel 0x%X!\n", channel->CommandPort);
 
 	// Reset triggered value.
-	irqTriggeredPri = false;
+	channel->InterruptTriggered = false;
 	if (ret)
-        return ata_check_status(portCommand, master);
+        return ata_check_status(channel, master);
     else
         return -1;
-}
-
-bool ata_wait_for_irq_sec(uint16_t portCommand, bool master) {
-    // Wait until IRQ is triggered or we time out.
-    uint16_t timeout = 200;
-	uint8_t ret = false;
-	while (!irqTriggeredSec) {
-		if(!timeout)
-			break;
-		timeout--;
-		sleep(10);
-	}
-
-	// Did we hit the IRQ?
-	if(irqTriggeredSec)
-		ret = true;
-	else
-		kprintf("ATA: IRQ15 timeout for secondary channel!\n");
-
-	// Reset triggered value.
-	irqTriggeredSec = false;
-	if (ret)
-        return ata_check_status(portCommand, master);
-    else
-        return false;
 }
 
 uint16_t ata_read_data_word(uint16_t portCommand) {
     return inw(ATA_REG_DATA(portCommand));
 }
 
-void ata_read_data_pio(uint16_t portCommand, void *outData, uint32_t size) {
+void ata_read_data_pio(ata_channel_t *channel, void *outData, uint32_t size) {
     // Get pointer to word array.
     uint16_t *buffer = (uint16_t*)outData;
 
     // Read words from device.
     for (uint32_t i = 0; i < size; i += 2)
-        buffer[i / 2] = inw(ATA_REG_DATA(portCommand));
+        buffer[i / 2] = inw(ATA_REG_DATA(channel->CommandPort));
 }
 
-void ata_write_data_pio(uint16_t portCommand, const void *data, uint32_t size) {
+void ata_write_data_pio(ata_channel_t *channel, const void *data, uint32_t size) {
     // Get pointer to word array.
     uint16_t *buffer = (uint16_t*)data;
 
     // Write words to device.
     for (uint32_t i = 0; i < size; i += 2)
-        outw(ATA_REG_DATA(portCommand), buffer[i / 2]);
+        outw(ATA_REG_DATA(channel->CommandPort), buffer[i / 2]);
 }
 
-void ata_send_command(uint16_t portCommand, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh, uint8_t command) {
-    // Send command to current ATA device.
-    outb(ATA_REG_SECTOR_COUNT(portCommand), sectorCount);
-    outb(ATA_REG_SECTOR_NUMBER(portCommand), sectorNumber);
-    outb(ATA_REG_CYLINDER_LOW(portCommand), cylinderLow);
-    outb(ATA_REG_CYLINDER_HIGH(portCommand), cylinderHigh);
-    outb(ATA_REG_COMMAND(portCommand), command);
+void ata_send_params(ata_channel_t *channel, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh) {
+    // Send params to ATA device.
+    outb(ATA_REG_SECTOR_COUNT(channel->CommandPort), sectorCount);
+    outb(ATA_REG_SECTOR_NUMBER(channel->CommandPort), sectorNumber);
+    outb(ATA_REG_CYLINDER_LOW(channel->CommandPort), cylinderLow);
+    outb(ATA_REG_CYLINDER_HIGH(channel->CommandPort), cylinderHigh);
     io_wait();
 }
 
-void ata_send_params(uint16_t portCommand, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh) {
-    // Send command to current ATA device.
-    outb(ATA_REG_SECTOR_COUNT(portCommand), sectorCount);
-    outb(ATA_REG_SECTOR_NUMBER(portCommand), sectorNumber);
-    outb(ATA_REG_CYLINDER_LOW(portCommand), cylinderLow);
-    outb(ATA_REG_CYLINDER_HIGH(portCommand), cylinderHigh);
+void ata_send_command(ata_channel_t *channel, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh, uint8_t command) {
+    // Send command to ATA device.
+    ata_send_params(channel, sectorCount, sectorNumber, cylinderLow, cylinderHigh);
+    outb(ATA_REG_COMMAND(channel->CommandPort), command);
     io_wait();
 }
 
-void ata_set_lba_high(uint16_t portCommand, uint8_t lbaHigh) {
+void ata_set_lba_high(ata_channel_t *channel, uint8_t lbaHigh) {
     // Get current device value.
-    uint8_t deviceFlags = inb(ATA_REG_DRIVE_SELECT(portCommand));
+    uint8_t deviceFlags = inb(ATA_REG_DRIVE_SELECT(channel->CommandPort));
 
     // Set LBA flag and add high bits of LBA address, and write back to register.
     deviceFlags |= ATA_DEVICE_FLAGS_LBA | lbaHigh;
-    outb(ATA_REG_DRIVE_SELECT(portCommand), deviceFlags);
+    outb(ATA_REG_DRIVE_SELECT(channel->CommandPort), deviceFlags);
     io_wait();
 }
 
-void ata_select_device(uint16_t portCommand, uint16_t portControl, bool master) {
+void ata_select_device(ata_channel_t *channel, bool master) {
     uint8_t deviceFlags = ATA_DEVICE_FLAGS_ECC | ATA_DEVICE_FLAGS_SECTOR;
     if (!master)
         deviceFlags |= ATA_DEVICE_FLAGS_SLAVE;
-    outb(ATA_REG_DRIVE_SELECT(portCommand), deviceFlags);
+    outb(ATA_REG_DRIVE_SELECT(channel->CommandPort), deviceFlags);
     io_wait();
-    inb(ATA_REG_ALT_STATUS(portControl));
-    inb(ATA_REG_ALT_STATUS(portControl));
-    inb(ATA_REG_ALT_STATUS(portControl));
-    inb(ATA_REG_ALT_STATUS(portControl));
+    inb(ATA_REG_ALT_STATUS(channel->ControlPort));
+    inb(ATA_REG_ALT_STATUS(channel->ControlPort));
+    inb(ATA_REG_ALT_STATUS(channel->ControlPort));
+    inb(ATA_REG_ALT_STATUS(channel->ControlPort));
     io_wait();
 }
 
-void ata_soft_reset(uint16_t portCommand, uint16_t portControl, bool *outMasterPresent, bool *outMasterAtapi, bool *outSlavePresent, bool *outSlaveAtapi) {
+void ata_soft_reset(ata_channel_t *channel, bool *outMasterPresent, bool *outMasterAtapi, bool *outSlavePresent, bool *outSlaveAtapi) {
     // Cycle reset bit.
-    outb(ATA_REG_DEVICE_CONTROL(portControl), ATA_DEVICE_CONTROL_RESET);
+    outb(ATA_REG_DEVICE_CONTROL(channel->ControlPort), ATA_DEVICE_CONTROL_RESET);
     sleep(10);
-    outb(ATA_REG_DEVICE_CONTROL(portControl), 0x00);
+    outb(ATA_REG_DEVICE_CONTROL(channel->ControlPort), 0x00);
     sleep(500);
 
     // Select master device.
-    ata_select_device(portCommand, portControl, true);
+    ata_select_device(channel, true);
 
     // Get signature.
-    uint8_t sectorCount = inb(ATA_REG_SECTOR_COUNT(portCommand));
-    uint8_t sectorNumber = inb(ATA_REG_SECTOR_NUMBER(portCommand));
-    uint8_t cylinderLow = inb(ATA_REG_CYLINDER_LOW(portCommand));
-    uint8_t cylinderHigh = inb(ATA_REG_CYLINDER_HIGH(portCommand));
-    inb(ATA_REG_DRIVE_SELECT(portCommand));
+    uint8_t sectorCount = inb(ATA_REG_SECTOR_COUNT(channel->CommandPort));
+    uint8_t sectorNumber = inb(ATA_REG_SECTOR_NUMBER(channel->CommandPort));
+    uint8_t cylinderLow = inb(ATA_REG_CYLINDER_LOW(channel->CommandPort));
+    uint8_t cylinderHigh = inb(ATA_REG_CYLINDER_HIGH(channel->CommandPort));
+    inb(ATA_REG_DRIVE_SELECT(channel->CommandPort));
 
     // Check signature of master.
+    kprintf("ATA: SC: 0x%X SN: 0x%X CL: 0x%X CH: 0x%X\n", sectorCount, sectorNumber, cylinderLow, cylinderHigh);
     if (sectorCount == ATA_SIG_SECTOR_COUNT_ATA && sectorNumber == ATA_SIG_SECTOR_NUMBER_ATA
         && cylinderLow == ATA_SIG_CYLINDER_LOW_ATA && cylinderHigh == ATA_SIG_CYLINDER_HIGH_ATA) {
         *outMasterAtapi = false; // ATA device.
         *outMasterPresent = true;
-        kprintf("ATA: Master device on channel 0x%X should be an ATA device.\n", portCommand);
+        kprintf("ATA: Master device on channel 0x%X should be an ATA device.\n", channel->CommandPort);
     }
     else if (sectorCount == ATA_SIG_SECTOR_COUNT_ATAPI && sectorNumber == ATA_SIG_SECTOR_NUMBER_ATAPI
         && cylinderLow == ATA_SIG_CYLINDER_LOW_ATAPI && cylinderHigh == ATA_SIG_CYLINDER_HIGH_ATAPI) {
         *outMasterAtapi = true; // ATAPI device.
         *outMasterPresent = true;
-        kprintf("ATA: Master device on channel 0x%X should be an ATAPI device.\n", portCommand);
+        kprintf("ATA: Master device on channel 0x%X should be an ATAPI device.\n", channel->CommandPort);
     }
     else {
         *outMasterAtapi = false;
         *outMasterPresent = false; // Device probably not present.
-        kprintf("ATA: Master device on channel 0x%X didn't match known signatures!\n", portCommand);
+        kprintf("ATA: Master device on channel 0x%X didn't match known signatures!\n", channel->CommandPort);
     }
 
     // Select slave device.
-    ata_select_device(portCommand, portControl, false);
+    ata_select_device(channel, false);
 
     // Get signature.
-    sectorCount = inb(ATA_REG_SECTOR_COUNT(portCommand));
-    sectorNumber = inb(ATA_REG_SECTOR_NUMBER(portCommand));
-    cylinderLow = inb(ATA_REG_CYLINDER_LOW(portCommand));
-    cylinderHigh = inb(ATA_REG_CYLINDER_HIGH(portCommand));
-    inb(ATA_REG_DRIVE_SELECT(portCommand));
+    sectorCount = inb(ATA_REG_SECTOR_COUNT(channel->CommandPort));
+    sectorNumber = inb(ATA_REG_SECTOR_NUMBER(channel->CommandPort));
+    cylinderLow = inb(ATA_REG_CYLINDER_LOW(channel->CommandPort));
+    cylinderHigh = inb(ATA_REG_CYLINDER_HIGH(channel->CommandPort));
+    inb(ATA_REG_DRIVE_SELECT(channel->CommandPort));
 
     // Check signature of slave.
+    kprintf("ATA: SC: 0x%X SN: 0x%X CL: 0x%X CH: 0x%X\n", sectorCount, sectorNumber, cylinderLow, cylinderHigh);
     if (sectorCount == ATA_SIG_SECTOR_COUNT_ATA && sectorNumber == ATA_SIG_SECTOR_NUMBER_ATA
         && cylinderLow == ATA_SIG_CYLINDER_LOW_ATA && cylinderHigh == ATA_SIG_CYLINDER_HIGH_ATA) {
         *outSlaveAtapi = false; // ATA device.
         *outSlavePresent = true;
-        kprintf("ATA: Slave device on channel 0x%X should be an ATA device.\n", portCommand);
+        kprintf("ATA: Slave device on channel 0x%X should be an ATA device.\n", channel->CommandPort);
     }
     else if (sectorCount == ATA_SIG_SECTOR_COUNT_ATAPI && sectorNumber == ATA_SIG_SECTOR_NUMBER_ATAPI
         && cylinderLow == ATA_SIG_CYLINDER_LOW_ATAPI && cylinderHigh == ATA_SIG_CYLINDER_HIGH_ATAPI) {
         *outSlaveAtapi = true; // ATAPI device.
         *outSlavePresent = true;
-        kprintf("ATA: Slave device on channel 0x%X should be an ATAPI device.\n", portCommand);
+        kprintf("ATA: Slave device on channel 0x%X should be an ATAPI device.\n", channel->CommandPort);
     }
     else {
         *outSlaveAtapi = false;
         *outSlavePresent = false; // Device probably not present.
-        kprintf("ATA: Slave device on channel 0x%X didn't match known signatures!\n", portCommand);
+        kprintf("ATA: Slave device on channel 0x%X didn't match known signatures!\n", channel->CommandPort);
     }
 }
 
-
-
-bool ata_data_ready(uint16_t portCommand) {
-    return inb(ATA_REG_STATUS(portCommand)) & ATA_STATUS_DATA_REQUEST;
-}
-
-bool ata_wait_for_drq(uint16_t portControl) {
+bool ata_wait_for_drq(ata_channel_t *channel) {
     uint16_t timeout = 500;
-    uint8_t response = inb(ATA_REG_ALT_STATUS(portControl));
+    uint8_t response = inb(ATA_REG_ALT_STATUS(channel->ControlPort));
     sleep(1);
 
     // Is the drive busy?
@@ -242,7 +244,7 @@ bool ata_wait_for_drq(uint16_t portControl) {
         // Decrement timeout period and try again.
         timeout--;
         sleep(10);
-        response = inb(ATA_REG_ALT_STATUS(portControl));
+        response = inb(ATA_REG_ALT_STATUS(channel->ControlPort));
     }
 
     // Drive is ready.
@@ -327,115 +329,45 @@ static void ata_print_device_packet_info(ata_identify_packet_result_t info) {
     }
 }
 
-void ata_reset_identify(uint16_t portCommand, uint16_t portControl) {
+void ata_reset_identify(ata_channel_t *channel) {
     // Reset channel.
     bool masterPresent = false;
     bool slavePresent = false;
     bool atapiMaster = false;
     bool atapiSlave = false;
-    ata_soft_reset(portCommand, portControl, &masterPresent, &atapiMaster, &slavePresent, &atapiSlave);
+    ata_soft_reset(channel, &masterPresent, &atapiMaster, &slavePresent, &atapiSlave);
 
     // Identify master device if present.
     if (masterPresent) {
         // Select master.
-        ata_select_device(portCommand, portControl, true);
+        ata_select_device(channel, true);
         if (atapiMaster) { // ATAPI device.
-            ata_identify_packet_result_t atapiMaster;
+            /*ata_identify_packet_result_t atapiMaster;
             if (ata_identify_packet(portCommand, portControl, true, &atapiMaster)) {
                 kprintf("ATA: Found ATAPI master device on channel 0x%X!\n", portCommand);
                 ata_print_device_packet_info(atapiMaster);
-
-                /*uint8_t packet[6] = { 0x12, 0, 0, 0, 96, 0 };
-                uint8_t result[96];
-
-
-                ata_packet(portCommand, portControl, true, packet, 6, 12, result, 96);
-
-                char vendor[9];
-                memcpy(vendor, result+8, 8);
-                vendor[8] = '\0';
-                kprintf("ATA: SCSI vendor: %s\n", vendor);
-
-                char product[9];
-                memcpy(product, result+16, 8);
-                product[8] = '\0';
-                kprintf("ATA: SCSI product: %s\n", product);
-
-                char revision[9];
-                memcpy(revision, result+32, 8);
-                revision[8] = '\0';
-                kprintf("ATA: SCSI revision: %s\n", revision);
-
-                ata_packet(portCommand, portControl, true, packet, 6, 12, result, 96);
-
-                memcpy(vendor, result+8, 8);
-                vendor[8] = '\0';
-                kprintf("ATA: SCSI vendor: %s\n", vendor);
-
-                memcpy(product, result+16, 8);
-                product[8] = '\0';
-                kprintf("ATA: SCSI product: %s\n", product);
-
-                memcpy(revision, result+32, 8);
-                revision[8] = '\0';
-                kprintf("ATA: SCSI revision: %s\n", revision);
-
-                uint8_t packet2[6] = { 0x1B, 0, 0, 0, 0x2, 0 };
-                uint8_t result2[1];
-
-                asm volatile ("xchg %bx, %bx");
-
-                ata_packet(portCommand, portControl, true, packet2, 6, 12, result2, 0);
-
-
-                uint8_t packet3[6] = { 0x03, 0, 0, 0, 252, 0 };
-                uint8_t result3[252];
-
-
-                ata_packet(portCommand, portControl, true, packet3, 6, 12, result3, 252);
-
-                for (int i = 0; i < 252; i++)
-                    kprintf(" %X", result3[i]);
-
-
-                kprintf("\ndd\n");*/
             }
             else {
                 kprintf("ATA: Failed to identify ATAPI master device on channel 0x%X.\n", portCommand);
-            }
+            }*/
         }
         else { // ATA device.
             ata_identify_result_t ataMaster;
-            if (ata_identify(portCommand, portControl, true, &ataMaster)) {
-                kprintf("ATA: Found master device on channel 0x%X!\n", portCommand);
+            if (ata_identify(channel, true, &ataMaster) == ATA_CHK_STATUS_OK) {
+                kprintf("ATA: Found master device on channel 0x%X!\n", channel->CommandPort);
                 ata_print_device_info(ataMaster);
-
-
-                kprintf("Writing data...\n");
-                uint8_t bytes[ATA_SECTOR_SIZE_512];
-                memset(bytes, 0, ATA_SECTOR_SIZE_512);
-                for (uint16_t i = 0; i < 256; i++)
-                    bytes[i] = i;
-                //ata_write_sector(portCommand, portControl, true, 1, bytes, 1);
-                memset(bytes, 0, ATA_SECTOR_SIZE_512);
-
-                kprintf("Reading data...\n");
-                uint16_t status = ata_read_sector_ext(portCommand, portControl, true, 1, bytes, 1);
-                for (uint16_t i = 0; i < ATA_SECTOR_SIZE_512; i++)
-                    kprintf(" %X", bytes[i]);
-                kprintf("\n");
             }
             else {
-                kprintf("ATA: Failed to identify master device or no device exists on channel 0x%X.\n", portCommand);
+                kprintf("ATA: Failed to identify master device or no device exists on channel 0x%X.\n", channel->CommandPort);
             }
         }
     }
     else { // Master isn't present.
-        kprintf("ATA: Master device on channel 0x%X isn't present.\n", portCommand);
+        kprintf("ATA: Master device on channel 0x%X isn't present.\n", channel->CommandPort);
     }
 
     // Identify slave device if present.
-    if (slavePresent) {
+   /* if (slavePresent) {
         // Select slave.
         ata_select_device(portCommand, portControl, false);
         if (atapiSlave) { // ATAPI device.
@@ -461,19 +393,119 @@ void ata_reset_identify(uint16_t portCommand, uint16_t portControl) {
     }
     else { // Slave isn't present.
         kprintf("ATA: Slave device on channel 0x%X isn't present.\n", portCommand);
-    }
+    }*/
 }
 
 void ata_init(PciDevice *device) {
-    kprintf("ATA: Initializing...\n");
+    kprintf("ATA: Initializing controller on PCI bus %u device %u function %u...\n", device->Bus, device->Device, device->Function);
 
-    // Register interrupt handlers.
-    irqs_install_handler(IRQ_PRI_ATA, ata_callback_pri);
-    irqs_install_handler(IRQ_SEC_ATA, ata_callback_sec);
+    // Create ATA device object.
+    ata_device_t *ataDevice = (ata_device_t*)kheap_alloc(sizeof(ata_device_t));
+    memset(ataDevice, 0, sizeof(ata_device_t));
+    device->DriverObject = ataDevice;
+    device->InterruptHandler = ata_callback_pci;
+
+    // Get contents of programming interface.
+    uint8_t pi = pci_config_read_byte(device, PCI_REG_PROG_IF);
+
+    // Change into native mode if possible.
+    if (pi & ATA_PCI_PIF_PRI_SUPPORTS_NATIVE)
+        pi |= ATA_PCI_PIF_PRI_NATIVE_MODE;
+    if (pi & ATA_PCI_PIF_SEC_SUPPORTS_NATIVE)
+        pi |= ATA_PCI_PIF_SEC_NATIVE_MODE;
+    pci_config_write_byte(device, PCI_REG_PROG_IF, pi);
+    pi = pci_config_read_byte(device, PCI_REG_PROG_IF);
+
+    // Get info.
+    kprintf("ATA: Primary channel mode: %s\n", pi & ATA_PCI_PIF_PRI_NATIVE_MODE ? "native" : "compatibility");
+    kprintf("ATA: Secondary channel mode: %s\n", pi & ATA_PCI_PIF_SEC_NATIVE_MODE ? "native" : "compatibility");
+
+    // Get primary channel ports.
+    if ((pi & ATA_PCI_PIF_PRI_NATIVE_MODE) && (device->BAR[0] & PCI_BAR_PORT_MASK) && (device->BAR[1] & PCI_BAR_PORT_MASK)) {
+        ataDevice->Primary.CommandPort = (uint16_t)(device->BAR[0] & PCI_BAR_PORT_MASK);
+        ataDevice->Primary.ControlPort = (uint16_t)(device->BAR[1] & PCI_BAR_PORT_MASK);
+        ataDevice->Primary.Interrupt = device->InterruptLine;
+    }
+    else {
+        // Use default ISA ports.
+        ataDevice->Primary.CommandPort = ATA_PRI_COMMAND_PORT;
+        ataDevice->Primary.ControlPort = ATA_PRI_CONTROL_PORT;
+        ataDevice->Primary.Interrupt = IRQ_PRI_ATA;
+        irqs_install_handler(IRQ_PRI_ATA, ata_callback_isa);
+    }
+    ataDevice->Primary.InterruptTriggered = false;
+
+    // Get secondary channel ports.
+    if ((pi & ATA_PCI_PIF_SEC_NATIVE_MODE) && (device->BAR[2] & PCI_BAR_PORT_MASK) && (device->BAR[3] & PCI_BAR_PORT_MASK)) {
+        ataDevice->Secondary.CommandPort = (uint16_t)(device->BAR[2] & PCI_BAR_PORT_MASK);
+        ataDevice->Secondary.ControlPort = (uint16_t)(device->BAR[3] & PCI_BAR_PORT_MASK);
+        ataDevice->Secondary.Interrupt = device->InterruptLine;
+    }
+    else {
+        // Use default ISA ports.
+        ataDevice->Secondary.CommandPort = ATA_SEC_COMMAND_PORT;
+        ataDevice->Secondary.ControlPort = ATA_SEC_CONTROL_PORT;
+        ataDevice->Secondary.Interrupt = IRQ_SEC_ATA;
+        irqs_install_handler(IRQ_SEC_ATA, ata_callback_isa);
+    }
+    ataDevice->Secondary.InterruptTriggered = false;
+
+    // Print ports.
+    kprintf("ATA: Primary channel ports: 0x%X and 0x%X\n", ataDevice->Primary.CommandPort, ataDevice->Primary.ControlPort);
+    kprintf("ATA: Secondary channel ports: 0x%X and 0x%X\n", ataDevice->Secondary.CommandPort, ataDevice->Secondary.ControlPort);
+    kprintf("ATA: Primary channel IRQ: IRQ%u, Secondary: IRQ%u\n", ataDevice->Primary.Interrupt, ataDevice->Secondary.Interrupt);
+
+    // Get bus master info.
+    if ((pi & ATA_PCI_PIF_BUSMASTER) && (device->BAR[4] & PCI_BAR_PORT_MASK)) {
+        kprintf("ATA: Bus Master supported.\n");
+        ataDevice->Primary.BusMasterCapable = true;
+        ataDevice->Secondary.BusMasterCapable = true;
+
+        // Get busmaster ports.
+        uint16_t busMasterBase = (uint16_t)(device->BAR[4] & PCI_BAR_PORT_MASK);
+        ataDevice->Primary.BusMasterCommandPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRICMD;
+        ataDevice->Primary.BusMasterStatusPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRISTATUS;
+        ataDevice->Primary.BusMasterPrdt = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRIPRDT;
+        ataDevice->Secondary.BusMasterCommandPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECCMD;
+        ataDevice->Secondary.BusMasterStatusPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECSTATUS;
+        ataDevice->Secondary.BusMasterPrdt = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECPRDT;
+    }
 
     // Reset and identify both channels.
-    ata_reset_identify(ATA_PRI_COMMAND_PORT, ATA_PRI_CONTROL_PORT);
-    ata_reset_identify(ATA_SEC_COMMAND_PORT, ATA_SEC_CONTROL_PORT);
+    kprintf("ATA: Resetting channels...\n");
+    ata_reset_identify(&ataDevice->Primary);
+    ata_reset_identify(&ataDevice->Secondary);
+    kprintf("ATA: Initialized!\n");
 
-    //while(true);
+
+
+    // ===== DEMO ======
+    // Select masters on channels.
+    kprintf("ATA: Selecting masters....\n");
+    ata_select_device(&ataDevice->Primary, true);
+    ata_select_device(&ataDevice->Secondary, true);
+    uint8_t *data = (uint8_t*)kheap_alloc(ATA_SECTOR_SIZE_512);
+
+    // Wipe first sector of primary master.
+    kprintf("ATA: Wiping sector 0 on pri master....\n");
+    memset(data, 0, ATA_SECTOR_SIZE_512);
+    int16_t status = ata_write_sector(&ataDevice->Primary, true, 0, data, 1);
+    kprintf("ATA: Status %d\n", status);
+    status = ata_read_sector(&ataDevice->Primary, true, 0, data, 1);
+    kprintf("ATA: Status %d\n", status);
+    for (int i = 0; i < 25; i++)
+        kprintf("%X ", data[i]);
+    kprintf("\n\n");
+
+    // Read data from secondary master and write to primary master.
+    kprintf("ATA: Copying sector 0 from sec master to pri master....\n");
+    status = ata_read_sector(&ataDevice->Secondary, true, 0, data, 1);
+    kprintf("ATA: Status %d\n", status);
+    status = ata_write_sector(&ataDevice->Primary, true, 0, data, 1);
+    kprintf("ATA: Status %d\n", status);
+    status = ata_read_sector(&ataDevice->Primary, true, 0, data, 1);
+    kprintf("ATA: Status %d\n", status);
+    for (int i = 0; i < 25; i++)
+        kprintf("%X ", data[i]);
+    kprintf("\n\n");
 }

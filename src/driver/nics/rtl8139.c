@@ -26,11 +26,12 @@ struct RTL8139 {
 	uint8_t MACAddress[6];
 };
 
-void rtl_callbac(PciDevice *device) {
+bool rtl_callbac(PciDevice *device) {
 	
 kprintf_nlock("Clearing RTL8139 interrupt\n");
 struct RTL8139 *rtl = (struct RTL8139*)device->DriverObject;
 outw(rtl->BaseAddress + 0x3E, 0xFFFF);
+return true;
 	
 }
 

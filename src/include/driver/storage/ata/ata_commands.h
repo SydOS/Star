@@ -382,6 +382,9 @@ struct ata_identify_packet_result {
 };
 typedef struct ata_identify_packet_result ata_identify_packet_result_t;
 
-extern bool ata_identify(uint16_t portCommand, uint16_t portControl, bool master, ata_identify_result_t *outResult);
+extern uint16_t ata_read_identify_word(ata_channel_t *channel, uint8_t *checksum);
+extern void ata_read_identify_words(ata_channel_t *channel, uint8_t *checksum, uint8_t firstWord, uint8_t lastWord);
+
+extern int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t *outResult);
 
 #endif

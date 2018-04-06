@@ -76,6 +76,45 @@ enum {
 #define ATA_CHK_STATUS_DEVICE_MISMATCH  -10
 #define ATA_CHK_STATUS_ERROR            1
 
+
+
+// PCI ATA controller bits
+#define ATA_PCI_PIF_PRI_NATIVE_MODE         0x01
+#define ATA_PCI_PIF_PRI_SUPPORTS_NATIVE     0x02
+#define ATA_PCI_PIF_SEC_NATIVE_MODE         0x04
+#define ATA_PCI_PIF_SEC_SUPPORTS_NATIVE     0x08
+#define ATA_PCI_PIF_BUSMASTER               0x80
+
+#define ATA_PCI_STATUS_INTERRUPT            0x08
+
+#define ATA_PCI_BUSMASTER_PORT_PRICMD       0x00
+#define ATA_PCI_BUSMASTER_PORT_PRISTATUS    0x02
+#define ATA_PCI_BUSMASTER_PORT_PRIPRDT      0x04
+#define ATA_PCI_BUSMASTER_PORT_SECCMD       0x08
+#define ATA_PCI_BUSMASTER_PORT_SECSTATUS    0x0A
+#define ATA_PCI_BUSMASTER_PORT_SECPRDT      0x0C
+
+#define ATA_PCI_BUSMASTER_STATUS_INTERRUPT  0x04
+
+
+// ATA driver structures.
+typedef struct {
+    uint16_t CommandPort;
+    uint16_t ControlPort;
+    uint8_t Interrupt;
+    bool InterruptTriggered;
+
+    bool BusMasterCapable;
+    uint16_t BusMasterCommandPort;
+    uint16_t BusMasterStatusPort;
+    uint16_t BusMasterPrdt;
+} ata_channel_t;
+
+typedef struct {
+    ata_channel_t Primary;
+    ata_channel_t Secondary;
+} ata_device_t;
+
 //extern void ata_init();
 
 #endif
