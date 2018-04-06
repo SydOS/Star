@@ -111,6 +111,6 @@ void irqs_init(void) {
 
     // Open gates in IDT.
     for (uint8_t irq = 0; irq < irqCount; irq++)
-        idt_open_interrupt_gate(irq + IRQ_OFFSET, _irq_common);
+        idt_open_interrupt_gate(irq + IRQ_OFFSET, (uintptr_t)_irq_common);
     kprintf("IRQS: Initialized!\n");
 }

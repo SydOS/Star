@@ -3,7 +3,9 @@
 #include <io.h>
 #include <kernel/interrupts/interrupts.h>
 
+#include <kernel/interrupts/exceptions.h>
 #include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/irqs.h>
 #include <driver/vga.h>
 
 /**

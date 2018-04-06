@@ -4,8 +4,8 @@
 #include <kernel/interrupts/idt.h>
 
 // Create an IDT.
-static IdtEntry_t idt[IDT_ENTRIES];
-static IdtPtr_t idtPtr;
+static idt_entry_t idt[IDT_ENTRIES];
+static idt_ptr_t idtPtr;
 
 // Sets an entry in the IDT.
 void idt_set_gate(uint8_t gate, uintptr_t base, uint16_t selector, uint8_t flags) {
@@ -47,11 +47,11 @@ void idt_init() {
     kprintf("IDT: Initializing...\n");
 
     // Set up the IDT pointer and limit.
-    idtPtr.Limit = (sizeof(IdtEntry_t) * IDT_ENTRIES) - 1;
-    idtPtr.Base = &idt;
+    idtPtr.Limit = (sizeof(idt_entry_t) * IDT_ENTRIES) - 1;
+    idtPtr.Base = (uintptr_t)&idt;
 
     // Clear out the IDT with zeros.
-    memset(&idt, 0, sizeof(IdtEntry_t) * IDT_ENTRIES);
+    memset(&idt, 0, sizeof(idt_entry_t) * IDT_ENTRIES);
 
     // Load the IDT.
     idt_load();

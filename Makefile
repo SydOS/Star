@@ -1,4 +1,4 @@
-CFLAGS?=-std=gnu99 -ffreestanding -ggdb -gdwarf-2 -Wall -Wextra -I./src/include -I./acpica/include
+CFLAGS?=-std=gnu99 -ffreestanding -ggdb -gdwarf-2 -Wall -Wextra -I./src/include -I./acpica/include -Wno-unused-parameter
 CXXFLAGS?=-std=gnu++14 -ffreestanding -fno-rtti -fno-exceptions -ggdb -gdwarf-2 -Wall -Wextra -I./src/include -I./acpica/include
 ARCH?=i686
 TIME?=$(shell date +%s)
@@ -68,7 +68,7 @@ endif
 
 ifeq ($(ARCH), x86_64)
 	cp Star-x86_64.kernel isofiles/
-	grub-mkrescue -o os.iso isofiles --verbose -d /usr/lib/grub/i386-pc
+	grub-mkrescue -o os.iso isofiles -d /usr/lib/grub/i386-pc
 endif
 
 # Compile assembly source files.

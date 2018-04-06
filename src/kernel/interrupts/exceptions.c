@@ -3,6 +3,7 @@
 #include <kernel/interrupts/exceptions.h>
 
 #include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/lapic.h>
 
 // Functions defined by Intel for service extensions.
 extern void _exception0();
