@@ -10,13 +10,13 @@
 
 // PCI devices array.
 static PciDevice *pciDevices = NULL;
-static size_t pciDevicesSize = 0;
+static size_t pciDevicesLength = 0;
 
 static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
     kprintf_nlock("PCI: IRQ %u raised!\n", irqNum);
 
     // Search through PCI devices until we find the device that raised the interrupt.
-    for (uint16_t i = 0; i < pciDevicesSize / sizeof(PciDevice); i++) {
+    for (uint16_t i = 0; i < pciDevicesLength; i++) {
         // Get pointer to device.
         PciDevice *device = &pciDevices[i];
 
@@ -220,9 +220,9 @@ bool pci_check_device(uint8_t bus, uint8_t device, uint8_t function, ACPI_BUFFER
     }
 
         // Add device to array.
-    pciDevicesSize += sizeof(PciDevice);
-    pciDevices = (PciDevice**)kheap_realloc(pciDevices, pciDevicesSize);
-    pciDevices[(pciDevicesSize / sizeof(PciDevice)) - 1] = pciDevice;
+    pciDevicesLength++;
+    pciDevices = (PciDevice**)kheap_realloc(pciDevices, pciDevicesLength * sizeof(PciDevice));
+    pciDevices[pciDevicesLength - 1] = pciDevice;
 }
 
 /**
@@ -260,7 +260,7 @@ void pci_check_busses(uint8_t bus, uint8_t device) {
 }
 
 void pci_display() {
-    for (uint16_t i = 0; i < pciDevicesSize / sizeof(PciDevice); i++)
+    for (uint16_t i = 0; i < pciDevicesLength; i++)
     {
         PciDevice *device = pciDevices+i;
         kprintf("Device %u: status: 0x%X\n", i, pci_config_read_word(device, PCI_REG_STATUS));
@@ -280,7 +280,7 @@ void pci_display() {
             ata_init(device);
         }
     }
-    kprintf("%u total PCI devices\n", pciDevicesSize / sizeof(PciDevice));
+    kprintf("%u total PCI devices\n", pciDevicesLength);
 }
 
 /**
@@ -312,7 +312,7 @@ void pci_init() {
 
     // Ensure array is reset.
     pciDevices = NULL;
-    pciDevicesSize = 0;
+    pciDevicesLength = 0;
 
     // Begin scanning at bus 0.
     pci_check_busses(0, 0);

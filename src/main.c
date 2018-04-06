@@ -14,7 +14,7 @@
 #include <kernel/interrupts/smp.h>
 #include <kernel/cpuid.h>
 #include <driver/vga.h>
-#include <driver/floppy.h>
+#include <driver/storage/floppy.h>
 #include <driver/serial.h>
 #include <driver/pci.h>
 #include <driver/speaker.h>

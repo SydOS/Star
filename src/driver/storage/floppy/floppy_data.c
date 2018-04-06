@@ -3,7 +3,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <string.h>
-#include <driver/floppy.h>
+#include <driver/storage/floppy.h>
 
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
