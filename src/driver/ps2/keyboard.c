@@ -345,6 +345,9 @@ static void ps2_keyboard_callback()
         }
     }
 
+    if (key == KEYBOARD_KEY_ESC && ctrlPressed && altPressed)
+        ps2_reset_system();
+
   //  if(key == KEYBOARD_KEY_ESC)
      //   outb(0x64, 0xFE);
 

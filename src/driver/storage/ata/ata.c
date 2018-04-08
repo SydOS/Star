@@ -431,6 +431,7 @@ void ata_init(PciDevice *device) {
         ataDevice->Primary.CommandPort = ATA_PRI_COMMAND_PORT;
         ataDevice->Primary.ControlPort = ATA_PRI_CONTROL_PORT;
         ataDevice->Primary.Interrupt = IRQ_PRI_ATA;
+        isaPrimary = &ataDevice->Primary;
         irqs_install_handler(IRQ_PRI_ATA, ata_callback_isa);
     }
     ataDevice->Primary.InterruptTriggered = false;
@@ -446,6 +447,7 @@ void ata_init(PciDevice *device) {
         ataDevice->Secondary.CommandPort = ATA_SEC_COMMAND_PORT;
         ataDevice->Secondary.ControlPort = ATA_SEC_CONTROL_PORT;
         ataDevice->Secondary.Interrupt = IRQ_SEC_ATA;
+        isaSecondary = &ataDevice->Secondary;
         irqs_install_handler(IRQ_SEC_ATA, ata_callback_isa);
     }
     ataDevice->Secondary.InterruptTriggered = false;
