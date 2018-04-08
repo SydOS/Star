@@ -114,7 +114,7 @@ void ps2_mouse_connect(bool from_irq)
     
     if (mouse_id == PS2_MOUSE_TYPE_WHEEL)
     {
-        kprintf("Intellimouse detected.\n");
+        kprintf_nlock("Intellimouse detected.\n");
         mouse_type = mouse_id;
 
         // Attempt to enter 5-button mode.
@@ -140,7 +140,7 @@ void ps2_mouse_connect(bool from_irq)
 
         if (mouse_id == PS2_MOUSE_TYPE_FIVEBUTTON)
         {
-            kprintf("5-button mouse detected.\n");
+            kprintf_nlock("5-button mouse detected.\n");
             mouse_type = mouse_id;
         }
     }
@@ -164,14 +164,14 @@ void ps2_mouse_connect(bool from_irq)
     // If the ID is 0xFE at this point, likely no mouse is present.
     if (mouse_id == PS2_DATA_RESPONSE_RESEND)
     {
-        kprintf("A working mouse couldn't be found!\n");
+        kprintf_nlock("A working mouse couldn't be found!\n");
         return;
     } 
 
-    kprintf("PS/2 mouse ID: 0x%X\n", mouse_id);
+    kprintf_nlock("PS/2 mouse ID: 0x%X\n", mouse_id);
     
     ps2_mouse_send_cmd(PS2_DATA_ENABLE);
-    kprintf("PS/2 mouse installed!\n");
+    kprintf_nlock("PS/2 mouse installed!\n");
 }
 
 // Processes a packet.
@@ -196,9 +196,9 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
                 return;
 
             if (mouse_bytes[3] & PS2_MOUSE_PACKET_FOURTH_BTN)
-                kprintf("Fourth mouse button pressed!\n");
+                kprintf_nlock("Fourth mouse button pressed!\n");
             if (mouse_bytes[3] & PS2_MOUSE_PACKET_FIFTH_BTN)
-                kprintf("Fifth mouse button pressed!\n");
+                kprintf_nlock("Fifth mouse button pressed!\n");
         }
 
         // Get Z-value (wheel).
@@ -210,15 +210,15 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
         return;
 
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_LEFT_BTN)
-        kprintf("Left mouse button pressed!\n");
+        kprintf_nlock("Left mouse button pressed!\n");
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_RIGHT_BTN)
-        kprintf("Right mouse button pressed!\n");
+        kprintf_nlock("Right mouse button pressed!\n");
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_MIDDLE_BTN)
-        kprintf("Middle mouse button pressed!\n");
+        kprintf_nlock("Middle mouse button pressed!\n");
 
     // Print status.
     if (x != 0 || y != 0 || z != 0)
-        kprintf("Mouse moved: X: %i Y: %i Z: %i\n", x, y, z);
+        kprintf_nlock("Mouse moved: X: %i Y: %i Z: %i\n", x, y, z);
 }
 
 // Callback for mouse on IRQ12.

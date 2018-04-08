@@ -77,7 +77,17 @@ void pmm_dma_set_frame(uintptr_t frame, bool status) {
 }
 
 uintptr_t pmm_dma_get_phys(uintptr_t frame) {
+    // If specified frame is 0, just return 0.
+    if (!frame)
+        return 0;
     return frame - memInfo.kernelVirtualOffset;
+}
+
+uintptr_t pmm_dma_get_virtual(uintptr_t frame) {
+    // If specified frame is 0, just return 0.
+    if (!frame)
+        return 0;
+    return frame + memInfo.kernelVirtualOffset;
 }
 
 /**

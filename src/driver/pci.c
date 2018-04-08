@@ -273,11 +273,15 @@ void pci_display() {
             kprintf("  - DETECTED RTL8139\n");
             rtl8139_init(device);
         }
-
-        if (device->Class == 1 && device->Subclass == 1) {
+        else if (device->Class == 1 && device->Subclass == 1) {
             vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
             kprintf("  - DETECTED ATA CONTROLLER\n");
             ata_init(device);
+        }
+        else if (device->Class == 0x0C && device->Subclass == 0x03 && pci_config_read_byte(device, PCI_REG_PROG_IF) == 0x00) {
+            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+            kprintf("  - DETECTED UHCI USB CONTROLLER\n");
+            usb_uhci_init(device);
         }
     }
     kprintf("%u total PCI devices\n", pciDevicesLength);
