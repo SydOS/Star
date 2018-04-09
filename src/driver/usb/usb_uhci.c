@@ -14,13 +14,30 @@
 #include <kernel/memory/paging.h>
 #include <driver/pci.h>
 
-static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controller_t *controller) {
+static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controller_t *controller, usb_uhci_transfer_desc_t *previousDesc, usb_device_t *usbDevice) {
     // Search for first free transfer descriptor.
     for (usb_uhci_transfer_desc_t *transferDesc = controller->TransferDescPool;
         ((uintptr_t)transferDesc + sizeof(usb_uhci_transfer_desc_t)) <= (controller->TransferDescPool + USB_UHCI_TD_POOL_SIZE); transferDesc++) {
         if (!transferDesc->InUse) {
-            // Mark descriptor as active and return it.
+            // Zero out descriptor.
+            memset(transferDesc, 0, sizeof(usb_uhci_transfer_desc_t));
+
+            // Mark descriptor as in-use.
             transferDesc->InUse = true;
+
+            // If a previous descriptor was specified, link this one onto it.
+            if (previousDesc != NULL)
+                previousDesc->LinkPointer = ((uint32_t)pmm_dma_get_phys((uintptr_t)transferDesc)) | USB_UHCI_FRAME_DEPTH_FIRST;
+
+            // No more descriptors after this.
+            transferDesc->LinkPointer = USB_UHCI_FRAME_TERMINATE;
+
+            // Populate descriptor with error count, speed.
+            transferDesc->ErrorCounter = 3;
+            transferDesc->LowSpeedDevice = usbDevice->Speed == USB_SPEED_LOW;
+            transferDesc->Active = true;
+
+            // Return the descriptor.
             return transferDesc;
         }
     }
@@ -32,6 +49,36 @@ static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controlle
 static void usb_uhci_transfer_desc_free(usb_uhci_transfer_desc_t *transferDesc) {
     // Mark descriptor as free.
     transferDesc->InUse = false;
+}
+
+static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_create_setup(usb_uhci_controller_t *controller, usb_device_t *usbDevice, uint8_t endpoint, usb_request_t *request) {
+    // Allocate a new descriptor.
+    usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_alloc(controller, NULL, usbDevice);
+
+    // This descriptor is a SETUP packet.
+    transferDesc->PacketType = USB_UHCI_TD_PACKET_SETUP;
+
+    // SETUP packet always has toggle false.
+    transferDesc->DataToggle = false;
+    transferDesc->DeviceAddress = usbDevice->Address;
+    transferDesc->Endpoint = endpoint;
+    transferDesc->MaximumLength = sizeof(usb_request_t) - 1;
+    transferDesc->BufferPointer = (uint32_t)pmm_dma_get_phys((uintptr_t)request);
+    return transferDesc;
+}
+
+static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_create_data(usb_uhci_controller_t *controller, usb_device_t *usbDevice, usb_uhci_transfer_desc_t *previousDesc,
+    uint8_t type, uint8_t endpoint, bool toggle, void* data, uint8_t packetSize) {
+    // Allocate a new descriptor.
+    usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_alloc(controller, previousDesc, usbDevice);
+
+    transferDesc->PacketType = type;
+    transferDesc->DataToggle = toggle;
+    transferDesc->DeviceAddress = usbDevice->Address;
+    transferDesc->Endpoint = endpoint;
+    transferDesc->MaximumLength = (packetSize - 1) & 0x7FF;
+    transferDesc->BufferPointer = (uint32_t)pmm_dma_get_phys((uintptr_t)data);
+    return transferDesc;
 }
 
 static usb_uhci_queue_head_t *usb_uhci_queue_head_alloc(usb_uhci_controller_t *controller) {
@@ -89,6 +136,7 @@ static bool usb_uhci_queue_head_process(usb_uhci_controller_t *controller, usb_u
         complete = true;
         *outStatus = true;
     }
+
     // Is the transfer descriptor inactive?
     else if(!(transferDesc->Active)) {
         // Is the transfer stalled?
@@ -107,9 +155,22 @@ static bool usb_uhci_queue_head_process(usb_uhci_controller_t *controller, usb_u
             kprintf("UHCI: crc error\n");
         if (transferDesc->BitstuffError)
             kprintf("UHCI: bitstuff\n");
-        kprintf("UHCI: packet type: 0x%X\n", transferDesc->PacketIdentification);
-        kprintf("UHCI: packet pointer: 0x%X\n", transferDesc->BufferPointer);
+        
     }
+
+if (transferDesc != NULL) {
+    kprintf("packet data\n");
+    kprintf("0x%X 0x%X 0x%X 0x%X\n", *t1, *t2, *t3, *t4);
+
+   // kprintf("tick\n");
+    kprintf("next packet: 0x%X\n", transferDesc->LinkPointer);
+    kprintf("UHCI: packet type: 0x%X\n", transferDesc->PacketType);
+        kprintf("UHCI: packet pointer: 0x%X\n", transferDesc->BufferPointer);}
+        kprintf("current frame: %u\n", d);
+                kprintf("status: 0x%X\n", s);
+        kprintf("pci status: 0x%X\n", pciS);
+        kprintf("usb cmd: 0x%X\n", inw(USB_UHCI_USBCMD(controller->BaseAddress)));
+        kprintf("port 1: 0x%X\n", inw(USB_UHCI_PORTSC1(controller->BaseAddress)));
 
     // Are we done with transfers?
     if (complete) {
@@ -146,19 +207,13 @@ static void usb_uhci_queue_head_wait(usb_uhci_controller_t *controller, usb_uhci
     while (!usb_uhci_queue_head_process(controller, queueHead, &status));
 }
 
-static void usb_uhci_transfer_desc_init(usb_uhci_transfer_desc_t *desc, usb_uhci_transfer_desc_t *previous,
+/*static void usb_uhci_transfer_desc_init(usb_uhci_transfer_desc_t *desc, usb_uhci_transfer_desc_t *previous,
     bool lowSpeed, uint8_t address, uint8_t endpoint, bool dataToggle, uint8_t packetType, uint16_t length, const void *data) {
-    // If a previous descriptor was specified, link this one onto it.
-    if (previous != NULL)
-        previous->LinkPointer = ((uint32_t)pmm_dma_get_phys((uintptr_t)desc)) | USB_UHCI_FRAME_DEPTH_FIRST;
 
-    // No more descriptors after this.
-    desc->LinkPointer = USB_UHCI_FRAME_TERMINATE;
 
     // Set speed and error count (3 errors before stalled).
-    desc->LowSpeedDevice = lowSpeed;
-    desc->Active = true;
-    desc->ErrorCounter = 3;
+
+   // desc->InterruptOnComplete = true;
 
     // Adjust length field to account for a null packet (0 bytes in size). 0x7FF indicates a null packet.
     // 0 = 1 bytes, 1 = 2 bytes, etc.
@@ -169,11 +224,12 @@ static void usb_uhci_transfer_desc_init(usb_uhci_transfer_desc_t *desc, usb_uhci
     desc->DataToggle = dataToggle;
     desc->Endpoint = endpoint;
     desc->DeviceAddress = address;
-    desc->PacketIdentification = packetType;
+    desc->PacketType = packetType;
 
     // Set buffer pointer.
     desc->BufferPointer = (uint32_t)pmm_dma_get_phys((uintptr_t)data);
-}
+    kprintf("packet pointer in desc: 0x%X\n", desc->BufferPointer);
+}*/
 
 static bool usb_uhci_write_device(usb_device_t *device, uint8_t endpoint, usb_request_t *request, void *data, uint16_t length) {
     // Get the UHCI controller.
@@ -185,12 +241,14 @@ static bool usb_uhci_write_device(usb_device_t *device, uint8_t endpoint, usb_re
     uint8_t maxPacketSize = device->MaxPacketSize;
 
     // Create first transfer descriptor.
-    usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_alloc(controller);
+    usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_create_setup(controller, device, 0, request);
     usb_uhci_transfer_desc_t *headDesc = transferDesc;
     usb_uhci_transfer_desc_t *prevDesc = NULL;
 
     // Create SETUP packet.
-    usb_uhci_transfer_desc_init(transferDesc, NULL, lowSpeed, address, endpoint, false, USB_UHCI_TD_PACKET_SETUP, sizeof(usb_request_t), request);
+    kprintf("Setting up setup packet for %s speed...\n", lowSpeed ? "low" : "full");
+    
+    //usb_uhci_transfer_desc_init(transferDesc, NULL, lowSpeed, address, endpoint, false, USB_UHCI_TD_PACKET_SETUP, sizeof(usb_request_t), request);
     prevDesc = transferDesc;
 
     // Determine whether packets are to be IN or OUT.
@@ -202,7 +260,7 @@ static bool usb_uhci_write_device(usb_device_t *device, uint8_t endpoint, usb_re
     bool toggle = false;
     while (packetPtr < endPtr) {
         // Allocate a transfer descriptor for packet.
-        transferDesc = usb_uhci_transfer_desc_alloc(controller);
+        //transferDesc = usb_uhci_transfer_desc_alloc(controller);
 
         // Toggle toggle bit.
         toggle = !toggle;
@@ -213,7 +271,9 @@ static bool usb_uhci_write_device(usb_device_t *device, uint8_t endpoint, usb_re
             packetSize = maxPacketSize;
         
         // Create packet.
-        usb_uhci_transfer_desc_init(transferDesc, prevDesc, lowSpeed, address, endpoint, toggle, packetType, packetSize, packetPtr);
+        kprintf("packet pointer: 0x%p\n", packetPtr);
+        //usb_uhci_transfer_desc_init(transferDesc, prevDesc, lowSpeed, address, endpoint, toggle, packetType, packetSize, packetPtr);
+        transferDesc = usb_uhci_transfer_desc_create_data(controller, device, prevDesc, packetType, 0, toggle, packetPtr, packetSize);
 
         // Move to next packet.
         packetPtr += packetSize;
@@ -221,9 +281,10 @@ static bool usb_uhci_write_device(usb_device_t *device, uint8_t endpoint, usb_re
     }
 
     // Create status packet.
-    transferDesc = usb_uhci_transfer_desc_alloc(controller);
+    //transferDesc = usb_uhci_transfer_desc_alloc(controller);
     packetType = request->Type & USB_REQUEST_TYPE_DEVICE_TO_HOST ? USB_UHCI_TD_PACKET_OUT : USB_UHCI_TD_PACKET_IN;
-    usb_uhci_transfer_desc_init(transferDesc, prevDesc, lowSpeed, address, endpoint, true, packetType, 0, NULL);
+    //usb_uhci_transfer_desc_init(transferDesc, prevDesc, lowSpeed, address, endpoint, true, packetType, 0, NULL);
+    transferDesc = usb_uhci_transfer_desc_create_data(controller, device, prevDesc, packetType, 0, true, NULL, 0);
 
     // Create queue head that starts with first transfer descriptor.
     usb_uhci_queue_head_t *queueHead = usb_uhci_queue_head_alloc(controller);
@@ -231,6 +292,7 @@ static bool usb_uhci_write_device(usb_device_t *device, uint8_t endpoint, usb_re
     queueHead->Element = (uint32_t)pmm_dma_get_phys((uintptr_t)headDesc);
 
     // Add queue head to schedule and wait for completion.
+    kprintf("UHCI: Adding packet....\n");
     usb_uhci_queue_head_add(controller, queueHead);
     usb_uhci_queue_head_wait(controller, queueHead);
 }
@@ -260,17 +322,26 @@ static uint16_t usb_uhci_reset_port(usb_uhci_controller_t *controller, uint8_t p
     uint16_t portReg = USB_UHCI_PORTSC1(controller->BaseAddress) + (port * sizeof(uint16_t));
 
     // Reset port and wait.
-    sleep(100);
-    uint16_t status = inw(portReg);
-    status &= USB_UHCI_PORTSC_MASK;
-    outw(portReg, status | USB_UHCI_PORTSC_RESET);
+   // uint16_t status = inw(portReg);
+  //  status &= USB_UHCI_PORTSC_MASK;
+    outw(portReg, USB_UHCI_PORTSC_RESET);
     sleep(50);
 
     // Clear reset bit.
-    status = inw(portReg);
-    status &= USB_UHCI_PORTSC_MASK;
-    outw(portReg, status & ~USB_UHCI_PORTSC_RESET);
-    sleep(100);
+  //  status = ;
+  //  status &= USB_UHCI_PORTSC_MASK;
+    outw(portReg, inw(portReg) & ~USB_UHCI_PORTSC_RESET);
+   // sleep(100);
+
+   while (inw(portReg) & USB_UHCI_PORTSC_RESET);
+   sleep(10);
+
+   // Enable port.
+   outw(portReg, USB_UHCI_PORTSC_PRESENT_CHANGE | USB_UHCI_PORTSC_ENABLE_CHANGE | USB_UHCI_PORTSC_ENABLED);
+   sleep(10);
+
+
+    return inw(portReg);
 
     // Reset port.
     //usb_uhci_write_port(portReg, USB_UHCI_PORT_STATUS_RESET, false);
@@ -279,7 +350,7 @@ static uint16_t usb_uhci_reset_port(usb_uhci_controller_t *controller, uint8_t p
   //  sleep(1000);
 
     // Wait for port to be connected and enabled.
-    for (uint16_t i = 0; i < 100; i++) {
+   /* for (uint16_t i = 0; i < 100; i++) {
         // Get the current status of the port.
         status = inw(portReg);
 
@@ -307,7 +378,7 @@ static uint16_t usb_uhci_reset_port(usb_uhci_controller_t *controller, uint8_t p
     }
 
     // Return the status.
-    return status;
+    return status;*/
 }
 
 static void usb_uhci_reset_global(usb_uhci_controller_t *controller) {
@@ -315,12 +386,8 @@ static void usb_uhci_reset_global(usb_uhci_controller_t *controller) {
     uint8_t sof = inb(USB_UHCI_SOFMOD(controller->BaseAddress));
 
     // Perform global reset.
-    uint16_t status = inw(USB_UHCI_USBCMD(controller->BaseAddress));
-    status |= USB_UHCI_STATUS_GLOBAL_RESET;
-    outw(USB_UHCI_USBCMD(controller->BaseAddress), status);
-
-    // Wait 10ms.
-    sleep(10);
+    outw(USB_UHCI_USBCMD(controller->BaseAddress), inw(USB_UHCI_USBCMD(controller->BaseAddress)) | USB_UHCI_STATUS_GLOBAL_RESET);
+    sleep(100);
 
     // Clear bit.
     outw(USB_UHCI_USBCMD(controller->BaseAddress), inw(USB_UHCI_USBCMD(controller->BaseAddress)) & ~USB_UHCI_STATUS_GLOBAL_RESET);
@@ -364,7 +431,6 @@ static void usb_uhci_change_state(usb_uhci_controller_t *controller, bool run) {
     uint16_t status = inw(USB_UHCI_USBCMD(controller->BaseAddress));
     
     // Start or stop controller.
-    status |= USB_UHCI_STATUS_CONFIGURE | USB_UHCI_STATUS_64_BYTE_PACKETS;
     if (run)
         status |= USB_UHCI_STATUS_RUN;
     else
@@ -373,46 +439,61 @@ static void usb_uhci_change_state(usb_uhci_controller_t *controller, bool run) {
     // Write to status register.
     outw(USB_UHCI_USBCMD(controller->BaseAddress), status);
 }
+usb_uhci_controller_t *testcontroller;
+void usb_callback() {
+    kprintf_nlock("IRQ usb\n");
+    PciDevice *device = testcontroller->PciDevice;
+    kprintf_nlock("status: 0x%X\n", pci_config_read_word(device, PCI_REG_STATUS));
+    kprintf_nlock("usb status: 0x%X\n", inw(USB_UHCI_USBSTS(testcontroller->BaseAddress)));
+    outw(USB_UHCI_USBSTS(testcontroller->BaseAddress), 0x3F);
+}
+
+
 
 void usb_uhci_init(PciDevice *device) {
     kprintf("UHCI: Initializing...\n");
+
     // Create UHCI controller object.
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)kheap_alloc(sizeof(usb_uhci_controller_t));
     device->DriverObject = controller;
+    testcontroller = controller;
 
-    // Populate UHCI object.
+    // Store PCI device object, port I/O base address, and specification version.
     controller->PciDevice = device;
     controller->BaseAddress = (device->BAR[4] & PCI_BAR_PORT_MASK);
     controller->SpecVersion = pci_config_read_byte(device, USB_UHCI_PCI_REG_RELEASE_NUM);
     kprintf("UHCI: Controller located at 0x%X, version 0x%X.\n", controller->BaseAddress, controller->SpecVersion);
 
-    outw(USB_UHCI_USBCMD(controller->BaseAddress), 0);
-    outw(USB_UHCI_USBINTR(controller->BaseAddress), 0);
+    // Enable PCI busmaster and port I/O, if not already enabled.
+    uint16_t pciCmd = pci_config_read_word(device, PCI_REG_COMMAND);
+    pci_config_write_word(device, PCI_REG_COMMAND, pciCmd | 0x01 | 0x04);
+    kprintf("UHCI: Original PCI command register value: 0x%X\n", pciCmd);
+    kprintf("UHCI: Current PCI command register value: 0x%X\n", pci_config_read_word(device, PCI_REG_COMMAND));
 
-    // Take ownership.
-    kprintf("UHCI: Taking ownership from BIOS...\n");
-    uint16_t ownership = pci_config_read_word(device, 0xC0);
-    kprintf("UHCI: Current value: 0x%X\n", ownership);
-    pci_config_write_word(device, 0xC0, 0x8F00);
-    kprintf("UHCI: SBRN 0x%X\n", pci_config_read_word(device, 0x60));
+    // Get value of legacy status register.
+    uint16_t legacyReg = pci_config_read_word(device, USB_UHCI_PCI_REG_LEGACY);
 
-    // bus master
-	uint16_t cmd = pci_config_read_word(device, PCI_REG_COMMAND);
-    kprintf("UHCI: PCI command 0x%X\n", cmd);
-	//pci_config_write_word(device, PCI_REG_COMMAND, cmd | 0x04);
-	//cmd = pci_config_read_word(device, PCI_REG_COMMAND);
-    
-    // Reset controller.
+    // Perform a global reset of the UHCI controller.
     kprintf("UHCI: Performing global reset...\n");
     usb_uhci_reset_global(controller);
+
+    // Reset controller status bits.
+    outw(USB_UHCI_USBSTS(controller->BaseAddress), USB_UHCI_STS_MASK);
+    sleep(1);
+
+    // Reset legacy status.
+    pci_config_write_word(device, USB_UHCI_PCI_REG_LEGACY, USB_UHCI_PCI_LEGACY_STATUS);
+
+    // Reset host controller.
     kprintf("UHCI: Resetting controller...\n");
     if (!usb_uhci_reset(controller)) {
         kprintf("UHCI: Failed to reset controller! Aborting.\n");
         return;
     }
-    sleep(100);
-    outw(USB_UHCI_USBCMD(controller->BaseAddress), 0);
+
+    // Ensure controller and interrupts are disabled.
     outw(USB_UHCI_USBINTR(controller->BaseAddress), 0);
+    outw(USB_UHCI_USBCMD(controller->BaseAddress), 0);
 
     // Pull a DMA frame for USB frame storage.
     if (!pmm_dma_get_free_frame(&controller->FrameList))
@@ -423,14 +504,6 @@ void usb_uhci_init(PciDevice *device) {
     kprintf("UHCI: Frame list located at: 0x%p (0x%X)\n", controller->FrameList, (uint32_t)pmm_dma_get_phys(controller->FrameList));
     controller->TransferDescPool = (usb_uhci_transfer_desc_t*)((uintptr_t)controller->FrameList + (USB_UHCI_FRAME_COUNT * sizeof(uint32_t)));
     controller->QueueHeadPool = (usb_uhci_queue_head_t*)((uintptr_t)controller->TransferDescPool + USB_UHCI_TD_POOL_SIZE);
-
-    // Set frame base address and frame number.
-    outl(USB_UHCI_FRBASEADD(controller->BaseAddress), (uint32_t)pmm_dma_get_phys(controller->FrameList));
-    outw(USB_UHCI_FRNUM(controller->BaseAddress), 0);
-
-    // Set max packet size to 64 bytes.
-    outw(USB_UHCI_USBCMD(controller->BaseAddress), inw(USB_UHCI_USBCMD(controller->BaseAddress)) | USB_UHCI_STATUS_64_BYTE_PACKETS);
-    outw(USB_UHCI_USBINTR(controller->BaseAddress), 0);
 
     // Setup frame list.
     usb_uhci_queue_head_t *queueHead = usb_uhci_queue_head_alloc(controller);
@@ -443,15 +516,42 @@ void usb_uhci_init(PciDevice *device) {
     // Fill frame list.
     for (uint16_t i = 0; i < USB_UHCI_FRAME_COUNT; i++)
         controller->FrameList[i] = (uint32_t)pmm_dma_get_phys((uintptr_t)queueHead) | USB_UHCI_FRAME_QUEUE_HEAD;
-  //  outb(USB_UHCI_SOFMOD(controller->BaseAddress), 0x40);
+
+    kprintf("current sof 0x%X\n", inb(USB_UHCI_SOFMOD(controller->BaseAddress)));
+    outb(USB_UHCI_SOFMOD(controller->BaseAddress), 0x40);
+
+    // Set frame base address and frame number.
+    outl(USB_UHCI_FRBASEADD(controller->BaseAddress), (uint32_t)pmm_dma_get_phys(controller->FrameList));
+    outw(USB_UHCI_FRNUM(controller->BaseAddress), 0);
+
+    // Set PIRQ.
+    pci_config_write_word(device, USB_UHCI_PCI_REG_LEGACY, USB_UHCI_PCI_LEGACY_PIRQ);
+
+    // Set max packet size to 64 bytes.
+    kprintf("UHCI: Starting controller...\n");
+    outw(USB_UHCI_USBCMD(controller->BaseAddress), USB_UHCI_STATUS_RUN | USB_UHCI_STATUS_CONFIGURE | USB_UHCI_STATUS_64_BYTE_PACKETS);
+    outw(USB_UHCI_USBINTR(controller->BaseAddress), 0xF);
+    irqs_install_handler(device->InterruptLine, usb_callback);
+
+    for (uint16_t port = 0; port < 2; port++)
+        outw(USB_UHCI_PORTSC1(controller->BaseAddress) + port * 2, USB_UHCI_PORTSC_PRESENT_CHANGE);
+
+    // Force a global resume.
+    outw(USB_UHCI_USBCMD(controller->BaseAddress), USB_UHCI_STATUS_RUN | USB_UHCI_STATUS_CONFIGURE | USB_UHCI_STATUS_64_BYTE_PACKETS | USB_UHCI_STATUS_FORCE_GLOBAL_RESUME);
+    sleep(20);
+    outw(USB_UHCI_USBCMD(controller->BaseAddress), USB_UHCI_STATUS_RUN | USB_UHCI_STATUS_CONFIGURE | USB_UHCI_STATUS_64_BYTE_PACKETS);
+    sleep(100);
+
 
     // Start up controller.
-    usb_uhci_change_state(controller, true);
+  //  usb_uhci_change_state(controller, true);
 
     // Query root ports.
     for (uint16_t port = 0; port < 2; port++) {
         // Reset the port and get its status.
         uint16_t portStatus = usb_uhci_reset_port(controller, port);
+        sleep(100);
+        portStatus = usb_uhci_reset_port(controller, port);
         kprintf("UHCI: Port status for port %u: 0x%X\n", port, portStatus);
 
         // Is the port enabled?
@@ -467,8 +567,9 @@ void usb_uhci_init(PciDevice *device) {
 
                 // Set port and speed.
                 usbDevice->Port = port;
-                usbDevice->Speed = (portStatus & USB_UHCI_PORTSC_LOW_SPEED);
+                usbDevice->Speed = ((portStatus & USB_UHCI_PORTSC_LOW_SPEED) == 0) ? USB_SPEED_FULL : USB_SPEED_LOW;
                 usbDevice->MaxPacketSize = 8;
+                usbDevice->Address = 0;
 
                 usb_request_t *req = (usb_request_t*)((uintptr_t)controller->QueueHeadPool + USB_UHCI_QH_POOL_SIZE);
                 memset(req, 0, sizeof(usb_request_t));
@@ -479,10 +580,12 @@ void usb_uhci_init(PciDevice *device) {
                 req->Length = sizeof(usb_descriptor_device_t);
                 uint64_t *g = (uint64_t*)&req;
                 
-                usb_descriptor_device_t *desc = (usb_request_t*)((uintptr_t)req + sizeof(usb_request_t));
+                usb_descriptor_device_t *desc = (usb_request_t*)((uintptr_t)req + PAGE_SIZE_4K);
                 memset(desc, 0, sizeof(usb_descriptor_device_t));
                 sleep(1000);
+                kprintf("speed: 0x%X\n", usbDevice->Speed);
                 usb_uhci_write_device(usbDevice, 0, req, desc, sizeof(usb_descriptor_device_t));
+                kprintf("max packet size: %u\n", desc->MaxPacketSize);
                 kprintf("Vendor: 0x%X\n", desc->VendorId);
                 while(true);
             }

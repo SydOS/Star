@@ -7,6 +7,11 @@
 
 #define USB_UHCI_PCI_REG_RELEASE_NUM    0x60
 
+#define USB_UHCI_PCI_REG_LEGACY         0xC0
+
+#define USB_UHCI_PCI_LEGACY_PIRQ        0x2000
+#define USB_UHCI_PCI_LEGACY_STATUS      0x8F00
+
 #define USB_UHCI_USBCMD(port)           (uint16_t)(port + 0x00)
 #define USB_UHCI_USBSTS(port)           (uint16_t)(port + 0x02)
 #define USB_UHCI_USBINTR(port)          (uint16_t)(port + 0x04)
@@ -20,6 +25,15 @@
 #define USB_UHCI_FRAME_COUNT            1024
 #define USB_UHCI_TD_POOL_SIZE           PAGE_SIZE_4K
 #define USB_UHCI_QH_POOL_SIZE           PAGE_SIZE_4K
+
+#define USB_UHCI_STS_INTERRUPT              0x01
+#define USB_UHCI_STS_ERROR_INTERRUPT        0x02
+#define USB_UHCI_STS_RESUME_DETECT          0x04
+#define USB_UHCI_STS_HOST_ERROR             0x08
+#define USB_UHCI_STS_HOST_PROCESS_ERROR     0x10
+#define USB_UHCI_STS_HCHALTED               0x20
+#define USB_UHCI_STS_MASK                   0x3F
+
 
 // Port status/control bits.
 #define USB_UHCI_PORTSC_PRESENT             0x0001
@@ -68,7 +82,7 @@ enum {
 #define USB_UHCI_TD_PACKET_OUT                   0xe1
 #define USB_UHCI_TD_PACKET_SETUP                 0x2d
 
-// Transfer descriptors. Must be aligned to 16 bytes and a multiple of 16 bytes in size.
+// Transfer descriptors. Must be aligned to 16 bytes and a multiple of 32 bytes in size.
 typedef struct {
     // UHCI fields. 16 bytes.
     uint32_t LinkPointer;
@@ -91,7 +105,7 @@ typedef struct {
     uint16_t Reserved1 : 2;
 
     // Token.
-    uint8_t PacketIdentification;
+    uint8_t PacketType;
     uint8_t DeviceAddress : 7;
     uint8_t Endpoint : 4;
     bool DataToggle : 1;
