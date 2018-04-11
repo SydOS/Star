@@ -303,7 +303,7 @@ static uint16_t usb_uhci_reset_port(usb_uhci_controller_t *controller, uint8_t p
 
    // Enable port.
    outw(portReg, USB_UHCI_PORTSC_PRESENT_CHANGE | USB_UHCI_PORTSC_ENABLE_CHANGE | USB_UHCI_PORTSC_ENABLED);
-   sleep(10);
+   sleep(200);
 
 
     return inw(portReg);
@@ -516,8 +516,8 @@ void usb_uhci_init(PciDevice *device) {
     for (uint16_t port = 0; port < 2; port++) {
         // Reset the port and get its status.
         uint16_t portStatus = usb_uhci_reset_port(controller, port);
-        sleep(100);
-        portStatus = usb_uhci_reset_port(controller, port);
+      //  sleep(100);
+        //portStatus = usb_uhci_reset_port(controller, port);
         kprintf("UHCI: Port status for port %u: 0x%X\n", port, portStatus);
 
         // Is the port enabled?
@@ -537,7 +537,8 @@ void usb_uhci_init(PciDevice *device) {
                 usbDevice->MaxPacketSize = 8;
                 usbDevice->Address = 0;
 
-                usb_request_t *req = (usb_request_t*)((uintptr_t)controller->QueueHeadPool + USB_UHCI_QH_POOL_SIZE);
+            for (int e = 0; e < 10; e++) {
+                    usb_request_t *req = (usb_request_t*)((uintptr_t)controller->QueueHeadPool + USB_UHCI_QH_POOL_SIZE);
                 memset(req, 0, sizeof(usb_request_t));
                 req->Type = USB_REQUEST_TYPE_DEVICE_TO_HOST | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
                 req->Request = USB_REQUEST_GET_DESCRIPTOR;
@@ -545,11 +546,15 @@ void usb_uhci_init(PciDevice *device) {
                 req->Index = 0;
                 req->Length = 8;//sizeof(usb_descriptor_device_t);
                 
-                usb_descriptor_device_t *desc = (usb_request_t*)((uintptr_t)req + PAGE_SIZE_4K);
+                usb_descriptor_device_t *desc = (usb_descriptor_device_t*)((uintptr_t)req + PAGE_SIZE_4K);
                 memset(desc, 0, sizeof(usb_descriptor_device_t));
               //  sleep(1000);
                // kprintf("speed: 0x%X\n", usbDevice->Speed);
-                usb_uhci_device_control(usbDevice, 0, req, desc, req->Length);
+               kprintf("attempting\n");
+                if (!usb_uhci_device_control(usbDevice, 0, req, desc, req->Length)) {
+                    portStatus = usb_uhci_reset_port(controller, port);
+                    continue;
+                }
                 kprintf("max packet size: %u\n", desc->MaxPacketSize);
                 usbDevice->MaxPacketSize = desc->MaxPacketSize;
 
@@ -565,7 +570,8 @@ void usb_uhci_init(PciDevice *device) {
                // sleep(1000);
                 //kprintf("speed: 0x%X\n", usbDevice->Speed);
                 usb_uhci_device_control(usbDevice, 0, req, desc, req->Length);
-                kprintf("address changed", desc->MaxPacketSize);
+                kprintf("max packet size: %u\n", usbDevice->MaxPacketSize);
+                kprintf("address changed");
 
                 usbDevice->Address = 1;
                 memset(req, 0, sizeof(usb_request_t));
@@ -582,7 +588,26 @@ void usb_uhci_init(PciDevice *device) {
                 kprintf("max packet size: %u\n", desc->MaxPacketSize);
 
                 kprintf("Vendor: 0x%X\n", desc->VendorId);
+
+                memset(req, 0, sizeof(usb_request_t));
+                req->Type = USB_REQUEST_TYPE_DEVICE_TO_HOST | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
+                req->Request = USB_REQUEST_GET_DESCRIPTOR;
+                req->Value = 0x3 << 8 | desc->ProductString;
+                req->Index = 0;
+                req->Length = 30;
+                
+                usb_descriptor_string_t *descS = (usb_descriptor_string_t*)((uintptr_t)req + PAGE_SIZE_4K);
+                memset(descS, 0, sizeof(usb_descriptor_string_t));
+                usb_uhci_device_control(usbDevice, 0, req, descS, req->Length);
+
+                char* dd = (char*)&descS->String;
+                kprintf("product string: ");
+                for (uint16_t i = 0; i < descS->Length - 2; i++)
+                    kprintf("%c", (char)descS->String[i]);
+                kprintf("\n");
+
                 while(true);
+}   
             }
         }
         else {
