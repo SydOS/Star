@@ -17,12 +17,12 @@
 static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controller_t *controller, usb_device_t *usbDevice,
     usb_uhci_transfer_desc_t *previousDesc, uint8_t type, uint8_t endpoint, bool toggle, void* data, uint8_t packetSize) {
     // Search for first free transfer descriptor.
-    for (usb_uhci_transfer_desc_t *transferDesc = controller->TransferDescPool;
-        ((uintptr_t)transferDesc + sizeof(usb_uhci_transfer_desc_t)) <= (controller->TransferDescPool + USB_UHCI_TD_POOL_SIZE); transferDesc++) {
-        if (!transferDesc->InUse) {
+    for (uint16_t i = 0; i < USB_UHCI_TD_POOL_COUNT; i++) {
+        if (!controller->TransferDescMap[i]) {
             // Zero out descriptor and mark in-use.
+            usb_uhci_transfer_desc_t *transferDesc = controller->TransferDescPool+i;
             memset(transferDesc, 0, sizeof(usb_uhci_transfer_desc_t));
-            transferDesc->InUse = true;
+            controller->TransferDescMap[i] = true;
 
             // If a previous descriptor was specified, link this one onto it.
             if (previousDesc != NULL)
@@ -51,9 +51,10 @@ static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controlle
     panic("UHCI: No more available transfer descriptors!\n");
 }
 
-static void usb_uhci_transfer_desc_free(usb_uhci_transfer_desc_t *transferDesc) {
+static void usb_uhci_transfer_desc_free(usb_uhci_controller_t *controller, usb_uhci_transfer_desc_t *transferDesc) {
     // Mark descriptor as free.
-    transferDesc->InUse = false;
+    uint32_t index = ((uintptr_t)transferDesc - (uintptr_t)controller->TransferDescPool) / sizeof(usb_uhci_transfer_desc_t);
+    controller->TransferDescMap[index] = false;
 }
 
 static usb_uhci_queue_head_t *usb_uhci_queue_head_alloc(usb_uhci_controller_t *controller) {
@@ -165,8 +166,8 @@ if (transferDesc != NULL) {
         transferDesc = (usb_uhci_transfer_desc_t*)pmm_dma_get_virtual(queueHead->TransferDescHead);
         while (transferDesc != NULL) {
             // Free transcript descriptor.
-            usb_uhci_transfer_desc_t* nextDesc = (usb_uhci_transfer_desc_t*)pmm_dma_get_virtual(transferDesc->NextDesc);
-            usb_uhci_transfer_desc_free(transferDesc);
+            usb_uhci_transfer_desc_t* nextDesc = (usb_uhci_transfer_desc_t*)pmm_dma_get_virtual(transferDesc->LinkPointer & ~0xF);
+            usb_uhci_transfer_desc_free(controller, transferDesc);
             transferDesc = nextDesc;
         }
 
@@ -421,6 +422,7 @@ void usb_uhci_init(PciDevice *device) {
 
     // Create UHCI controller object.
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)kheap_alloc(sizeof(usb_uhci_controller_t));
+    memset(controller, 0, sizeof(usb_uhci_controller_t));
     device->DriverObject = controller;
     testcontroller = controller;
 

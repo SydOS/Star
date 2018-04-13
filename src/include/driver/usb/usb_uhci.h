@@ -84,12 +84,12 @@ enum {
 
 // Transfer descriptors. Must be aligned to 16 bytes and a multiple of 32 bytes in size.
 typedef struct {
-    // UHCI fields. 16 bytes.
+    // Link pointer physical address.
     uint32_t LinkPointer;
 
     // Control and status.
     uint16_t ActualLength : 11;
-    uint32_t Reserved2 : 6;
+    uint32_t Reserved1 : 6;
     bool BitstuffError : 1;
     bool CrcError : 1;
     bool NakReceived : 1;
@@ -102,7 +102,7 @@ typedef struct {
     bool LowSpeedDevice : 1;
     uint16_t ErrorCounter : 2;
     bool ShortPacketDetect : 1;
-    uint16_t Reserved1 : 2;
+    uint16_t Reserved2 : 2;
 
     // Token.
     uint8_t PacketType;
@@ -112,12 +112,11 @@ typedef struct {
     uint8_t Reserved3 : 1;
     uint16_t MaximumLength : 11;
 
+    // Buffer pointer physical address.
     uint32_t BufferPointer;
 
-    // Used to determine if this descriptor is in-use or not when allocating.
-    uint8_t InUse; // 1 bytes.
-    uint32_t NextDesc; // 4 bytes;
-    uint8_t pad[11]; // 11 bytes.
+    // 4 dwords for use by the OS.
+    uint32_t pad[4];
 } __attribute__((packed)) usb_uhci_transfer_desc_t;
 
 // Queue heads. Must be aligned to 16 bytes and be a multiple of 16 bytes in size.
@@ -134,11 +133,15 @@ typedef struct {
     uint8_t pad[11]; // 11 bytes.
 } __attribute__((packed)) usb_uhci_queue_head_t;
 
+#define USB_UHCI_TD_POOL_COUNT          USB_UHCI_TD_POOL_SIZE / sizeof(usb_uhci_transfer_desc_t)
+
 typedef struct {
     PciDevice *PciDevice;
     uint32_t BaseAddress;
     uint8_t SpecVersion;
     uint32_t *FrameList;
+
+    bool TransferDescMap[USB_UHCI_TD_POOL_COUNT];
 
     usb_uhci_transfer_desc_t *TransferDescPool;
     usb_uhci_queue_head_t *QueueHeadPool;
