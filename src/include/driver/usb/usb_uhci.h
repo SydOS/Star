@@ -134,6 +134,7 @@ typedef struct {
 } __attribute__((packed)) usb_uhci_queue_head_t;
 
 #define USB_UHCI_TD_POOL_COUNT          USB_UHCI_TD_POOL_SIZE / sizeof(usb_uhci_transfer_desc_t)
+#define USB_UHCI_QH_POOL_COUNT          USB_UHCI_QH_POOL_SIZE / sizeof(usb_uhci_queue_head_t)
 
 typedef struct {
     PciDevice *PciDevice;
@@ -142,6 +143,7 @@ typedef struct {
     uint32_t *FrameList;
 
     bool TransferDescMap[USB_UHCI_TD_POOL_COUNT];
+    bool QueueHeadMap[USB_UHCI_QH_POOL_COUNT];
 
     usb_uhci_transfer_desc_t *TransferDescPool;
     usb_uhci_queue_head_t *QueueHeadPool;

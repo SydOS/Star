@@ -20,7 +20,7 @@ static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controlle
     for (uint16_t i = 0; i < USB_UHCI_TD_POOL_COUNT; i++) {
         if (!controller->TransferDescMap[i]) {
             // Zero out descriptor and mark in-use.
-            usb_uhci_transfer_desc_t *transferDesc = controller->TransferDescPool+i;
+            usb_uhci_transfer_desc_t *transferDesc = controller->TransferDescPool + i;
             memset(transferDesc, 0, sizeof(usb_uhci_transfer_desc_t));
             controller->TransferDescMap[i] = true;
 
@@ -59,11 +59,12 @@ static void usb_uhci_transfer_desc_free(usb_uhci_controller_t *controller, usb_u
 
 static usb_uhci_queue_head_t *usb_uhci_queue_head_alloc(usb_uhci_controller_t *controller) {
     // Search for first free queue head.
-    for (usb_uhci_queue_head_t *queueHead = controller->QueueHeadPool;
-        ((uintptr_t)queueHead + sizeof(usb_uhci_queue_head_t)) <= (controller->QueueHeadPool + USB_UHCI_QH_POOL_SIZE); queueHead++) {
-        if (!queueHead->InUse) {
+    for (uint16_t i = 0; i < USB_UHCI_QH_POOL_COUNT; i++) {
+        if (!controller->QueueHeadMap[i]) {
             // Mark queue head as active and return it.
-            queueHead->InUse = true;
+            usb_uhci_queue_head_t *queueHead = controller->QueueHeadPool + i;
+            memset(queueHead, 0, sizeof(usb_uhci_queue_head_t));
+            controller->QueueHeadMap[i] = true;
             return queueHead;
         }
     }
@@ -72,9 +73,10 @@ static usb_uhci_queue_head_t *usb_uhci_queue_head_alloc(usb_uhci_controller_t *c
     panic("UHCI: No more available queue heads!\n");
 }
 
-static void usb_uhci_queue_head_free(usb_uhci_queue_head_t *queueHead) {
+static void usb_uhci_queue_head_free(usb_uhci_controller_t *controller, usb_uhci_queue_head_t *queueHead) {
     // Mark queue head as free.
-    queueHead->InUse = false;
+    uint32_t index = ((uintptr_t)queueHead - (uintptr_t)controller->QueueHeadPool) / sizeof(usb_uhci_queue_head_t);
+    controller->QueueHeadMap[index] = false;
 }
 
 static void usb_uhci_queue_head_add(usb_uhci_controller_t *controller, usb_uhci_queue_head_t *queueHead) {
@@ -172,7 +174,7 @@ if (transferDesc != NULL) {
         }
 
         // Free queue head.
-        usb_uhci_queue_head_free(queueHead);
+        usb_uhci_queue_head_free(controller, queueHead);
        // usb_uhci_queue_head_t *end = (usb_uhci_queue_head_t*)pmm_dma_get_virtual(controller->QueueHead);  //(usb_uhci_queue_head_t*)pmm_dma_get_virtual(((uint8_t*)controller->QueueHead->PreviousQueueHead) - (uint32_t)(&(((usb_uhci_queue_head_t*)0)->PreviousQueueHead)));
 
         //queueHead->Head = USB_UHCI_FRAME_TERMINATE;
