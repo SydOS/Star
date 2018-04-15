@@ -5,6 +5,7 @@
 #include <string.h>
 #include <driver/usb/usb_device.h>
 #include <driver/usb/usb_requests.h>
+#include <driver/usb/usb_descriptors.h>
 
 #include <kernel/memory/kheap.h>
 
@@ -21,6 +22,13 @@ usb_device_t *usb_device_create() {
     return device;
 }
 
-bool usb_device_init(usb_device_t *device) {
+bool usb_device_init(usb_device_t *usbDevice) {
+    // Create descriptor object.
+    usb_descriptor_device_t *desc = (usb_descriptor_device_t*)kheap_alloc(sizeof(usb_descriptor_device_t)); // (usb_descriptor_device_t*)((uintptr_t)req + PAGE_SIZE_4K);
+    memset(desc, 0, sizeof(usb_descriptor_device_t));
+
+    // Get first 8 bytes of device descriptor. This will tell us the max packet size.
+    usbDevice->ControlTransfer(usbDevice, 0, true, 0, 0, USB_REQUEST_GET_DESCRIPTOR, 0, 0x1, 0, desc, 8);
+    usbDevice->MaxPacketSize = desc->MaxPacketSize;
 
 }

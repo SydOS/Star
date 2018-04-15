@@ -632,7 +632,7 @@ void usb_uhci_init(PciDevice *device) {
                 req->Index = 0;
                 req->Length = 8;//sizeof(usb_descriptor_device_t);*/
                 
-                usb_descriptor_device_t *desc = (usb_descriptor_device_t*)kheap_alloc(sizeof(usb_descriptor_device_t)); // (usb_descriptor_device_t*)((uintptr_t)req + PAGE_SIZE_4K);
+            /*    usb_descriptor_device_t *desc = (usb_descriptor_device_t*)kheap_alloc(sizeof(usb_descriptor_device_t)); // (usb_descriptor_device_t*)((uintptr_t)req + PAGE_SIZE_4K);
                 memset(desc, 0, sizeof(usb_descriptor_device_t));
               //  sleep(1000);
                // kprintf("speed: 0x%X\n", usbDevice->Speed);
@@ -642,9 +642,10 @@ void usb_uhci_init(PciDevice *device) {
                     continue;
                 }*/
 
-                usbDevice->ControlTransfer(usbDevice, 0, true, 0, 0, USB_REQUEST_GET_DESCRIPTOR, 0, 0x1, 0, desc, 18);
+             /*   usbDevice->ControlTransfer(usbDevice, 0, true, 0, 0, USB_REQUEST_GET_DESCRIPTOR, 0, 0x1, 0, desc, 18);
                 kprintf("max packet size: %u\n", desc->MaxPacketSize);
-                usbDevice->MaxPacketSize = desc->MaxPacketSize;
+                usbDevice->MaxPacketSize = desc->MaxPacketSize;*/
+                usb_device_init(usbDevice);
 
 
                /* memset(req, 0, sizeof(usb_request_t));
