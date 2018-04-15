@@ -23,8 +23,11 @@
 
 // All data is in 16 4KB pages.
 #define USB_UHCI_FRAME_COUNT            1024
+#define USB_UHCI_FRAME_POOL_SIZE        (USB_UHCI_FRAME_COUNT * sizeof(uint32_t))
 #define USB_UHCI_TD_POOL_SIZE           PAGE_SIZE_4K
 #define USB_UHCI_QH_POOL_SIZE           PAGE_SIZE_4K
+#define USB_UHCI_MEM_POOL_SIZE          (PAGE_SIZE_64K - USB_UHCI_FRAME_POOL_SIZE - USB_UHCI_TD_POOL_SIZE - USB_UHCI_QH_POOL_SIZE)
+#define USB_UHCI_MEM_BLOCK_COUNT        (USB_UHCI_MEM_POOL_SIZE / 8)
 
 #define USB_UHCI_STS_INTERRUPT              0x01
 #define USB_UHCI_STS_ERROR_INTERRUPT        0x02
@@ -142,11 +145,14 @@ typedef struct {
     uint8_t SpecVersion;
     uint32_t *FrameList;
 
+    // Bitmap for our personal heap. Each index manages 8 bytes of space.
+    bool MemMap[USB_UHCI_MEM_BLOCK_COUNT];
     bool TransferDescMap[USB_UHCI_TD_POOL_COUNT];
     bool QueueHeadMap[USB_UHCI_QH_POOL_COUNT];
 
     usb_uhci_transfer_desc_t *TransferDescPool;
     usb_uhci_queue_head_t *QueueHeadPool;
+    uint8_t *HeapPool;
     usb_uhci_queue_head_t *QueueHead;
 } usb_uhci_controller_t;
 

@@ -3,6 +3,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <string.h>
+#include <math.h>
 #include <driver/usb/usb_uhci.h>
 
 #include <driver/usb/usb_descriptors.h>
@@ -13,6 +14,56 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/paging.h>
 #include <driver/pci.h>
+
+static void *usb_uhci_alloc(usb_uhci_controller_t *controller, uint16_t size) {
+    // Get total required blocks.
+    uint16_t requiredBlocks = DIVIDE_ROUND_UP(size, 8);
+    uint16_t currentBlocks = 0;
+    uint16_t startIndex = 0;
+
+    // Search for free block range.
+    controller->MemMap[1] = true;
+    for (uint16_t i = 0; i < USB_UHCI_MEM_BLOCK_COUNT; i++) {
+        // Have we found enough contigous blocks?
+        if (currentBlocks >= requiredBlocks)
+            break;
+
+        // Is the block in-use?
+        if (controller->MemMap[i]) {
+            // Move to next one.
+            startIndex = i + 1;
+            currentBlocks = 0;
+            continue;
+        }
+
+        // Add block.
+        currentBlocks++;
+    }
+
+    if (currentBlocks < requiredBlocks)
+        panic("UHCI: No more blocks!\n");
+
+    // Mark blocks as used.
+    for (uint16_t i = startIndex; i < startIndex + requiredBlocks; i++)
+        controller->MemMap[i] = true;
+
+    // Return pointer to blocks.
+    return (void*)((uintptr_t)controller->HeapPool + (startIndex * 8));
+}
+
+static void usb_uhci_free(usb_uhci_controller_t *controller, void *pointer, uint16_t size) {
+    // Ensure pointer is valid.
+    if ((uintptr_t)pointer < (uintptr_t)controller->HeapPool || (uintptr_t)pointer > (uintptr_t)controller->HeapPool + USB_UHCI_MEM_POOL_SIZE || (uintptr_t)pointer & 0xF)
+        panic("UHCI: Invalid pointer 0x%p free attempt!", pointer);
+
+    // Get total required blocks.
+    uint16_t blocks = DIVIDE_ROUND_UP(size, 8);
+    uint16_t startIndex = ((uintptr_t)pointer - (uintptr_t)controller->HeapPool) / 8;
+
+    // Mark blocks as free.
+    for (uint16_t i = startIndex; i < startIndex + blocks; i++)
+        controller->MemMap[i] = false;
+}
 
 static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controller_t *controller, usb_device_t *usbDevice,
     usb_uhci_transfer_desc_t *previousDesc, uint8_t type, uint8_t endpoint, bool toggle, void* data, uint8_t packetSize) {
@@ -192,7 +243,8 @@ static bool usb_uhci_queue_head_wait(usb_uhci_controller_t *controller, usb_uhci
     return status;
 }
 
-static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, usb_request_t *request, void *data, uint16_t length) {
+static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool inbound, uint8_t type,
+    uint8_t recipient, uint8_t requestType, uint8_t valueLo, uint8_t valueHi, uint16_t index, void *buffer, uint16_t length) {
     // Get the UHCI controller.
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)device->Controller;
 
@@ -200,6 +252,20 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, usb_
     bool lowSpeed = device->Speed == USB_SPEED_LOW;
     uint8_t address = device->Address;
     uint8_t maxPacketSize = device->MaxPacketSize;
+
+    // Create USB request.
+    usb_request_t *request = (usb_request_t*)usb_uhci_alloc(controller, sizeof(usb_request_t));
+    memset(request, 0, sizeof(usb_request_t));
+    request->Inbound = inbound;
+    request->Type = type;
+    request->Recipient = recipient;
+    request->Request = requestType;
+    request->ValueLow = valueLo;
+    request->ValueHigh = valueHi;
+    request->Index = index;
+    request->Length = length;
+
+    uint64_t *d = (uint64_t*)request;
 
     // Create first transfer descriptor.
     usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_alloc(controller, device, NULL, USB_UHCI_TD_PACKET_SETUP, 0, false, request, sizeof(usb_request_t));
@@ -213,10 +279,10 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, usb_
     prevDesc = transferDesc;
 
     // Determine whether packets are to be IN or OUT.
-    uint8_t packetType = request->Type & USB_REQUEST_TYPE_DEVICE_TO_HOST ? USB_UHCI_TD_PACKET_IN : USB_UHCI_TD_PACKET_OUT;
+    uint8_t packetType = inbound ? USB_UHCI_TD_PACKET_IN : USB_UHCI_TD_PACKET_OUT;
 
     // Create packets for data.
-    uint8_t *packetPtr = (uint8_t*)data;
+    uint8_t *packetPtr = (uint8_t*)buffer;
     uint8_t *endPtr = packetPtr + length;
     bool toggle = false;
     while (packetPtr < endPtr) {
@@ -250,7 +316,7 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, usb_
 
     // Create status packet.
     //transferDesc = usb_uhci_transfer_desc_alloc(controller);
-    packetType = request->Type & USB_REQUEST_TYPE_DEVICE_TO_HOST ? USB_UHCI_TD_PACKET_OUT : USB_UHCI_TD_PACKET_IN;
+    packetType = inbound ? USB_UHCI_TD_PACKET_OUT : USB_UHCI_TD_PACKET_IN;
     //usb_uhci_transfer_desc_init(transferDesc, prevDesc, lowSpeed, address, endpoint, true, packetType, 0, NULL);
     transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, 0, true, NULL, 0);
 
@@ -262,7 +328,12 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, usb_
     // Add queue head to schedule and wait for completion.
     kprintf("UHCI: Adding packet....\n");
     usb_uhci_queue_head_add(controller, queueHead);
-    return usb_uhci_queue_head_wait(controller, queueHead);
+    bool result = usb_uhci_queue_head_wait(controller, queueHead);
+
+    // Free dats.
+    usb_uhci_free(controller, request, sizeof(usb_request_t));
+
+    return result;
 }
 
 /*static void usb_uhci_write_port(uint16_t port, uint16_t data, bool clear) {
@@ -472,8 +543,9 @@ void usb_uhci_init(PciDevice *device) {
 
     // Get pointers to frame list and pools.
     kprintf("UHCI: Frame list located at: 0x%p (0x%X)\n", controller->FrameList, (uint32_t)pmm_dma_get_phys(controller->FrameList));
-    controller->TransferDescPool = (usb_uhci_transfer_desc_t*)((uintptr_t)controller->FrameList + (USB_UHCI_FRAME_COUNT * sizeof(uint32_t)));
+    controller->TransferDescPool = (usb_uhci_transfer_desc_t*)((uintptr_t)controller->FrameList + USB_UHCI_FRAME_POOL_SIZE);
     controller->QueueHeadPool = (usb_uhci_queue_head_t*)((uintptr_t)controller->TransferDescPool + USB_UHCI_TD_POOL_SIZE);
+    controller->HeapPool = (uint8_t*)((uintptr_t)controller->QueueHeadPool + USB_UHCI_QH_POOL_SIZE);
 
     // Setup frame list.
     usb_uhci_queue_head_t *queueHead = usb_uhci_queue_head_alloc(controller);
@@ -542,20 +614,20 @@ void usb_uhci_init(PciDevice *device) {
                 usbDevice->Address = 0;
 
             for (int e = 0; e < 10; e++) {
-                    usb_request_t *req = (usb_request_t*)((uintptr_t)controller->QueueHeadPool + USB_UHCI_QH_POOL_SIZE);
+               /*     usb_request_t *req = (usb_request_t*)((uintptr_t)controller->QueueHeadPool + USB_UHCI_QH_POOL_SIZE);
                 memset(req, 0, sizeof(usb_request_t));
                 req->Type = USB_REQUEST_TYPE_DEVICE_TO_HOST | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
                 req->Request = USB_REQUEST_GET_DESCRIPTOR;
                 req->Value = 0x1 << 8;
                 req->Index = 0;
-                req->Length = 8;//sizeof(usb_descriptor_device_t);
+                req->Length = 8;//sizeof(usb_descriptor_device_t);*/
                 
-                usb_descriptor_device_t *desc = (usb_descriptor_device_t*)((uintptr_t)req + PAGE_SIZE_4K);
+                usb_descriptor_device_t *desc = (usb_descriptor_device_t*)usb_uhci_alloc(controller, sizeof(usb_descriptor_device_t)); // (usb_descriptor_device_t*)((uintptr_t)req + PAGE_SIZE_4K);
                 memset(desc, 0, sizeof(usb_descriptor_device_t));
               //  sleep(1000);
                // kprintf("speed: 0x%X\n", usbDevice->Speed);
                kprintf("attempting\n");
-                if (!usb_uhci_device_control(usbDevice, 0, req, desc, req->Length)) {
+                if (!usb_uhci_device_control(usbDevice, 0, true, 0, 0, USB_REQUEST_GET_DESCRIPTOR, 0, 0x1, 0, desc, 8)) {
                     portStatus = usb_uhci_reset_port(controller, port);
                     continue;
                 }
@@ -563,7 +635,7 @@ void usb_uhci_init(PciDevice *device) {
                 usbDevice->MaxPacketSize = desc->MaxPacketSize;
 
 
-                memset(req, 0, sizeof(usb_request_t));
+               /* memset(req, 0, sizeof(usb_request_t));
                 req->Type = USB_REQUEST_TYPE_HOST_TO_DEVICE | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
                 req->Request = USB_REQUEST_SET_ADDRESS;
                 req->Value = port + 1;
@@ -598,9 +670,19 @@ void usb_uhci_init(PciDevice *device) {
                 req->Request = USB_REQUEST_GET_DESCRIPTOR;
                 req->Value = 0x3 << 8 | desc->ProductString;
                 req->Index = 0;
-                req->Length = 30;
+                req->Length = 8;
                 
                 usb_descriptor_string_t *descS = (usb_descriptor_string_t*)((uintptr_t)req + PAGE_SIZE_4K);
+                memset(descS, 0, sizeof(usb_descriptor_string_t));
+                usb_uhci_device_control(usbDevice, 0, req, descS, req->Length);
+
+                memset(req, 0, sizeof(usb_request_t));
+                req->Type = USB_REQUEST_TYPE_DEVICE_TO_HOST | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
+                req->Request = USB_REQUEST_GET_DESCRIPTOR;
+                req->Value = 0x3 << 8 | desc->ProductString;
+                req->Index = 0;
+                req->Length = descS->Length;
+                
                 memset(descS, 0, sizeof(usb_descriptor_string_t));
                 usb_uhci_device_control(usbDevice, 0, req, descS, req->Length);
 
@@ -608,7 +690,7 @@ void usb_uhci_init(PciDevice *device) {
                 kprintf("product string: ");
                 for (uint16_t i = 0; i < descS->Length - 2; i++)
                     kprintf("%c", (char)descS->String[i]);
-                kprintf("\n");
+                kprintf("\n");*/
 
                 while(true);
 }   

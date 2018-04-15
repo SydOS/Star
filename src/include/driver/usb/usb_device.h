@@ -15,6 +15,8 @@ typedef struct usb_device_t {
 
     // Pointer to controller that device is on.
     void *Controller;
+    
+    void (*Control)(struct usb_device_t* device, uint8_t endpoint);
 
     // Port device is on.
     uint8_t Port;

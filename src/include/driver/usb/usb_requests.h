@@ -44,13 +44,16 @@
 // USB request structure.
 typedef struct {
     // Characteristics of request.
-    uint8_t Type;
+    uint8_t Recipient : 5;
+    uint8_t Type : 2;
+    bool Inbound : 1;
 
     // Specific request.
     uint8_t Request;
 
     // Word-sized field that varies according to request.
-    uint16_t Value;
+    uint8_t ValueLow;
+    uint8_t ValueHigh;
 
     // Word-sized field that varies according to request;
     // typically used to pass an index or offset.
