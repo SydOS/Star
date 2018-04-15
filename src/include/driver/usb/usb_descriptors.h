@@ -3,6 +3,15 @@
 
 #include <main.h>
 
+#define USB_DESCRIPTOR_TYPE_DEVICE              1
+#define USB_DESCRIPTOR_TYPE_CONFIGURATION       2
+#define USB_DESCRIPTOR_TYPE_STRING              3
+#define USB_DESCRIPTOR_TYPE_INTERFACE           4
+#define USB_DESCRIPTOR_TYPE_ENDPOINT            5
+#define USB_DESCRIPTOR_TYPE_DEVICE_QUALIFIER    6
+#define USB_DESCRIPTOR_TYPE_OTHER_SPEED_CONF    7
+#define USB_DESCRIPTOR_TYPE_INTERFACE_POWER     8
+
 // USB device descriptor.
 typedef struct {
     // Size of this descriptor in bytes.
@@ -38,7 +47,7 @@ typedef struct {
     uint16_t BcdDevice;
 
     // String descriptor indexes.
-    uint8_t ManufacturerString;
+    uint8_t VendorString;
     uint8_t ProductString;
     uint8_t SerialNumberString;
 

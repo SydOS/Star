@@ -3,19 +3,15 @@
 
 #include <main.h>
 
-// Standard USB request types.
-#define USB_REQUEST_TYPE_DEVICE_TO_HOST 0x80
-#define USB_REQUEST_TYPE_HOST_TO_DEVICE 0x00
+// USB request bits.
+#define USB_REQUEST_TYPE_STANDARD       0x0
+#define USB_REQUEST_TYPE_CLASS          0x1
+#define USB_REQUEST_TYPE_VENDOR         0x2
 
-#define USB_REQUEST_TYPE_VENDOR         0x40
-#define USB_REQUEST_TYPE_CLASS          0x20
-#define USB_REQUEST_TYPE_STANDARD       0x00
-
-#define USB_REQUEST_TYPE_REC_MASK       0x1F
-#define USB_REQUEST_TYPE_REC_OTHER      0x03
-#define USB_REQUEST_TYPE_REC_ENDPOINT   0x02
-#define USB_REQUEST_TYPE_REC_INTERFACE  0x01
-#define USB_REQUEST_TYPE_REC_DEVICE     0x00
+#define USB_REQUEST_REC_DEVICE          0x0
+#define USB_REQUEST_REC_INTERFACE       0x1
+#define USB_REQUEST_REC_ENDPOINT        0x2
+#define USB_REQUEST_REC_OTHER           0x3
 
 // Standard USB request.
 #define USB_REQUEST_GET_STATUS      0

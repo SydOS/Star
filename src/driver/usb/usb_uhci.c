@@ -247,10 +247,8 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     // Get the UHCI controller.
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)device->Controller;
 
-    // Create temporary buffer that the UHCI controller can use.
-    void *usbBuffer = usb_uhci_alloc(controller, length);
-    if (!inbound)
-        memcpy(usbBuffer, buffer, length);
+    // Temporary buffer.
+    void *usbBuffer = NULL;
 
     // Get device attributes.
     bool lowSpeed = device->Speed == USB_SPEED_LOW;
@@ -269,59 +267,44 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     request->Index = index;
     request->Length = length;
 
-    uint64_t *d = (uint64_t*)request;
-
-    // Create first transfer descriptor.
+    // Create SETUP transfer descriptor.
     usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_alloc(controller, device, NULL, USB_UHCI_TD_PACKET_SETUP, 0, false, request, sizeof(usb_request_t));
     usb_uhci_transfer_desc_t *headDesc = transferDesc;
-    usb_uhci_transfer_desc_t *prevDesc = NULL;
-
-    // Create SETUP packet.
-    kprintf("Setting up setup packet for %s speed...\n", lowSpeed ? "low" : "full");
-    
-    //usb_uhci_transfer_desc_init(transferDesc, NULL, lowSpeed, address, endpoint, false, USB_UHCI_TD_PACKET_SETUP, sizeof(usb_request_t), request);
-    prevDesc = transferDesc;
+    usb_uhci_transfer_desc_t *prevDesc = transferDesc;
 
     // Determine whether packets are to be IN or OUT.
     uint8_t packetType = inbound ? USB_UHCI_TD_PACKET_IN : USB_UHCI_TD_PACKET_OUT;
 
     // Create packets for data.
-    uint8_t *packetPtr = (uint8_t*)usbBuffer;
-    uint8_t *endPtr = packetPtr + length;
-    bool toggle = false;
-    while (packetPtr < endPtr) {
-        // Allocate a transfer descriptor for packet.
-        //transferDesc = usb_uhci_transfer_desc_alloc(controller);
+    if (length > 0) {
+        // Create temporary buffer that the UHCI controller can use.
+        usbBuffer = usb_uhci_alloc(controller, length);
+        if (!inbound)
+            memcpy(usbBuffer, buffer, length);
 
-        // Toggle toggle bit.
-        toggle = !toggle;
+        uint8_t *packetPtr = (uint8_t*)usbBuffer;
+        uint8_t *endPtr = packetPtr + length;
+        bool toggle = false;
+        while (packetPtr < endPtr) {
+            // Toggle toggle bit.
+            toggle = !toggle;
 
-        // Determine size of packet, and cut it down if above max size.
-        uint8_t packetSize = endPtr - packetPtr;
-        if (packetSize > maxPacketSize)
-            packetSize = maxPacketSize;
-        
-        // Create packet.
-        kprintf("packet pointer: 0x%p\n", packetPtr);
-        //usb_uhci_transfer_desc_init(transferDesc, prevDesc, lowSpeed, address, endpoint, toggle, packetType, packetSize, packetPtr);
-        transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, 0, toggle, packetPtr, packetSize);
+            // Determine size of packet, and cut it down if above max size.
+            uint8_t packetSize = endPtr - packetPtr;
+            if (packetSize > maxPacketSize)
+                packetSize = maxPacketSize;
+            
+            // Create packet.
+            transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, 0, toggle, packetPtr, packetSize);
 
-        // Move to next packet.
-        packetPtr += packetSize;
-        prevDesc = transferDesc;
+            // Move to next packet.
+            packetPtr += packetSize;
+            prevDesc = transferDesc;
+        }
     }
 
-   /* if (length == 0) {
-        transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, 0, true, NULL, 0);
-
-        // Move to next packet.
-        prevDesc = transferDesc;
-    }*/
-
     // Create status packet.
-    //transferDesc = usb_uhci_transfer_desc_alloc(controller);
     packetType = inbound ? USB_UHCI_TD_PACKET_OUT : USB_UHCI_TD_PACKET_IN;
-    //usb_uhci_transfer_desc_init(transferDesc, prevDesc, lowSpeed, address, endpoint, true, packetType, 0, NULL);
     transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, 0, true, NULL, 0);
 
     // Create queue head that starts with first transfer descriptor.
@@ -335,12 +318,13 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     bool result = usb_uhci_queue_head_wait(controller, queueHead);
 
     // Copy data if the operation succeeded.
-    if (result && inbound)
+    if (usbBuffer != NULL && result && inbound)
         memcpy(buffer, usbBuffer, length);
 
-    // Free dats.
+    // Free buffers.
     usb_uhci_free(controller, request, sizeof(usb_request_t));
-    usb_uhci_free(controller, usbBuffer, length);
+    if (usbBuffer != NULL)
+        usb_uhci_free(controller, usbBuffer, length);
 
     return result;
 }
