@@ -64,6 +64,36 @@ static void usb_uhci_free(usb_uhci_controller_t *controller, void *pointer, uint
         controller->MemMap[i] = false;
 }
 
+static bool usb_uhci_address_alloc(usb_device_t *usbDevice) {
+    // Get the UHCI controller.
+    usb_uhci_controller_t *controller = (usb_uhci_controller_t*)usbDevice->Controller;
+
+    // Search for free address. Addresses start at 1 and end at 127.
+    for (uint8_t i = 0; i < USB_MAX_DEVICES; i++) {
+        if (!controller->AddressPool[i]) {
+            // Set the address.
+            if (!usbDevice->ControlTransfer(usbDevice, 0, false, USB_REQUEST_TYPE_STANDARD, USB_REQUEST_REC_DEVICE, USB_REQUEST_SET_ADDRESS, i + 1, 0, 0, NULL, 0))
+                return false;
+
+            // Mark address in-use and save to device object.
+            controller->AddressPool[i] = true;
+            usbDevice->Address = i + 1;
+            return true;
+        }
+    }
+
+    // No address found, too many USB devices attached to host most likely.
+    return false;
+}
+
+static void usb_uhci_address_free(usb_device_t *usbDevice) {
+    // Get the UHCI controller.
+    usb_uhci_controller_t *controller = (usb_uhci_controller_t*)usbDevice->Controller;
+
+    // Mark address free.
+    controller->AddressPool[usbDevice->Address - 1] = false;
+}
+
 static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controller_t *controller, usb_device_t *usbDevice,
     usb_uhci_transfer_desc_t *previousDesc, uint8_t type, uint8_t endpoint, bool toggle, void* data, uint8_t packetSize) {
     // Search for first free transfer descriptor.
@@ -186,16 +216,16 @@ static bool usb_uhci_queue_head_process(usb_uhci_controller_t *controller, usb_u
         
     }
 
-if (transferDesc != NULL) {
-    kprintf("packet data\n");
-    kprintf("0x%X 0x%X 0x%X 0x%X\n", *t1, *t2, *t3, *t4);}
+//if (transferDesc != NULL) {
+  //  kprintf("packet data\n");
+   // kprintf("0x%X 0x%X 0x%X 0x%X\n", *t1, *t2, *t3, *t4);}
 
    // kprintf("tick\n");
    // kprintf("next packet: 0x%X\n", transferDesc->LinkPointer);
   //  kprintf("UHCI: packet type: 0x%X\n", transferDesc->PacketType);
     //    kprintf("UHCI: packet pointer: 0x%X\n", transferDesc->BufferPointer);
-        kprintf("current frame: %u\n", d);
-                kprintf("status: 0x%X\n", s);
+      //  kprintf("current frame: %u\n", d);
+       //         kprintf("status: 0x%X\n", s);
        // kprintf("pci status: 0x%X\n", pciS);
        // kprintf("usb cmd: 0x%X\n", inw(USB_UHCI_USBCMD(controller->BaseAddress)));
      //   kprintf("port 1: 0x%X\n", inw(USB_UHCI_PORTSC1(controller->BaseAddress)));
@@ -203,8 +233,8 @@ if (transferDesc != NULL) {
     // Are we done with transfers?
     if (complete) {
         // Remove queue head from schedule.
-        kprintf("done!\n");
-        kprintf("status: 0x%X\n", s);
+     //   kprintf("done!\n");
+     //   kprintf("status: 0x%X\n", s);
       //  kprintf("pci status: 0x%X\n", pciS);
       //  kprintf("usb cmd: 0x%X\n", inw(USB_UHCI_USBCMD(controller->BaseAddress)));
      //   kprintf("port 1: 0x%X\n", inw(USB_UHCI_PORTSC1(controller->BaseAddress)));
@@ -313,7 +343,7 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     queueHead->Element = (uint32_t)pmm_dma_get_phys((uintptr_t)headDesc);
 
     // Add queue head to schedule and wait for completion.
-    kprintf("UHCI: Adding packet....\n");
+   // kprintf("UHCI: Adding packet....\n");
     usb_uhci_queue_head_add(controller, queueHead);
     bool result = usb_uhci_queue_head_wait(controller, queueHead);
 
@@ -599,6 +629,8 @@ void usb_uhci_init(PciDevice *device) {
                 // No parent means it is on the root hub.
                 usbDevice->Parent = NULL;
                 usbDevice->Controller = controller;
+                usbDevice->AllocAddress = usb_uhci_address_alloc;
+                usbDevice->FreeAddress = usb_uhci_address_free;
                 usbDevice->ControlTransfer = usb_uhci_device_control;
 
                 // Set port and speed.
@@ -607,90 +639,8 @@ void usb_uhci_init(PciDevice *device) {
                 usbDevice->MaxPacketSize = 8;
                 usbDevice->Address = 0;
 
-            for (int e = 0; e < 10; e++) {
-               /*     usb_request_t *req = (usb_request_t*)((uintptr_t)controller->QueueHeadPool + USB_UHCI_QH_POOL_SIZE);
-                memset(req, 0, sizeof(usb_request_t));
-                req->Type = USB_REQUEST_TYPE_DEVICE_TO_HOST | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
-                req->Request = USB_REQUEST_GET_DESCRIPTOR;
-                req->Value = 0x1 << 8;
-                req->Index = 0;
-                req->Length = 8;//sizeof(usb_descriptor_device_t);*/
-                
-            /*    usb_descriptor_device_t *desc = (usb_descriptor_device_t*)kheap_alloc(sizeof(usb_descriptor_device_t)); // (usb_descriptor_device_t*)((uintptr_t)req + PAGE_SIZE_4K);
-                memset(desc, 0, sizeof(usb_descriptor_device_t));
-              //  sleep(1000);
-               // kprintf("speed: 0x%X\n", usbDevice->Speed);
-               kprintf("attempting\n");
-               /* if (!usb_uhci_device_control(usbDevice, 0, true, 0, 0, USB_REQUEST_GET_DESCRIPTOR, 0, 0x1, 0, desc, 8)) {
-                    portStatus = usb_uhci_reset_port(controller, port);
-                    continue;
-                }*/
-
-             /*   usbDevice->ControlTransfer(usbDevice, 0, true, 0, 0, USB_REQUEST_GET_DESCRIPTOR, 0, 0x1, 0, desc, 18);
-                kprintf("max packet size: %u\n", desc->MaxPacketSize);
-                usbDevice->MaxPacketSize = desc->MaxPacketSize;*/
                 usb_device_init(usbDevice);
-
-
-               /* memset(req, 0, sizeof(usb_request_t));
-                req->Type = USB_REQUEST_TYPE_HOST_TO_DEVICE | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
-                req->Request = USB_REQUEST_SET_ADDRESS;
-                req->Value = port + 1;
-                req->Index = 0;
-                req->Length = 0;//sizeof(usb_descriptor_device_t);
-                
-                memset(desc, 0, sizeof(usb_descriptor_device_t));
-               // sleep(1000);
-                //kprintf("speed: 0x%X\n", usbDevice->Speed);
-                usb_uhci_device_control(usbDevice, 0, req, desc, req->Length);
-                kprintf("max packet size: %u\n", usbDevice->MaxPacketSize);
-                kprintf("address changed");
-
-                usbDevice->Address = 1;
-                memset(req, 0, sizeof(usb_request_t));
-                req->Type = USB_REQUEST_TYPE_DEVICE_TO_HOST | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
-                req->Request = USB_REQUEST_GET_DESCRIPTOR;
-                req->Value = 0x1 << 8;
-                req->Index = 0;
-                req->Length = sizeof(usb_descriptor_device_t);
-                
-                memset(desc, 0, sizeof(usb_descriptor_device_t));
-              //  sleep(1000);
-                kprintf("speed: 0x%X\n", usbDevice->Speed);
-                usb_uhci_device_control(usbDevice, 0, req, desc, req->Length);
-                kprintf("max packet size: %u\n", desc->MaxPacketSize);
-
-                kprintf("Vendor: 0x%X\n", desc->VendorId);
-
-                memset(req, 0, sizeof(usb_request_t));
-                req->Type = USB_REQUEST_TYPE_DEVICE_TO_HOST | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
-                req->Request = USB_REQUEST_GET_DESCRIPTOR;
-                req->Value = 0x3 << 8 | desc->ProductString;
-                req->Index = 0;
-                req->Length = 8;
-                
-                usb_descriptor_string_t *descS = (usb_descriptor_string_t*)((uintptr_t)req + PAGE_SIZE_4K);
-                memset(descS, 0, sizeof(usb_descriptor_string_t));
-                usb_uhci_device_control(usbDevice, 0, req, descS, req->Length);
-
-                memset(req, 0, sizeof(usb_request_t));
-                req->Type = USB_REQUEST_TYPE_DEVICE_TO_HOST | USB_REQUEST_TYPE_STANDARD | USB_REQUEST_TYPE_REC_DEVICE;
-                req->Request = USB_REQUEST_GET_DESCRIPTOR;
-                req->Value = 0x3 << 8 | desc->ProductString;
-                req->Index = 0;
-                req->Length = descS->Length;
-                
-                memset(descS, 0, sizeof(usb_descriptor_string_t));
-                usb_uhci_device_control(usbDevice, 0, req, descS, req->Length);
-
-                char* dd = (char*)&descS->String;
-                kprintf("product string: ");
-                for (uint16_t i = 0; i < descS->Length - 2; i++)
-                    kprintf("%c", (char)descS->String[i]);
-                kprintf("\n");*/
-
-                while(true);
-}   
+               // while(true);  
             }
         }
         else {

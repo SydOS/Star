@@ -8,6 +8,8 @@
 #define USB_SPEED_LOW       0x1
 #define USB_SPEED_HIGH      0x2
 
+#define USB_MAX_DEVICES     127
+
 typedef struct usb_device_t {
     // Relationship to other USB devices.
     struct usb_device_t *Parent;
@@ -15,7 +17,9 @@ typedef struct usb_device_t {
 
     // Pointer to controller that device is on.
     void *Controller;
-    
+
+    bool (*AllocAddress)(struct usb_device_t* device);
+    void (*FreeAddress)(struct usb_device_t* device);   
     bool (*ControlTransfer)(struct usb_device_t* device, uint8_t endpoint, bool inbound, uint8_t type,
         uint8_t recipient, uint8_t requestType, uint8_t valueLo, uint8_t valueHi, uint16_t index, void *buffer, uint16_t length);
 

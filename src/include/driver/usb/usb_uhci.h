@@ -5,6 +5,8 @@
 #include <kernel/memory/paging.h>
 #include <driver/pci.h>
 
+#include <driver/usb/usb_device.h>
+
 #define USB_UHCI_PCI_REG_RELEASE_NUM    0x60
 
 #define USB_UHCI_PCI_REG_LEGACY         0xC0
@@ -154,6 +156,8 @@ typedef struct {
     usb_uhci_queue_head_t *QueueHeadPool;
     uint8_t *HeapPool;
     usb_uhci_queue_head_t *QueueHead;
+
+    bool AddressPool[USB_MAX_DEVICES];
 } usb_uhci_controller_t;
 
 #endif

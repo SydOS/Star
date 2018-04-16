@@ -12,6 +12,9 @@
 #define USB_DESCRIPTOR_TYPE_OTHER_SPEED_CONF    7
 #define USB_DESCRIPTOR_TYPE_INTERFACE_POWER     8
 
+// Max power field expressed in 2mA units.
+#define USB_MAX_POWER_UNITS                     2
+
 // USB device descriptor.
 typedef struct {
     // Size of this descriptor in bytes.
@@ -98,8 +101,8 @@ typedef struct {
     // Total length of data returned for this configuration.
     uint16_t TotalLength;
 
-    // Number of possible configurations.
-    uint8_t NumConfigurations;
+    // Number of interfaces.
+    uint8_t NumInterfaces;
 
     // Value to use as an argument to the SetConfiguration() request to select this configuration.
     uint8_t ConfigurationValue;
@@ -108,10 +111,10 @@ typedef struct {
     uint8_t ConfigurationString;
 
     // Configuration characteristics.
-    bool Reserved1 : 1; // Must be set to one.
-    bool SelfPowered : 1;
+    uint8_t Reserved1 : 5;
     bool RemoteWakeup : 1;
-    uint8_t Reserved2 : 5;
+    bool SelfPowered : 1;
+    bool Reserved2 : 1; // Must be set to one.
 
     // Maximum power consumption.
     uint8_t MaxPower;
@@ -147,6 +150,20 @@ typedef struct {
     uint8_t InterfaceString;
 } __attribute__((packed)) usb_descriptor_interface_t;
 
+#define USB_ENDPOINT_TRANSFERTYPE_CONTROL   0x0
+#define USB_ENDPOINT_TRANSFERTYPE_ISO       0x1
+#define USB_ENDPOINT_TRANSFERTYPE_BULK      0x2
+#define USB_ENDPOINT_TRANSFERTYPE_INTERRUPT 0x3
+
+#define USB_ENDPOINT_SYNCTYPE_NONE          0x0
+#define USB_ENDPOINT_SYNCTYPE_ASYNC         0x1
+#define USB_ENDPOINT_SYNCTYPE_ADAPTIVE      0x2
+#define USB_ENDPOINT_SYNCTYPE_SYNC          0x3
+
+#define USB_ENDPOINT_USAGETYPE_DATA             0x0
+#define USB_ENDPOINT_USAGETYPE_FEEDBACK         0x1
+#define USB_ENDPOINT_USAGETYPE_IMPL_FEEDBACK    0x2
+
 // USB endpoint descriptor.
 typedef struct {
     // Size of this descriptor in bytes.
@@ -156,13 +173,21 @@ typedef struct {
     uint8_t Type;
 
     // The address of the endpoint on the USB device described by this descriptor.
-    uint8_t EndpointAddress;
+    uint8_t EndpointNumber : 4;
+    uint8_t Reserved1 : 3;
+    bool Inbound : 1;
 
-    uint8_t Attributes;
+    // Attributes.
+    uint8_t TransferType : 2;
+    uint8_t SyncType : 2;
+    uint8_t UsageType : 2;
+    uint8_t Reserved2 : 2;
 
     // Maximum packet size this endpoint is capable of sending or receiving when
     // this configuration is selected.
-    uint16_t MaxPacketSize;
+    uint16_t MaxPacketSize : 11;
+    uint8_t TransactionsPerMicroframe : 2;
+    uint8_t Reserved3 : 3;
 
     // Interval for polling endpoint for data transfers.
     uint8_t Interval;
@@ -179,5 +204,34 @@ typedef struct {
     // String.
     uint16_t String[];
 } __attribute__((packed)) usb_descriptor_string_t;
+
+// USB hub descriptor.
+typedef struct {
+    // Size of this descriptor in bytes.
+    uint8_t Length;
+
+    // Descriptor type.
+    uint8_t Type;
+
+    // Number of downstream ports.
+    uint8_t NumPorts;
+
+    // Characteristics.
+    uint8_t PowerSwitchingMode : 2;
+    bool CompoundDevice : 1;
+    uint8_t OvercurrentMode : 2;
+    uint8_t TtThinkTime : 2;
+    bool PortIndicatorsSupported : 1;
+    uint8_t Reserved1 : 8;
+
+    // Time (in 2 ms intervals) from the time the power-on sequence
+    // begins on a port until power is good on that port.
+    uint8_t PowerOnToPowerGood;
+
+    // Maximum current requirements of the Hub Controller electronics in mA.
+    uint8_t HubControllerCurrent;
+
+    // Removable bitmap and power control masks are variable.
+} __attribute__((packed)) usb_descriptor_hub_t;
 
 #endif

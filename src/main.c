@@ -114,7 +114,7 @@ void kernel_late() {
 	
 	// Initialize floppy.
 	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
-	//floppy_init();
+	floppy_init();
 
     vga_enable_cursor();
 
