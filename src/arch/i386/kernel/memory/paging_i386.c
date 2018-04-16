@@ -70,11 +70,14 @@ static void paging_map_std(uintptr_t virtual, uint32_t physical, bool unmap) {
     // Get address of table from directory.
     // If there isn't one, create one.
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.
+    uint32_t *table = (uint32_t*)(PAGE_TABLES_ADDRESS + (tableIndex * PAGE_SIZE_4K));
     if (MASK_PAGE_4K(directory[tableIndex]) == 0) {
         directory[tableIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
+
+        // Zero out new table.
+        memset(table, 0, PAGE_SIZE_4K);
     }
-    uint32_t *table = (uint32_t*)(PAGE_TABLES_ADDRESS + (tableIndex * PAGE_SIZE_4K));
 
     // Add address to table.
     table[entryIndex] = unmap ? 0 : physical;
@@ -155,7 +158,7 @@ void paging_unmap(uintptr_t virtual) {
     paging_flush_tlb_address(virtual);
 }
 
-static bool paging_get_phys_std(uintptr_t virtual, uint32_t *physOut) {
+static bool paging_get_phys_std(uintptr_t virtual, uint64_t *physOut) {
     // Get pointer to page directory.
     uint32_t *directory = (uint32_t*)(PAGE_DIR_ADDRESS);
 
@@ -217,7 +220,7 @@ bool paging_get_phys(uintptr_t virtual, uint64_t *physOut) {
     if (memInfo.paeEnabled)
         return paging_get_phys_pae(virtual, physOut);
     else
-        return paging_get_phys_std(virtual, (uint32_t*)physOut);
+        return paging_get_phys_std(virtual, physOut);
 }
 
 void paging_late_std() {
