@@ -9,6 +9,35 @@
 
 #include <kernel/memory/kheap.h>
 
+static char *usbClassDescriptions[255];
+static bool usbClassDescriptionsFilled = false;
+
+static void usb_fill_class_names(void) {
+    usbClassDescriptions[0x00] = "Defined in interface";
+    usbClassDescriptions[0x01] = "Audio device";
+    usbClassDescriptions[0x02] = "Communications device";
+    usbClassDescriptions[0x03] = "Human Interface Device";
+    usbClassDescriptions[0x05] = "Physical device";
+    usbClassDescriptions[0x06] = "Still imaging device";
+    usbClassDescriptions[0x07] = "Printing device";
+    usbClassDescriptions[0x08] = "Mass storage device";
+    usbClassDescriptions[0x09] = "Hub";
+    usbClassDescriptions[0x0A] = "Communications data device";
+    usbClassDescriptions[0x0B] = "Smart card controller";
+    usbClassDescriptions[0x0D] = "Content security device";
+    usbClassDescriptions[0x0E] = "Video device";
+    usbClassDescriptions[0x0F] = "Personal healthcare device";
+    usbClassDescriptions[0x10] = "Audio/video device";
+    usbClassDescriptions[0x11] = "Billboard device";
+    usbClassDescriptions[0x12] = "USB Type-C bridge device";
+    usbClassDescriptions[0xDC] = "Diagnostic device";
+    usbClassDescriptions[0xE0] = "Wireless controller";
+    usbClassDescriptions[0xEF] = "Miscellaneous device";
+    usbClassDescriptions[0xFE] = "Application-specific device";
+    usbClassDescriptions[0xFF] = "Vendor-specific device";
+    usbClassDescriptionsFilled = true;
+}
+
 usb_device_t *usb_device_create() {
     // Allocate space for a USB device and return it.
     usb_device_t *device = (usb_device_t*)kheap_alloc(sizeof(usb_device_t));
@@ -79,10 +108,11 @@ static bool usb_device_print_interface(usb_device_t *usbDevice, uint16_t langId,
 
     // Print info.
     kprintf("USB: Interface %u:\n", interfaceDesc->IntefaceNumber);
-    kprintf("USB:     Alternate setting: %u\n", interfaceDesc->AlternateSetting);
-    kprintf("USB:     Endpoints: %u\n", interfaceDesc->NumEndpoints);
+    kprintf("USB:     Type: %s\n", usbClassDescriptions[interfaceDesc->InterfaceClass]);
     kprintf("USB:     Class: 0x%X | Subclass: 0x%X | Protocol: 0x%X\n", interfaceDesc->InterfaceClass,
         interfaceDesc->InterfaceSubclass, interfaceDesc->InterfaceProtocol);
+    kprintf("USB:     Alternate setting: %u\n", interfaceDesc->AlternateSetting);
+    kprintf("USB:     Endpoints: %u\n", interfaceDesc->NumEndpoints);
     kprintf("USB:     Interface string: %s\n", strInterface);
 
     // Free string.
@@ -185,6 +215,10 @@ bool usb_device_init(usb_device_t *usbDevice) {
     if (!(usb_device_get_first_lang(usbDevice, &langId)))
         kprintf("USB: Strings are not supported by this device.\n");
 
+    // Fill class names if needed.
+    if (!usbClassDescriptionsFilled)
+        usb_fill_class_names();
+
     char *strVendor;
     char *strProduct;
     char *strSerial;
@@ -208,6 +242,8 @@ bool usb_device_init(usb_device_t *usbDevice) {
     kprintf("USB:     Serial number: %s\n", strSerial);
     kprintf("USB:     Version: %u.%u | Max packet size: %u bytes\n", deviceDesc.BcdUsb >> 8, deviceDesc.BcdUsb & 0xFF, usbDevice->MaxPacketSize);
     kprintf("USB:     Vendor ID: 0x%X | Product ID: 0x%X | Configs: %u\n", deviceDesc.VendorId, deviceDesc.ProductId, deviceDesc.NumConfigurations);
+    kprintf("USB:     Type: %s\n", usbClassDescriptions[deviceDesc.Class]);
+    kprintf("USB:     Class: 0x%X | Subclass: 0x%X | Protocol: 0x%X\n", deviceDesc.Class, deviceDesc.Subclass, deviceDesc.Protocol);
 
     // Clean up strings.
     kheap_free(strVendor);

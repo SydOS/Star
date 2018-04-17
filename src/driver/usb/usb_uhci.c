@@ -64,6 +64,14 @@ static void usb_uhci_free(usb_uhci_controller_t *controller, void *pointer, uint
         controller->MemMap[i] = false;
 }
 
+static void usb_uhci_address_free(usb_device_t *usbDevice) {
+    // Get the UHCI controller.
+    usb_uhci_controller_t *controller = (usb_uhci_controller_t*)usbDevice->Controller;
+
+    // Mark address free.
+    controller->AddressPool[usbDevice->Address - 1] = false;
+}
+
 static bool usb_uhci_address_alloc(usb_device_t *usbDevice) {
     // Get the UHCI controller.
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)usbDevice->Controller;
@@ -75,6 +83,10 @@ static bool usb_uhci_address_alloc(usb_device_t *usbDevice) {
             if (!usbDevice->ControlTransfer(usbDevice, 0, false, USB_REQUEST_TYPE_STANDARD, USB_REQUEST_REC_DEVICE, USB_REQUEST_SET_ADDRESS, i + 1, 0, 0, NULL, 0))
                 return false;
 
+            // Free the old address, if any.
+            if (usbDevice->Address)
+                usb_uhci_address_free(usbDevice);
+
             // Mark address in-use and save to device object.
             controller->AddressPool[i] = true;
             usbDevice->Address = i + 1;
@@ -84,14 +96,6 @@ static bool usb_uhci_address_alloc(usb_device_t *usbDevice) {
 
     // No address found, too many USB devices attached to host most likely.
     return false;
-}
-
-static void usb_uhci_address_free(usb_device_t *usbDevice) {
-    // Get the UHCI controller.
-    usb_uhci_controller_t *controller = (usb_uhci_controller_t*)usbDevice->Controller;
-
-    // Mark address free.
-    controller->AddressPool[usbDevice->Address - 1] = false;
 }
 
 static usb_uhci_transfer_desc_t *usb_uhci_transfer_desc_alloc(usb_uhci_controller_t *controller, usb_device_t *usbDevice,
@@ -360,88 +364,25 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     return result;
 }
 
-/*static void usb_uhci_write_port(uint16_t port, uint16_t data, bool clear) {
-    // Get current port status/control.
-    uint16_t status = inw(port);
-
-    if (!clear)
-        status |= data;
-
-    // Add data to port and pull out two changed bits.
-    status &= ~(USB_UHCI_PORT_STATUS_PRESENT_CHANGE | USB_UHCI_PORT_STATUS_ENABLE_CHANGE);
-
-    // Clear the changed bits if specified.
-    if (clear) {
-        status &= ~data;
-        status |= (USB_UHCI_PORT_STATUS_PRESENT_CHANGE | USB_UHCI_PORT_STATUS_ENABLE_CHANGE) & data;
-    }
-
-    // Write result to port.
-    outw(port, status);
-}*/
-
 static uint16_t usb_uhci_reset_port(usb_uhci_controller_t *controller, uint8_t port) {
     // Determine port register.
-    uint16_t portReg = USB_UHCI_PORTSC1(controller->BaseAddress) + (port * sizeof(uint16_t));
+    uint16_t portReg = USB_UHCI_PORTSC1(controller->BaseAddress) + ((port - 1) * sizeof(uint16_t));
 
     // Reset port and wait.
-   // uint16_t status = inw(portReg);
-  //  status &= USB_UHCI_PORTSC_MASK;
     outw(portReg, USB_UHCI_PORTSC_RESET);
     sleep(50);
 
-    // Clear reset bit.
-  //  status = ;
-  //  status &= USB_UHCI_PORTSC_MASK;
+    // Clear reset bit and wait for port to reset.
     outw(portReg, inw(portReg) & ~USB_UHCI_PORTSC_RESET);
-   // sleep(100);
+    while (inw(portReg) & USB_UHCI_PORTSC_RESET);
+    sleep(10);
 
-   while (inw(portReg) & USB_UHCI_PORTSC_RESET);
-   sleep(10);
+    // Enable port.
+    outw(portReg, USB_UHCI_PORTSC_PRESENT_CHANGE | USB_UHCI_PORTSC_ENABLE_CHANGE | USB_UHCI_PORTSC_ENABLED);
+    sleep(200);
 
-   // Enable port.
-   outw(portReg, USB_UHCI_PORTSC_PRESENT_CHANGE | USB_UHCI_PORTSC_ENABLE_CHANGE | USB_UHCI_PORTSC_ENABLED);
-   sleep(200);
-
-
+    // Return port status.
     return inw(portReg);
-
-    // Reset port.
-    //usb_uhci_write_port(portReg, USB_UHCI_PORT_STATUS_RESET, false);
-  //  sleep(58);
-  //  usb_uhci_write_port(portReg, USB_UHCI_PORT_STATUS_RESET, true);
-  //  sleep(1000);
-
-    // Wait for port to be connected and enabled.
-   /* for (uint16_t i = 0; i < 100; i++) {
-        // Get the current status of the port.
-        status = inw(portReg);
-
-        // Ensure a device is attached. If not, abort.
-        if (~status & USB_UHCI_PORTSC_PRESENT)
-            break;
-
-        // Clear any changed bits.
-        if (status & (USB_UHCI_PORTSC_PRESENT_CHANGE | USB_UHCI_PORTSC_ENABLE_CHANGE)) {
-            outw(portReg, status);
-            continue;
-        }
-
-        // If the port is enabled, we are done. Otherwise enable the port and check again.
-        if (status & USB_UHCI_PORTSC_ENABLED)
-            break;
-
-        // Get the current status of the port.
-        //status = inw(portReg);
-        status &= USB_UHCI_PORTSC_MASK;
-
-        // Enable port.
-        outw(portReg, status | USB_UHCI_PORTSC_ENABLED);
-        sleep(50);
-    }
-
-    // Return the status.
-    return status;*/
 }
 
 static void usb_uhci_reset_global(usb_uhci_controller_t *controller) {
@@ -512,8 +453,6 @@ void usb_callback() {
     pci_config_write_word(device, PCI_REG_STATUS, 0x8);
 }
 
-
-
 void usb_uhci_init(PciDevice *device) {
     kprintf("UHCI: Initializing...\n");
 
@@ -553,6 +492,7 @@ void usb_uhci_init(PciDevice *device) {
     kprintf("UHCI: Resetting controller...\n");
     if (!usb_uhci_reset(controller)) {
         kprintf("UHCI: Failed to reset controller! Aborting.\n");
+        kheap_free(controller);
         return;
     }
 
@@ -583,22 +523,21 @@ void usb_uhci_init(PciDevice *device) {
     for (uint16_t i = 0; i < USB_UHCI_FRAME_COUNT; i++)
         controller->FrameList[i] = (uint32_t)pmm_dma_get_phys((uintptr_t)queueHead) | USB_UHCI_FRAME_QUEUE_HEAD;
 
-    kprintf("current sof 0x%X\n", inb(USB_UHCI_SOFMOD(controller->BaseAddress)));
-    outb(USB_UHCI_SOFMOD(controller->BaseAddress), 0x40);
-
     // Set frame base address and frame number.
+    outb(USB_UHCI_SOFMOD(controller->BaseAddress), 0x40);
     outl(USB_UHCI_FRBASEADD(controller->BaseAddress), (uint32_t)pmm_dma_get_phys(controller->FrameList));
     outw(USB_UHCI_FRNUM(controller->BaseAddress), 0);
 
     // Set PIRQ.
     pci_config_write_word(device, USB_UHCI_PCI_REG_LEGACY, USB_UHCI_PCI_LEGACY_PIRQ);
 
-    // Set max packet size to 64 bytes.
+    // Start up controller and enable interrupts.
     kprintf("UHCI: Starting controller...\n");
     outw(USB_UHCI_USBCMD(controller->BaseAddress), USB_UHCI_STATUS_RUN | USB_UHCI_STATUS_CONFIGURE | USB_UHCI_STATUS_64_BYTE_PACKETS);
     outw(USB_UHCI_USBINTR(controller->BaseAddress), 0xF);
     irqs_install_handler(device->InterruptLine, usb_callback);
 
+    // Clear port status bits.
     for (uint16_t port = 0; port < 2; port++)
         outw(USB_UHCI_PORTSC1(controller->BaseAddress) + port * 2, USB_UHCI_PORTSC_PRESENT_CHANGE);
 
@@ -607,22 +546,18 @@ void usb_uhci_init(PciDevice *device) {
     sleep(20);
     outw(USB_UHCI_USBCMD(controller->BaseAddress), USB_UHCI_STATUS_RUN | USB_UHCI_STATUS_CONFIGURE | USB_UHCI_STATUS_64_BYTE_PACKETS);
     sleep(100);
-
-
-    // Start up controller.
-  //  usb_uhci_change_state(controller, true);
+    kprintf("UHCI: Controller started!\n");
 
     // Query root ports.
-    for (uint16_t port = 0; port < 2; port++) {
+    for (uint16_t port = 1; port <= 2; port++) {
         // Reset the port and get its status.
         uint16_t portStatus = usb_uhci_reset_port(controller, port);
-      //  sleep(100);
-        //portStatus = usb_uhci_reset_port(controller, port);
+        sleep(20);
         kprintf("UHCI: Port status for port %u: 0x%X\n", port, portStatus);
 
         // Is the port enabled?
         if (portStatus & USB_UHCI_PORTSC_ENABLED) {
-            kprintf("UHCI: Port %u is enabled, at %s speed!\n", port + 1, (portStatus & USB_UHCI_PORTSC_LOW_SPEED) ? "low" : "full");
+            kprintf("UHCI: Port %u is enabled, at %s speed!\n", port, (portStatus & USB_UHCI_PORTSC_LOW_SPEED) ? "low" : "full");
 
             // Create a USB device on the port.
             usb_device_t *usbDevice = usb_device_create();
@@ -640,12 +575,15 @@ void usb_uhci_init(PciDevice *device) {
                 usbDevice->MaxPacketSize = 8;
                 usbDevice->Address = 0;
 
-                usb_device_init(usbDevice);
-               // while(true);  
+                // Initialize device on port.
+                if (!usb_device_init(usbDevice)) {
+                    kprintf("UHCI: Failed to initialize USB device on port %u!\n", port);
+                    kheap_free(usbDevice);
+                }
             }
         }
         else {
-            kprintf("UHCI: Port %u is disabled!\n", port + 1);
+            kprintf("UHCI: Port %u is disabled!\n", port);
         }
     }
 }

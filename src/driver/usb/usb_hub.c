@@ -96,6 +96,7 @@ static void usb_hub_probe(usb_hub_t *usbHub) {
     for (uint8_t port = 1; port <= portCount; port++) {
         // Reset port.
         usb_hub_port_status_t status = usb_hub_reset_port(usbHub, port);
+        sleep(20);
 
         // If the port is enabled, intialize device on port.
         if (status.Enabled) {
