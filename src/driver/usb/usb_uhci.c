@@ -202,6 +202,9 @@ static bool usb_uhci_queue_head_process(usb_uhci_controller_t *controller, usb_u
             kprintf("UHCI: stall:\n");
             complete = true;
             outStatus = false;
+            kprintf("packet data\n");
+            kprintf("0x%X 0x%X 0x%X 0x%X\n", *t1, *t2, *t3, *t4);
+            kprintf("UHCI: packet type: 0x%X\n", transferDesc->PacketType);
         }
         if (transferDesc->DataBufferError)
             kprintf("UHCI: data buffer error\n");
@@ -213,16 +216,14 @@ static bool usb_uhci_queue_head_process(usb_uhci_controller_t *controller, usb_u
             kprintf("UHCI: crc error\n");
         if (transferDesc->BitstuffError)
             kprintf("UHCI: bitstuff\n");
-        
     }
 
 //if (transferDesc != NULL) {
-  //  kprintf("packet data\n");
-   // kprintf("0x%X 0x%X 0x%X 0x%X\n", *t1, *t2, *t3, *t4);}
+  //  }
 
    // kprintf("tick\n");
    // kprintf("next packet: 0x%X\n", transferDesc->LinkPointer);
-  //  kprintf("UHCI: packet type: 0x%X\n", transferDesc->PacketType);
+  //  
     //    kprintf("UHCI: packet pointer: 0x%X\n", transferDesc->BufferPointer);
       //  kprintf("current frame: %u\n", d);
        //         kprintf("status: 0x%X\n", s);

@@ -70,6 +70,94 @@ bool usb_device_get_string(usb_device_t *usbDevice, uint16_t langId, uint8_t ind
     return true;
 }
 
+static bool usb_device_print_interface(usb_device_t *usbDevice, uint16_t langId, usb_descriptor_interface_t *interfaceDesc) {
+    // Get string.
+    char *strInterface;
+    if (!usb_device_get_string(usbDevice, langId, interfaceDesc->InterfaceString, &strInterface)) {
+        return false;
+    }
+
+    // Print info.
+    kprintf("USB: Interface %u:\n", interfaceDesc->IntefaceNumber);
+    kprintf("USB:     Alternate setting: %u\n", interfaceDesc->AlternateSetting);
+    kprintf("USB:     Endpoints: %u\n", interfaceDesc->NumEndpoints);
+    kprintf("USB:     Class: 0x%X | Subclass: 0x%X | Protocol: 0x%X\n", interfaceDesc->InterfaceClass,
+        interfaceDesc->InterfaceSubclass, interfaceDesc->InterfaceProtocol);
+    kprintf("USB:     Interface string: %s\n", strInterface);
+
+    // Free string.
+    kheap_free(strInterface);
+    return true;
+}
+
+static void usb_device_print_endpoint(usb_descriptor_endpoint_t *endpointDesc) {
+    kprintf("USB: Endpoint %u:\n", endpointDesc->EndpointNumber);
+    if (endpointDesc->TransferType != USB_ENDPOINT_TRANSFERTYPE_CONTROL)
+        kprintf("USB:     Direction: %s\n", endpointDesc->Inbound ? "IN" : "OUT");
+
+    // Print transfer type.
+    char *transferType = "";
+    switch (endpointDesc->TransferType) {
+        case USB_ENDPOINT_TRANSFERTYPE_CONTROL:
+            transferType = "control";
+            break;
+        
+        case USB_ENDPOINT_TRANSFERTYPE_ISO:
+            transferType = "isochronous";
+            break;
+
+        case USB_ENDPOINT_TRANSFERTYPE_BULK:
+            transferType = "bulk";
+            break;
+
+        case USB_ENDPOINT_TRANSFERTYPE_INTERRUPT:
+            transferType = "interrupt";
+            break;
+    }
+    kprintf("USB:     Transfer type: %s\n", transferType);
+
+    // Print sync type.
+    char *syncType = "";
+    switch (endpointDesc->SyncType) {
+        case USB_ENDPOINT_SYNCTYPE_NONE:
+            syncType = "none";
+            break;
+
+        case USB_ENDPOINT_SYNCTYPE_ASYNC:
+            syncType = "asynchronous";
+            break;
+
+        case USB_ENDPOINT_SYNCTYPE_ADAPTIVE:
+            syncType = "adaptive";
+            break;
+
+        case USB_ENDPOINT_SYNCTYPE_SYNC:
+            syncType = "synchronous";
+            break;
+    }
+    kprintf("USB:     Synchronization type: %s\n", syncType);
+
+    // Print usage type.
+    char *usageType = "";
+    switch (endpointDesc->UsageType) {
+        case USB_ENDPOINT_USAGETYPE_DATA:
+            usageType = "data";
+            break;
+
+        case USB_ENDPOINT_USAGETYPE_FEEDBACK:
+            usageType = "feedback";
+            break;
+
+        case USB_ENDPOINT_USAGETYPE_IMPL_FEEDBACK:
+            usageType = "implicit feedback";
+            break;
+    }
+    kprintf("USB:     Usage type: %s\n", usageType);
+
+    // Print additional inof.
+    kprintf("USB:     Max packet size: %u bytes\n", endpointDesc->MaxPacketSize);
+}
+
 bool usb_device_init(usb_device_t *usbDevice) {
     // Create descriptor object.
     usb_descriptor_device_t deviceDesc = {};
@@ -160,91 +248,19 @@ bool usb_device_init(usb_device_t *usbDevice) {
         uint8_t type = currentConfBuffer[1];
 
         // Check type.
+        kprintf("USB: Got descriptor 0x%X, %u bytes in length\n", type, length);
         if (type == USB_DESCRIPTOR_TYPE_INTERFACE) {
-            // Get pointer to interface descriptor.
+            // Get pointer to interface descriptor and print info.
             usb_descriptor_interface_t *interfaceDesc = (usb_descriptor_interface_t*)currentConfBuffer;
-            char *strInterface;
-            if (!usb_device_get_string(usbDevice, langId, interfaceDesc->InterfaceString, &strInterface)) {
+            if (!usb_device_print_interface(usbDevice, langId, interfaceDesc)) {
                 kheap_free(confBuffer);
                 return false;
             }
-
-            kprintf("USB: Interface %u:\n", interfaceDesc->IntefaceNumber);
-            kprintf("USB:     Alternate setting: %u\n", interfaceDesc->AlternateSetting);
-            kprintf("USB:     Endpoints: %u\n", interfaceDesc->NumEndpoints);
-            kprintf("USB:     Class: 0x%X | Subclass: 0x%X | Protocol: 0x%X\n", interfaceDesc->InterfaceClass,
-                interfaceDesc->InterfaceSubclass, interfaceDesc->InterfaceProtocol);
-            kprintf("USB:     Interface string: %s\n", strInterface);
-            kheap_free(strInterface);
         }
         else if (type == USB_DESCRIPTOR_TYPE_ENDPOINT) {
-            // Get pointer to endpoint descriptor.
+            // Get pointer to endpoint descriptor and print info.
             usb_descriptor_endpoint_t *endpointDesc = (usb_descriptor_endpoint_t*)currentConfBuffer;
-            kprintf("USB: Endpoint %u:\n", endpointDesc->EndpointNumber);
-            if (endpointDesc->TransferType != USB_ENDPOINT_TRANSFERTYPE_CONTROL)
-                kprintf("USB:     Direction: %s\n", endpointDesc->Inbound ? "IN" : "OUT");
-
-            // Print transfer type.
-            char *transferType = "";
-            switch (endpointDesc->TransferType) {
-                case USB_ENDPOINT_TRANSFERTYPE_CONTROL:
-                    transferType = "control";
-                    break;
-                
-                case USB_ENDPOINT_TRANSFERTYPE_ISO:
-                    transferType = "isochronous";
-                    break;
-
-                case USB_ENDPOINT_TRANSFERTYPE_BULK:
-                    transferType = "bulk";
-                    break;
-
-                case USB_ENDPOINT_TRANSFERTYPE_INTERRUPT:
-                    transferType = "interrupt";
-                    break;
-            }
-            kprintf("USB:     Transfer type: %s\n", transferType);
-
-            // Print sync type.
-            char *syncType = "";
-            switch (endpointDesc->SyncType) {
-                case USB_ENDPOINT_SYNCTYPE_NONE:
-                    syncType = "none";
-                    break;
-
-                case USB_ENDPOINT_SYNCTYPE_ASYNC:
-                    syncType = "asynchronous";
-                    break;
-
-                case USB_ENDPOINT_SYNCTYPE_ADAPTIVE:
-                    syncType = "adaptive";
-                    break;
-
-                case USB_ENDPOINT_SYNCTYPE_SYNC:
-                    syncType = "synchronous";
-                    break;
-            }
-            kprintf("USB:     Synchronization type: %s\n", syncType);
-
-            // Print usage type.
-            char *usageType = "";
-            switch (endpointDesc->UsageType) {
-                case USB_ENDPOINT_USAGETYPE_DATA:
-                    usageType = "data";
-                    break;
-
-                case USB_ENDPOINT_USAGETYPE_FEEDBACK:
-                    usageType = "feedback";
-                    break;
-
-                case USB_ENDPOINT_USAGETYPE_IMPL_FEEDBACK:
-                    usageType = "implicit feedback";
-                    break;
-            }
-            kprintf("USB:     Usage type: %s\n", usageType);
-
-            // Print additional inof.
-            kprintf("USB:     Max packet size: %u bytes\n", endpointDesc->MaxPacketSize);
+            usb_device_print_endpoint(endpointDesc);
         }
         else {
             kprintf("USB: Ignoring other descriptor 0x%X\n", type);
@@ -254,5 +270,51 @@ bool usb_device_init(usb_device_t *usbDevice) {
         currentConfBuffer += length;
     }
 
+    // Save configuration value for later use.
+    usbDevice->ConfigurationValue = confDesc.ConfigurationValue;
+    usbDevice->Configured = false;
+
+    // Search configuration data for interfaces, and load drivers.
+    currentConfBuffer = confBuffer + sizeof(usb_descriptor_configuration_t);
+    endConfBuffer = confBuffer + confDesc.TotalLength;
+    while (currentConfBuffer < endConfBuffer) {
+        // Get length and type.
+        uint8_t length = currentConfBuffer[0];
+        uint8_t type = currentConfBuffer[1];
+
+        // Make sure we have an interface descriptor.
+        if (type == USB_DESCRIPTOR_TYPE_INTERFACE) {
+            // Get pointer to interface descriptor.
+            usb_descriptor_interface_t *interfaceDesc = (usb_descriptor_interface_t*)currentConfBuffer;
+            
+            if (interfaceDesc->InterfaceClass == USB_CLASS_HUB && interfaceDesc->InterfaceSubclass == 0x00) {
+                usb_hub_init(usbDevice, interfaceDesc);
+            }
+        }
+
+        // Move to next descriptor.
+        currentConfBuffer += length;
+    }
+
     return true;
+}
+
+bool usb_device_configure(usb_device_t *usbDevice) {
+    // Set configuration.
+    kprintf("USB: Setting configuration on device %u to %u...\n", usbDevice->Address, usbDevice->ConfigurationValue);
+    if (!usbDevice->ControlTransfer(usbDevice, 0, false, USB_REQUEST_TYPE_STANDARD,
+        USB_REQUEST_REC_DEVICE, USB_REQUEST_SET_CONFIG, usbDevice->ConfigurationValue, 0, 0, NULL, 0))
+        return false;
+    
+    // Get configuration.
+    uint8_t newConfigurationValue = 0;
+    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
+        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_CONFIG, 0, 0, 0, &newConfigurationValue, sizeof(newConfigurationValue)))
+        return false;
+
+    // Ensure current config value matches desired value.
+    bool result = usbDevice->ConfigurationValue == newConfigurationValue;
+    if (result)
+        kprintf("USB: Device %u configured!\n", usbDevice->Address);
+    return result;
 }

@@ -31,12 +31,6 @@
 #define USB_REQUEST_FEAT_ENDPOINT_HALT          0
 #define USB_REQUEST_FEAT_TEST_MODE              2
 
-// Hub USB requests.
-#define USB_REQUEST_HUB_CLEAR_TT_BUFFER 8
-#define USB_REQUEST_HUB_RESET_TT        9
-#define USB_REQUEST_HUB_GET_TT_STATE    10
-#define USB_REQUEST_STOP_TT             11
-
 // USB request structure.
 typedef struct {
     // Characteristics of request.

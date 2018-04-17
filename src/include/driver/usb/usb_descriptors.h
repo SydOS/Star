@@ -3,14 +3,15 @@
 
 #include <main.h>
 
-#define USB_DESCRIPTOR_TYPE_DEVICE              1
-#define USB_DESCRIPTOR_TYPE_CONFIGURATION       2
-#define USB_DESCRIPTOR_TYPE_STRING              3
-#define USB_DESCRIPTOR_TYPE_INTERFACE           4
-#define USB_DESCRIPTOR_TYPE_ENDPOINT            5
-#define USB_DESCRIPTOR_TYPE_DEVICE_QUALIFIER    6
-#define USB_DESCRIPTOR_TYPE_OTHER_SPEED_CONF    7
-#define USB_DESCRIPTOR_TYPE_INTERFACE_POWER     8
+#define USB_DESCRIPTOR_TYPE_DEVICE              0x01
+#define USB_DESCRIPTOR_TYPE_CONFIGURATION       0x02
+#define USB_DESCRIPTOR_TYPE_STRING              0x03
+#define USB_DESCRIPTOR_TYPE_INTERFACE           0x04
+#define USB_DESCRIPTOR_TYPE_ENDPOINT            0x05
+#define USB_DESCRIPTOR_TYPE_DEVICE_QUALIFIER    0x06
+#define USB_DESCRIPTOR_TYPE_OTHER_SPEED_CONF    0x07
+#define USB_DESCRIPTOR_TYPE_INTERFACE_POWER     0x08
+#define USB_DESCRIPTOR_TYPE_HUB                 0x29
 
 // Max power field expressed in 2mA units.
 #define USB_MAX_POWER_UNITS                     2
@@ -204,34 +205,5 @@ typedef struct {
     // String.
     uint16_t String[];
 } __attribute__((packed)) usb_descriptor_string_t;
-
-// USB hub descriptor.
-typedef struct {
-    // Size of this descriptor in bytes.
-    uint8_t Length;
-
-    // Descriptor type.
-    uint8_t Type;
-
-    // Number of downstream ports.
-    uint8_t NumPorts;
-
-    // Characteristics.
-    uint8_t PowerSwitchingMode : 2;
-    bool CompoundDevice : 1;
-    uint8_t OvercurrentMode : 2;
-    uint8_t TtThinkTime : 2;
-    bool PortIndicatorsSupported : 1;
-    uint8_t Reserved1 : 8;
-
-    // Time (in 2 ms intervals) from the time the power-on sequence
-    // begins on a port until power is good on that port.
-    uint8_t PowerOnToPowerGood;
-
-    // Maximum current requirements of the Hub Controller electronics in mA.
-    uint8_t HubControllerCurrent;
-
-    // Removable bitmap and power control masks are variable.
-} __attribute__((packed)) usb_descriptor_hub_t;
 
 #endif
