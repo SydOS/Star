@@ -1,6 +1,5 @@
 #include <main.h>
 #include <tools.h>
-#include <io.h>
 #include <kprint.h>
 #include <string.h>
 #include <driver/usb/usb_hub.h>
@@ -136,9 +135,13 @@ bool usb_hub_init(usb_device_t *usbDevice, usb_descriptor_interface_t *interface
     if (interfaceDesc->InterfaceClass != USB_CLASS_HUB)
         return false;
 
-    kprintf("USB HUB: Initializing device %u...\n", usbDevice->Address);
+    // Get status endpoint.
+    usb_descriptor_endpoint_t *statusEndpoint = (usb_descriptor_endpoint_t*)((uint8_t*)interfaceDesc + interfaceDesc->Length);
+    if (statusEndpoint->Type != USB_DESCRIPTOR_TYPE_ENDPOINT || !statusEndpoint->Inbound || statusEndpoint->TransferType != USB_ENDPOINT_TRANSFERTYPE_INTERRUPT)
+        return false;
 
     // Configure device if needed.
+    kprintf("USB HUB: Initializing device %u...\n", usbDevice->Address);
     if (!usbDevice->Configured) {
         if (!usb_device_configure(usbDevice))
             return false;
@@ -153,14 +156,18 @@ bool usb_hub_init(usb_device_t *usbDevice, usb_descriptor_interface_t *interface
 
     // Get the hub descriptor.
     usb_descriptor_hub_t *hubDesc = (usb_descriptor_hub_t*)kheap_alloc(hubDescLength);
+    memset(hubDesc, 0, hubDescLength);
     if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_CLASS,
         USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_HUB, 0, hubDesc, hubDescLength))
         return false;
 
     // Create USB hub object.
     usb_hub_t *usbHub = (usb_hub_t*)kheap_alloc(sizeof(usb_hub_t));
+    memset(usbHub, 0, sizeof(usb_hub_t));
     usbHub->Device = usbDevice;
     usbHub->Descriptor = hubDesc;
+    usbHub->StatusEndpointAddress = statusEndpoint->EndpointNumber;
+    usbHub->StatusEndpointMaxPacketSize = statusEndpoint->MaxPacketSize;
 
     // Print info.
     usb_hub_print_desc(usbHub->Descriptor);

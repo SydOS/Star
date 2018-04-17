@@ -2,6 +2,7 @@
 #define USB_HUB_H
 
 #include <main.h>
+#include <driver/usb/usb_descriptors.h>
 #include <driver/usb/usb_device.h>
 
 #define USB_HUB_POWERSW_GANGED      0x0
@@ -76,7 +77,10 @@ typedef struct {
     usb_device_t *Device;
     usb_descriptor_hub_t *Descriptor;
 
-
+    uint8_t StatusEndpointAddress;
+    uint8_t StatusEndpointMaxPacketSize;
 } usb_hub_t;
+
+extern bool usb_hub_init(usb_device_t *usbDevice, usb_descriptor_interface_t *interfaceDesc);
 
 #endif

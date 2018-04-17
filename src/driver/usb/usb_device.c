@@ -182,7 +182,8 @@ bool usb_device_init(usb_device_t *usbDevice) {
 
     // Get strings.
     uint16_t langId = 0;
-    usb_device_get_first_lang(usbDevice, &langId);
+    if (!(usb_device_get_first_lang(usbDevice, &langId)))
+        kprintf("USB: Strings are not supported by this device.\n");
 
     char *strVendor;
     char *strProduct;

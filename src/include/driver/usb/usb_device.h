@@ -61,5 +61,6 @@ typedef struct usb_device_t {
 
 extern usb_device_t *usb_device_create();
 extern bool usb_device_init(usb_device_t *device);
+extern bool usb_device_configure(usb_device_t *usbDevice);
 
 #endif
