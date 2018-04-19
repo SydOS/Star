@@ -50,6 +50,7 @@ typedef struct {
 typedef struct usb_device_t {
     // Relationship to other USB devices.
     struct usb_device_t *Parent;
+    struct usb_device_t *Children;
     struct usb_device_t *Next;
 
     // Pointer to controller that device is on.
@@ -93,7 +94,7 @@ typedef struct usb_device_t {
 
 extern usb_device_t *StartUsbDevice;
 //extern usb_device_t *usb_device_create();
-extern bool usb_device_init(usb_device_t *device);
+extern void usb_device_destroy(usb_device_t *usbDevice);
 extern bool usb_device_configure(usb_device_t *usbDevice);
 
 #endif

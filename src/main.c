@@ -103,6 +103,27 @@ void hmmm_thread(void) {
 	 }
 }
 
+static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
+	// If there are no children, just return.
+	if (usbDevice->Children == NULL)
+		return;
+
+	usb_device_t *childDevice = usbDevice->Children;
+	while (childDevice != NULL) {
+		kprintf(" ");
+		for (uint8_t i = 0; i < level; i++)
+			kprintf("-");
+		kprintf(" ");
+		kprintf("%4X:%4X %s %s\n", childDevice->VendorId, childDevice->ProductId, childDevice->VendorString, childDevice->ProductString);
+		
+		// Iterate through children.
+		print_usb_children(childDevice, level + 1);
+
+		// Move to next device.
+		childDevice = childDevice->Next;
+	}
+}
+
 void kernel_late() {
 	kprintf("Adding second task...\n");
 	tasking_add_process(tasking_create_process("hmmm", (uintptr_t)hmmm_thread, 0, 0));
@@ -258,6 +279,11 @@ void kernel_late() {
 			usb_device_t *usbDevice = StartUsbDevice;
 			while (usbDevice != NULL) {
 				kprintf("%4X:%4X %s %s\n", usbDevice->VendorId, usbDevice->ProductId, usbDevice->VendorString, usbDevice->ProductString);
+				
+				// Iterate through children.
+				print_usb_children(usbDevice, 1);
+
+				// Move to next device.
 				usbDevice = usbDevice->Next;
 			}
 		}

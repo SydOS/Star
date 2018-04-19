@@ -94,32 +94,45 @@ static void usb_hub_probe(usb_hub_t *usbHub) {
 
     // Reset ports and enumerate devices on those ports.
     for (uint8_t port = 1; port <= portCount; port++) {
-        // Reset port.
-        usb_hub_port_status_t status = usb_hub_reset_port(usbHub, port);
-        sleep(20);
+        for (uint8_t i = 0; i < 5; i++) {
+            // Reset port.
+            usb_hub_port_status_t status = usb_hub_reset_port(usbHub, port);
+            sleep(20);
 
-        // If the port is enabled, intialize device on port.
-        if (status.Enabled) {
-            // Determine speed.
-            uint8_t speed = USB_SPEED_FULL;
-            if (status.LowSpeed)
-                speed = USB_SPEED_LOW;
-            else if (status.HighSpeed)
-                speed = USB_SPEED_HIGH;
+            // If the port is enabled, intialize device on port.
+            if (status.Enabled) {
+                // Determine speed.lsus
+                uint8_t speed = USB_SPEED_FULL;
+                if (status.LowSpeed)
+                    speed = USB_SPEED_LOW;
+                else if (status.HighSpeed)
+                    speed = USB_SPEED_HIGH;
 
-            // Initialize device.
-            kprintf("USB HUB: Initializing new device on hub %u...\n", usbHub->Device->Address);
-            usb_device_t *usbDevice = usb_device_create(usbHub->Device, port, speed);
-            if (usbDevice != NULL) {
-                if (StartUsbDevice != NULL) {
-                    usb_device_t *lastDevice = StartUsbDevice;
+                // Initialize device.
+                kprintf("USB HUB: Initializing new device on hub %u...\n", usbHub->Device->Address);
+                usb_device_t *usbDevice = usb_device_create(usbHub->Device, port, speed);
+
+                // If device is null, reset port and try again.
+                if (usbDevice == NULL) {
+                    kprintf("USB HUB: Failed! Retrying...\n");
+                    sleep(500);
+                    continue;
+                }
+
+                // Add as our child.
+                if (usbHub->Device->Children != NULL) {
+                    usb_device_t *lastDevice = usbHub->Device->Children;
                     while (lastDevice->Next != NULL)
                         lastDevice = lastDevice->Next;
                     lastDevice->Next = usbDevice;
                 }
-                else
-                    StartUsbDevice = usbDevice;
+                else {
+                    usbHub->Device->Children = usbDevice;
+                }
             }
+
+            // We are done, move to next port.
+            break;
         }
     }
 }

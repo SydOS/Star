@@ -575,7 +575,7 @@ void usb_uhci_init(PciDevice *device) {
     controller->RootDevice->Protocol = 0;
     controller->RootDevice->VendorString = "SydOS";
     controller->RootDevice->ProductString = "UHCI Root Hub";
-    controller->RootDevice->SerialNumber = "00";
+    controller->RootDevice->SerialNumber = USB_SERIAL_GENERIC;
 
     controller->RootDevice->NumConfigurations = 0;
     controller->RootDevice->CurrentConfigurationValue = 0;
@@ -601,14 +601,16 @@ void usb_uhci_init(PciDevice *device) {
             kprintf("UHCI: Port %u is enabled, at %s speed!\n", port, (portStatus & USB_UHCI_PORTSC_LOW_SPEED) ? "low" : "full");
             usb_device_t *usbDevice = usb_device_create(controller->RootDevice, port, (portStatus & USB_UHCI_PORTSC_LOW_SPEED) ? USB_SPEED_LOW : USB_SPEED_FULL);
             if (usbDevice != NULL) {
-                if (StartUsbDevice != NULL) {
-                    usb_device_t *lastDevice = StartUsbDevice;
+                // Add as our child.
+                if (controller->RootDevice->Children != NULL) {
+                    usb_device_t *lastDevice = controller->RootDevice->Children;
                     while (lastDevice->Next != NULL)
                         lastDevice = lastDevice->Next;
                     lastDevice->Next = usbDevice;
                 }
-                else
-                    StartUsbDevice = usbDevice;
+                else {
+                    controller->RootDevice->Children = usbDevice;
+                }
             }
         }
         else {
