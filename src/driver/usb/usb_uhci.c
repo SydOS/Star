@@ -325,9 +325,8 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
             toggle = !toggle;
 
             // Determine size of packet, and cut it down if above max size.
-            uint8_t packetSize = endPtr - packetPtr;
-            if (packetSize > maxPacketSize)
-                packetSize = maxPacketSize;
+            uint16_t remainingData = endPtr - packetPtr;
+            uint8_t packetSize = remainingData > maxPacketSize ? maxPacketSize : remainingData;
             
             // Create packet.
             transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, 0, toggle, packetPtr, packetSize);
@@ -548,6 +547,48 @@ void usb_uhci_init(PciDevice *device) {
     sleep(100);
     kprintf("UHCI: Controller started!\n");
 
+    // Create root USB device.
+    controller->RootDevice = (usb_device_t*)kheap_alloc(sizeof(usb_device_t));
+    memset(controller->RootDevice, 0, sizeof(usb_device_t));
+    if (controller->RootDevice == NULL) {
+        kprintf("UHCI: Failed to create root device!\n");
+        kheap_free(controller);
+        return;
+    }
+
+    // No parent means it is on the root hub.
+    controller->RootDevice->Parent = NULL;
+    controller->RootDevice->Controller = controller;
+    controller->RootDevice->AllocAddress = usb_uhci_address_alloc;
+    controller->RootDevice->FreeAddress = usb_uhci_address_free;
+    controller->RootDevice->ControlTransfer = usb_uhci_device_control;
+
+    // These fields are mostly meaningless as this is the root hub.
+    controller->RootDevice->Port = 0;
+    controller->RootDevice->Speed = USB_SPEED_FULL;
+    controller->RootDevice->MaxPacketSize = 0;
+    controller->RootDevice->Address = 255;
+    controller->RootDevice->VendorId = device->VendorId;
+    controller->RootDevice->ProductId = device->DeviceId;
+    controller->RootDevice->Class = USB_CLASS_HUB;
+    controller->RootDevice->Subclass = 0;
+    controller->RootDevice->Protocol = 0;
+    controller->RootDevice->VendorString = "SydOS";
+    controller->RootDevice->ProductString = "UHCI Root Hub";
+    controller->RootDevice->SerialNumber = "00";
+
+    controller->RootDevice->NumConfigurations = 0;
+    controller->RootDevice->CurrentConfigurationValue = 0;
+    controller->RootDevice->Configured = true;
+    if (StartUsbDevice != NULL) {
+        usb_device_t *lastDevice = StartUsbDevice;
+        while (lastDevice->Next != NULL)
+            lastDevice = lastDevice->Next;
+        lastDevice->Next = controller->RootDevice;
+    }
+    else
+        StartUsbDevice = controller->RootDevice;
+
     // Query root ports.
     for (uint16_t port = 1; port <= 2; port++) {
         // Reset the port and get its status.
@@ -558,28 +599,16 @@ void usb_uhci_init(PciDevice *device) {
         // Is the port enabled?
         if (portStatus & USB_UHCI_PORTSC_ENABLED) {
             kprintf("UHCI: Port %u is enabled, at %s speed!\n", port, (portStatus & USB_UHCI_PORTSC_LOW_SPEED) ? "low" : "full");
-
-            // Create a USB device on the port.
-            usb_device_t *usbDevice = usb_device_create();
+            usb_device_t *usbDevice = usb_device_create(controller->RootDevice, port, (portStatus & USB_UHCI_PORTSC_LOW_SPEED) ? USB_SPEED_LOW : USB_SPEED_FULL);
             if (usbDevice != NULL) {
-                // No parent means it is on the root hub.
-                usbDevice->Parent = NULL;
-                usbDevice->Controller = controller;
-                usbDevice->AllocAddress = usb_uhci_address_alloc;
-                usbDevice->FreeAddress = usb_uhci_address_free;
-                usbDevice->ControlTransfer = usb_uhci_device_control;
-
-                // Set port and speed.
-                usbDevice->Port = port;
-                usbDevice->Speed = ((portStatus & USB_UHCI_PORTSC_LOW_SPEED) == 0) ? USB_SPEED_FULL : USB_SPEED_LOW;
-                usbDevice->MaxPacketSize = 8;
-                usbDevice->Address = 0;
-
-                // Initialize device on port.
-                if (!usb_device_init(usbDevice)) {
-                    kprintf("UHCI: Failed to initialize USB device on port %u!\n", port);
-                    kheap_free(usbDevice);
+                if (StartUsbDevice != NULL) {
+                    usb_device_t *lastDevice = StartUsbDevice;
+                    while (lastDevice->Next != NULL)
+                        lastDevice = lastDevice->Next;
+                    lastDevice->Next = usbDevice;
                 }
+                else
+                    StartUsbDevice = usbDevice;
             }
         }
         else {

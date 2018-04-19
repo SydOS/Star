@@ -158,6 +158,8 @@ typedef struct {
     usb_uhci_queue_head_t *QueueHead;
 
     bool AddressPool[USB_MAX_DEVICES];
+
+    usb_device_t *RootDevice;
 } usb_uhci_controller_t;
 
 #endif

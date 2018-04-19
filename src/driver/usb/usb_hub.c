@@ -107,25 +107,18 @@ static void usb_hub_probe(usb_hub_t *usbHub) {
             else if (status.HighSpeed)
                 speed = USB_SPEED_HIGH;
 
-            // Create and intialize device.
-            usb_device_t *usbDevice = usb_device_create();
+            // Initialize device.
+            kprintf("USB HUB: Initializing new device on hub %u...\n", usbHub->Device->Address);
+            usb_device_t *usbDevice = usb_device_create(usbHub->Device, port, speed);
             if (usbDevice != NULL) {
-                 // This device is the parent.
-                usbDevice->Parent = usbHub->Device;
-                usbDevice->Controller = usbHub->Device->Controller;
-                usbDevice->AllocAddress = usbHub->Device->AllocAddress;
-                usbDevice->FreeAddress = usbHub->Device->FreeAddress;
-                usbDevice->ControlTransfer = usbHub->Device->ControlTransfer;
-
-                // Set port and speed.
-                usbDevice->Port = port;
-                usbDevice->Speed = speed;
-                usbDevice->MaxPacketSize = 8;
-                usbDevice->Address = 0;
-
-                // Initialize device.
-                kprintf("USB HUB: Initializing new device on hub %u...\n", usbHub->Device->Address);
-                usb_device_init(usbDevice);
+                if (StartUsbDevice != NULL) {
+                    usb_device_t *lastDevice = StartUsbDevice;
+                    while (lastDevice->Next != NULL)
+                        lastDevice = lastDevice->Next;
+                    lastDevice->Next = usbDevice;
+                }
+                else
+                    StartUsbDevice = usbDevice;
             }
         }
     }

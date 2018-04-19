@@ -34,6 +34,19 @@
 #define USB_CLASS_APP_SPECIFIC      0xFE
 #define USB_CLASS_VEN_SPECIFIC      0xFF
 
+#define USB_VENDOR_GENERIC          "Generic"
+#define USB_PRODUCT_GENERIC         "USB device"
+#define USB_HUB_GENERIC             "USB hub"
+#define USB_SERIAL_GENERIC          ""
+
+typedef struct {
+    uint8_t Number;
+
+    uint8_t Class;
+    uint8_t Subclass;
+    uint8_t Protocol;
+} usb_function_t;
+
 typedef struct usb_device_t {
     // Relationship to other USB devices.
     struct usb_device_t *Parent;
@@ -47,7 +60,7 @@ typedef struct usb_device_t {
     bool (*ControlTransfer)(struct usb_device_t* device, uint8_t endpoint, bool inbound, uint8_t type,
         uint8_t recipient, uint8_t requestType, uint8_t valueLo, uint8_t valueHi, uint16_t index, void *buffer, uint16_t length);
 
-    // Port device is on.
+    // Port, speed, and address.
     uint8_t Port;
     uint8_t Speed;
     uint8_t Address;
@@ -55,11 +68,31 @@ typedef struct usb_device_t {
     // Maximum packet size for endpoint zero (only 8, 16, 32, or 64 are valid).
     uint8_t MaxPacketSize;
 
+    // ID info.
+    uint16_t VendorId;
+    uint16_t ProductId;
+
+    uint8_t Class;
+    uint8_t Subclass;
+    uint8_t Protocol;
+
+    // Strings.
+    char *VendorString;
+    char *ProductString;
+    char *SerialNumber;
+
+    // Configuration info.
     bool Configured;
-    uint8_t ConfigurationValue;
+    uint8_t CurrentConfigurationValue;
+    uint8_t NumConfigurations;
+
+    // Functions.
+    uint8_t NumFunctions;
+    usb_function_t *Functions;
 } usb_device_t;
 
-extern usb_device_t *usb_device_create();
+extern usb_device_t *StartUsbDevice;
+//extern usb_device_t *usb_device_create();
 extern bool usb_device_init(usb_device_t *device);
 extern bool usb_device_configure(usb_device_t *usbDevice);
 

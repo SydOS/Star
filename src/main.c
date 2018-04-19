@@ -22,6 +22,8 @@
 #include <driver/ps2/keyboard.h>
 #include <driver/rtc.h>
 
+#include <driver/usb/usb_device.h>
+
 #include <acpi.h>
 
 // Displays a kernel panic message and halts the system.
@@ -252,7 +254,13 @@ void kernel_late() {
 			kprintf("Beeping at %u hertz for %u ms...\n", hz, ms);
 			speaker_play_tone(hz, ms);
 		}
-
+		else if (strcmp(buffer, "lsusb") == 0) {
+			usb_device_t *usbDevice = StartUsbDevice;
+			while (usbDevice != NULL) {
+				kprintf("%4X:%4X %s %s\n", usbDevice->VendorId, usbDevice->ProductId, usbDevice->VendorString, usbDevice->ProductString);
+				usbDevice = usbDevice->Next;
+			}
+		}
 
 
 		/*char c = serial_read();

@@ -112,27 +112,26 @@ void kprint_uint(uint64_t num)
 }
 
 // Print unsigned int as hexadecimal.
-void kprint_hex(uint64_t num, bool capital, bool pad)
-{
-    // If zero, just print zero.
-    if (num == 0)
-    {
-        kputchar('0');
-        return;
-    }
-
+void kprint_hex(uint64_t num, bool capital, uint8_t width) {
     bool first = true;
+    for (int8_t i = sizeof(num) - 1; i >= 0; i--) {
+        // Get byte.
+        const uint8_t byte = (num >> (8 * i)) & 0xFF;
 
-    for (int32_t i = sizeof(num) - 1; i >= 0; i--)
-    {
-        const uint8_t byte =(num >> (8 * i)) & 0xFF;
-
-        if (first && byte == 0)
+        // Are we wanting to ouput a certain width?
+        if (width && (i * 2) >= width) {
             continue;
+        }
+        else if (width == 0) { // No width specified
+            // If we have yet to hit the first non-zero byte, just continue to the next one.
+            if (first && byte == 0 && i > 0)
+                continue;
+        }
 
         // Print hex byte.
-        kputchar_hex(byte, capital, !first ? true : pad);
+        kputchar_hex(byte, capital, !first ? true : width > 0);
         first = false;
+        width -= 2;
     }
 }
 
@@ -181,22 +180,30 @@ void kprintf_va(const char* format, va_list args) {
             if (f == '-')
                 f = *format++;
 
+            // Ignore 0.
+            if (f == '0')
+                f = *format++;
+
             // Check width.
             size_t width = 0;
-            if (f >= '0' && f <= '9') {
-                //width += f - '0';
-                f = *format++;
-            }
-
-            // Ignore justify for now.
-            if (f == '.')
-                f = *format++;
-
-            // Check width.
+            size_t precision = 0;
             if (f >= '0' && f <= '9') {
                 width += f - '0';
                 f = *format++;
             }
+
+            // Ignore justify for now.
+            if (f == '.') {
+                f = *format++;
+
+                // Check width.
+                if (f >= '0' && f <= '9') {
+                    precision += f - '0';
+                    f = *format++;
+                }
+            }
+
+
 
             // Do we have a long long?
             if (f == 'l' && *format++ == 'l')
@@ -232,12 +239,12 @@ void kprintf_va(const char* format, va_list args) {
                     
                     // Print hexadecimal.
                     case 'x':
-                        kprint_hex((uint64_t)va_arg(args, uint64_t), false, false);
+                        kprint_hex((uint64_t)va_arg(args, uint64_t), false, width);
                         break;
 
                     // Print hexadecimal (uppercase).
                     case 'X':
-                        kprint_hex((uint64_t)va_arg(args, uint64_t), true, false);
+                        kprint_hex((uint64_t)va_arg(args, uint64_t), true, width);
                         break;
 
                     // Print string.
@@ -284,12 +291,12 @@ void kprintf_va(const char* format, va_list args) {
                     
                     // Print hexadecimal.
                     case 'x':
-                        kprint_hex((uint32_t)va_arg(args, uint32_t), false, false);
+                        kprint_hex((uint32_t)va_arg(args, uint32_t), false, width);
                         break;
 
                     // Print hexadecimal (uppercase).
                     case 'X':
-                        kprint_hex((uint32_t)va_arg(args, uint32_t), true, false);
+                        kprint_hex((uint32_t)va_arg(args, uint32_t), true, width);
                         break;
 
                     // Print pointer as hex.
