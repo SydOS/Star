@@ -138,6 +138,11 @@ typedef struct {
     uint8_t pad[11]; // 11 bytes.
 } __attribute__((packed)) usb_uhci_queue_head_t;
 
+typedef struct {
+    usb_uhci_queue_head_t *QueueHead;
+    usb_uhci_transfer_desc_t *TransferDesc;
+} usb_uhci_transfer_info_t;
+
 #define USB_UHCI_TD_POOL_COUNT          USB_UHCI_TD_POOL_SIZE / sizeof(usb_uhci_transfer_desc_t)
 #define USB_UHCI_QH_POOL_COUNT          USB_UHCI_QH_POOL_SIZE / sizeof(usb_uhci_queue_head_t)
 

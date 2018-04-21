@@ -148,7 +148,7 @@ bool usb_hub_init(usb_device_t *usbDevice, usb_descriptor_interface_t *interface
         return false;
 
     // Configure device if needed.
-    kprintf("USB HUB: Initializing device %u...\n", usbDevice->Address);
+    kprintf("USB HUB: Initializing hub %u...\n", usbDevice->Address);
     if (!usbDevice->Configured) {
         if (!usb_device_configure(usbDevice))
             return false;

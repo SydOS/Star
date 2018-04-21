@@ -394,6 +394,9 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
             if (interfaceDesc->InterfaceClass == USB_CLASS_HUB && interfaceDesc->InterfaceSubclass == 0x00) {
                 usb_hub_init(usbDevice, interfaceDesc);
             }
+            else if (interfaceDesc->InterfaceClass == USB_CLASS_HID) {
+                usb_keyboard_init(usbDevice, interfaceDesc);
+            }
         }
 
         // Move to next descriptor.

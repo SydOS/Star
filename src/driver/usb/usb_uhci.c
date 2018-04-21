@@ -286,8 +286,6 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     void *usbBuffer = NULL;
 
     // Get device attributes.
-    bool lowSpeed = device->Speed == USB_SPEED_LOW;
-    uint8_t address = device->Address;
     uint8_t maxPacketSize = device->MaxPacketSize;
 
     // Create USB request.
@@ -363,6 +361,69 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     return result;
 }
 
+void usb_uhci_device_interrupt_in_start(usb_device_t *device, usb_endpoint_t *endpoint, uint16_t length) {
+    // Get the UHCI controller.
+    usb_uhci_controller_t *controller = (usb_uhci_controller_t*)device->Controller;
+
+    // Temporary buffer.
+    void *usbBuffer = usb_uhci_alloc(controller, length);
+
+    // Create transfer descriptor.
+    usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_alloc(controller, device, NULL, USB_UHCI_TD_PACKET_IN, endpoint->Number, false, usbBuffer, length);
+
+    // Create queue head that starts with transfer descriptor.
+    usb_uhci_queue_head_t *queueHead = usb_uhci_queue_head_alloc(controller);
+    queueHead->Head = USB_UHCI_FRAME_TERMINATE;
+    queueHead->TransferDescHead = (uint32_t)pmm_dma_get_phys((uintptr_t)transferDesc);
+    queueHead->Element = (uint32_t)pmm_dma_get_phys((uintptr_t)transferDesc);
+
+    // Store info in endpoint.
+    usb_uhci_transfer_info_t *transferInfo = (usb_uhci_transfer_info_t*)kheap_alloc(sizeof(usb_uhci_transfer_info_t));
+    transferInfo->QueueHead = queueHead;
+    transferInfo->TransferDesc = transferDesc;
+    endpoint->TransferInfo = (void*)transferInfo;
+
+    for (uint16_t i = 0; i < USB_UHCI_FRAME_COUNT; i += 10) {
+        // If the queue head is the main one, replace with a new one.
+        if (pmm_dma_get_virtual(controller->FrameList[i] & ~0xF) == (uintptr_t)controller->QueueHead) {
+            controller->FrameList[i] = (uint32_t)pmm_dma_get_phys((uintptr_t)queueHead) | USB_UHCI_FRAME_QUEUE_HEAD;
+        }
+        else {
+            // ¯\_(ツ)_/¯. Replace whoever is living here for now.
+            controller->FrameList[i] = (uint32_t)pmm_dma_get_phys((uintptr_t)queueHead) | USB_UHCI_FRAME_QUEUE_HEAD;
+        }
+    }
+
+  //  bool result = usb_uhci_queue_head_wait(controller, queueHead);
+
+    // Add queue head to schedule and wait for completion.
+   // usb_uhci_queue_head_add(controller, queueHead);
+
+    //return result;
+}
+
+bool usb_uhci_device_interrupt_in_poll(usb_device_t *device, usb_endpoint_t *endpoint, void *outBuffer, uint16_t length) {
+    // Get transfer descriptor.
+    usb_uhci_transfer_info_t *transferInfo = (usb_uhci_transfer_info_t*)endpoint->TransferInfo;
+
+    // Is it complete?
+    if (transferInfo->TransferDesc->Active)
+        return false;
+
+    // Copy data.
+    void *usbBuffer = (void*)pmm_dma_get_virtual(transferInfo->TransferDesc->BufferPointer);
+    memcpy(outBuffer, usbBuffer, length);
+
+    // Flip toggle bit and reset TD.
+    transferInfo->TransferDesc->DataToggle = !transferInfo->TransferDesc->DataToggle;
+    transferInfo->TransferDesc->ActualLength = 0;
+
+    // Reset element
+    transferInfo->QueueHead->Element = (uint32_t)pmm_dma_get_phys((uintptr_t)transferInfo->TransferDesc);
+    transferInfo->TransferDesc->Active = true;
+    return true;
+}
+
 static uint16_t usb_uhci_reset_port(usb_uhci_controller_t *controller, uint8_t port) {
     // Determine port register.
     uint16_t portReg = USB_UHCI_PORTSC1(controller->BaseAddress) + ((port - 1) * sizeof(uint16_t));
@@ -429,19 +490,6 @@ static bool usb_uhci_reset(usb_uhci_controller_t *controller) {
     return false;
 }
 
-static void usb_uhci_change_state(usb_uhci_controller_t *controller, bool run) {
-    // Get contents of status register.
-    uint16_t status = inw(USB_UHCI_USBCMD(controller->BaseAddress));
-    
-    // Start or stop controller.
-    if (run)
-        status |= USB_UHCI_STATUS_RUN;
-    else
-        status &= ~USB_UHCI_STATUS_RUN;
-
-    // Write to status register.
-    outw(USB_UHCI_USBCMD(controller->BaseAddress), status);
-}
 usb_uhci_controller_t *testcontroller;
 void usb_callback() {
     kprintf_nlock("IRQ usb\n");

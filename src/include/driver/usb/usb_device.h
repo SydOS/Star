@@ -39,6 +39,15 @@
 #define USB_HUB_GENERIC             "USB hub"
 #define USB_SERIAL_GENERIC          ""
 
+
+
+typedef struct {
+    uint8_t Number;
+    uint8_t Type;
+
+    void *TransferInfo;
+} usb_endpoint_t;
+
 typedef struct {
     uint8_t Number;
 
