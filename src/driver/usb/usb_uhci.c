@@ -383,13 +383,16 @@ void usb_uhci_device_interrupt_in_start(usb_device_t *device, usb_endpoint_t *en
     transferInfo->TransferDesc = transferDesc;
     endpoint->TransferInfo = (void*)transferInfo;
 
-    for (uint16_t i = 0; i < USB_UHCI_FRAME_COUNT; i += 10) {
+    // Add interrupt to schedule using the interval specified. Each frame/interval = 1ms.
+    for (uint16_t i = 0; i < USB_UHCI_FRAME_COUNT; i += endpoint->Interval) {
         // If the queue head is the main one, replace with a new one.
-        if (pmm_dma_get_virtual(controller->FrameList[i] & ~0xF) == (uintptr_t)controller->QueueHead) {
+        uintptr_t qhAddress = pmm_dma_get_virtual(controller->FrameList[i] & ~0xF);
+        if (qhAddress == (uintptr_t)controller->QueueHead) {
             controller->FrameList[i] = (uint32_t)pmm_dma_get_phys((uintptr_t)queueHead) | USB_UHCI_FRAME_QUEUE_HEAD;
         }
         else {
-            // ¯\_(ツ)_/¯. Replace whoever is living here for now.
+            // Add queue head to entry, with existing queue head linked after.
+            queueHead->Head = (controller->FrameList[i] & ~0xF) | USB_UHCI_FRAME_QUEUE_HEAD;
             controller->FrameList[i] = (uint32_t)pmm_dma_get_phys((uintptr_t)queueHead) | USB_UHCI_FRAME_QUEUE_HEAD;
         }
     }

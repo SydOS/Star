@@ -26,9 +26,13 @@ typedef struct {
 
 typedef struct {
     usb_device_t *Device;
+    usb_interface_t *Interface;
+    usb_endpoint_t *DataEndpoint;
+
+    
     usb_descriptor_hid_t *Descriptor;
 
-    uint8_t InputEndpointAddress;
+    
 } usb_keyboard_t;
 
 #endif

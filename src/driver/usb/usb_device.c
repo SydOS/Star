@@ -354,6 +354,7 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
     }
 
     // Allocate address for device.
+    kprintf("USB: Allocating address for new device...\n");
     if (!usbDevice->AllocAddress(usbDevice)) {
         // The command failed, so destroy device and return nothing.
         usb_device_destroy(usbDevice);
@@ -367,7 +368,9 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
         return false;
 
     // Get full configuration data (configuration descriptor + interface/endpoint descriptors).
+    kprintf("USB: Getting configuration data for new device...\n");
     uint8_t *confBuffer = kheap_alloc(confDesc.TotalLength);
+    memset(confBuffer, 0, confDesc.TotalLength);
     if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
         USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, confBuffer, confDesc.TotalLength)) {
         kheap_free(confBuffer);
@@ -390,12 +393,54 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
         if (type == USB_DESCRIPTOR_TYPE_INTERFACE) {
             // Get pointer to interface descriptor.
             usb_descriptor_interface_t *interfaceDesc = (usb_descriptor_interface_t*)currentConfBuffer;
+
+            // Create USB interface object.
+            usb_interface_t *interface = (usb_interface_t*)kheap_alloc(sizeof(usb_interface_t));
+            memset(interface, 0, sizeof(usb_interface_t));
+            interface->Number = interfaceDesc->IntefaceNumber;
+            interface->Class = interfaceDesc->InterfaceClass;
+            interface->Subclass = interfaceDesc->InterfaceSubclass;
+            interface->Protocol = interfaceDesc->InterfaceProtocol;
+
+            // Search for endpoints.
+            interface->NumEndpoints = 0;
+            uint8_t *currentInterfaceBuffer = currentConfBuffer + sizeof(usb_descriptor_interface_t);
+            while (currentInterfaceBuffer < endConfBuffer) {
+                // Get length and type.
+                uint8_t iLength = currentInterfaceBuffer[0];
+                uint8_t iType = currentInterfaceBuffer[1];
+
+                // If the descriptor is an interface, we are done.
+                if (iType == USB_DESCRIPTOR_TYPE_INTERFACE)
+                    break;
+                // Do we have an endpoint?
+                else if (iType == USB_DESCRIPTOR_TYPE_ENDPOINT) {
+                    // Get endpoint descriptor.
+                    usb_descriptor_endpoint_t *endpointDesc = (usb_descriptor_endpoint_t*)currentInterfaceBuffer;
+
+                    // Create endpoint object.
+                    usb_endpoint_t *endpoint = (usb_endpoint_t*)kheap_alloc(sizeof(usb_endpoint_t));
+                    memset(endpoint, 0, sizeof(usb_endpoint_t));
+                    endpoint->Number = endpointDesc->EndpointNumber;
+                    endpoint->Inbound = endpointDesc->Inbound;
+                    endpoint->Type = endpointDesc->TransferType;
+                    endpoint->Interval = endpointDesc->Interval;
+
+                    // Add endpoint to interface.
+                    interface->NumEndpoints++;
+                    interface->Endpoints = (usb_endpoint_t**)kheap_realloc(interface->Endpoints, interface->NumEndpoints * sizeof(usb_endpoint_t));
+                    interface->Endpoints[interface->NumEndpoints - 1] = endpoint;
+                }
+
+                // Move to next descriptor.
+                currentInterfaceBuffer += iLength;
+            }
             
             if (interfaceDesc->InterfaceClass == USB_CLASS_HUB && interfaceDesc->InterfaceSubclass == 0x00) {
                 usb_hub_init(usbDevice, interfaceDesc);
             }
             else if (interfaceDesc->InterfaceClass == USB_CLASS_HID) {
-                usb_keyboard_init(usbDevice, interfaceDesc);
+                usb_keyboard_init(usbDevice, interface);
             }
         }
 
@@ -408,12 +453,36 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
 
 void usb_device_destroy(usb_device_t *usbDevice) {
     // Free strings.
+    kprintf("USB: Freeing strings...\n");
     if (usbDevice->VendorString != NULL)
         kheap_free(usbDevice->VendorString);
     if (usbDevice->ProductString != NULL)
         kheap_free(usbDevice->ProductString);
     if (usbDevice->SerialNumber != NULL)
         kheap_free(usbDevice->SerialNumber);
+
+    // Free each interface.
+    if (usbDevice->Interfaces != NULL) {
+        for (uint8_t interfaceIndex = 0; interfaceIndex < usbDevice->NumInterfaces; interfaceIndex++) {
+            // Get interface.
+            usb_interface_t *interface = usbDevice->Interfaces[interfaceIndex];
+
+            // Free each endpoint.
+            if (interface->Endpoints != NULL) {
+                for (uint8_t endpointIndex = 0; endpointIndex < interface->NumEndpoints; endpointIndex++)
+                    kheap_free(interface->Endpoints[endpointIndex]);
+                kheap_free(interface->Endpoints);
+            }
+
+            // Free driver, if any.
+            if (interface->Driver != NULL)
+                kheap_free(interface->Driver);
+
+            // Free interface.
+            kheap_free(interface);
+        }
+        kheap_free(usbDevice->Interfaces);
+    }
 
     // Free device.
     kheap_free(usbDevice);

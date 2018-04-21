@@ -43,18 +43,29 @@
 
 typedef struct {
     uint8_t Number;
+
+    bool Inbound;
     uint8_t Type;
+    uint8_t Interval;
 
     void *TransferInfo;
 } usb_endpoint_t;
 
 typedef struct {
+    // Interface number.
     uint8_t Number;
 
+    // Interface IDs.
     uint8_t Class;
     uint8_t Subclass;
     uint8_t Protocol;
-} usb_function_t;
+
+    // Endpoints.
+    usb_endpoint_t **Endpoints;
+    uint8_t NumEndpoints;
+
+    void *Driver;
+} usb_interface_t;
 
 typedef struct usb_device_t {
     // Relationship to other USB devices.
@@ -96,9 +107,9 @@ typedef struct usb_device_t {
     uint8_t CurrentConfigurationValue;
     uint8_t NumConfigurations;
 
-    // Functions.
-    uint8_t NumFunctions;
-    usb_function_t *Functions;
+    // Interfaces.
+    usb_interface_t **Interfaces;
+    uint8_t NumInterfaces;
 } usb_device_t;
 
 extern usb_device_t *StartUsbDevice;
