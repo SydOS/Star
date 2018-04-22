@@ -1,5 +1,15 @@
-#ifndef PS2_KEYBOARD_H
-#define PS2_KEYBOARD_H
+#ifndef LIB_KEYBOARD_H
+#define LIB_KEYBOARD_H
+
+#include <main.h>
+
+typedef struct keyboard_t {
+    struct keyboard_t* Next;
+
+    char *Name;
+    void *Driver;
+    uint16_t (*GetLastKey)(void *driver);
+} keyboard_t;
 
 enum {
     KEYBOARD_KEY_A = 0x00,
@@ -101,10 +111,7 @@ enum {
     KEYBOARD_KEY_UNKNOWN
 };
 
-
-
-extern void ps2_keyboard_set_leds(bool numLock, bool capsLock, bool scrollLock);
-extern uint16_t ps2_keyboard_get_last_key(void);
-extern void ps2_keyboard_init(void);
+extern uint16_t keyboard_get_last_key(void);
+extern char keyboard_get_ascii(uint16_t key);
 
 #endif

@@ -19,7 +19,7 @@
 #include <driver/pci.h>
 #include <driver/speaker.h>
 #include <driver/ps2/ps2.h>
-#include <driver/ps2/keyboard.h>
+#include <libs/keyboard.h>
 #include <driver/rtc.h>
 
 #include <driver/usb/usb_device.h>
@@ -200,9 +200,9 @@ void kernel_late() {
 
 		uint16_t i = 0;
 		while (i < 98) {
-			uint16_t k = ps2_keyboard_get_last_key();
+			uint16_t k = keyboard_get_last_key();
 			while (k == KEYBOARD_KEY_UNKNOWN && serial_received() == 0)
-				k = ps2_keyboard_get_last_key();
+				k = keyboard_get_last_key();
 
 			if (serial_received() != 0) {
 				char c = serial_read();
@@ -229,7 +229,7 @@ void kernel_late() {
 					}
 				}
 				else {
-					char c = ps2_keyboard_get_ascii(k);
+					char c = keyboard_get_ascii(k);
 					if (c) {
 						kprintf("%c", c);
 						buffer[i++] = c;

@@ -139,6 +139,8 @@ typedef struct {
     bool ControlPressed;
     bool AltPressed;
     bool GuiPressed;
+
+    uint16_t LastKeyCode;
 } usb_keyboard_t;
 
 extern bool usb_keyboard_init(usb_device_t *usbDevice, usb_interface_t *interface, uint8_t *interfaceConfBuffer, uint8_t *interfaceConfBufferEnd);

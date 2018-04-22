@@ -1,7 +1,7 @@
 #include <main.h>
 #include <kprint.h>
 #include <tools.h>
-#include <driver/ps2/mouse.h>
+#include <driver/ps2/ps2_mouse.h>
 
 #include <driver/ps2/ps2.h>
 #include <kernel/interrupts/irqs.h>

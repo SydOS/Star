@@ -3,8 +3,8 @@
 #include <kprint.h>
 #include <tools.h>
 #include <driver/ps2/ps2.h>
-#include <driver/ps2/keyboard.h>
-#include <driver/ps2/mouse.h>
+#include <driver/ps2/ps2_keyboard.h>
+#include <driver/ps2/ps2_mouse.h>
 
 // Ports used for comms with controller.
 
