@@ -8,6 +8,8 @@
 #include <driver/usb/usb_requests.h>
 #include <driver/usb/usb_descriptors.h>
 #include <libs/keyboard.h>
+#include <kernel/memory/kheap.h>
+#include <kernel/tasking.h>
 
 static const uint16_t UsbKeyboardScancodes[] = {
     [USB_KEYBOARD_KEY_A] = KEYBOARD_KEY_A,

@@ -8,6 +8,7 @@
 #include <driver/ps2/ps2.h>
 #include <driver/vga.h>
 #include <kernel/interrupts/irqs.h>
+#include <kernel/memory/kheap.h>
 
 // http://www.computer-engineering.org/ps2keyboard/scancodes2.html
 
