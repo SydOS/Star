@@ -4,6 +4,7 @@
 #include <kprint.h>
 #include <string.h>
 #include <driver/usb/usb_device.h>
+#include <driver/usb/usb_driver.h>
 #include <driver/usb/usb_requests.h>
 #include <driver/usb/usb_descriptors.h>
 
@@ -40,15 +41,20 @@ static void usb_fill_class_names(void) {
     usbClassDescriptionsFilled = true;
 }
 
-
-
 bool usb_device_get_first_lang(usb_device_t *usbDevice, uint16_t *outLang) {
     // Create temporary string descriptor.
     usb_descriptor_string_t stringDesc = {};
 
+    // Build transfer to get language codes.
+    usb_control_transfer_t transfer = { };
+    transfer.Inbound = true;
+    transfer.Type = USB_REQUEST_TYPE_STANDARD;
+    transfer.Recipient = USB_REQUEST_REC_DEVICE;
+    transfer.Request = USB_REQUEST_GET_DESCRIPTOR;
+    transfer.ValueHigh = USB_DESCRIPTOR_TYPE_STRING;
+
     // Get first language code.
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_STRING, 0, &stringDesc, sizeof(usb_descriptor_string_t)))
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, &stringDesc, sizeof(usb_descriptor_string_t)))
         return false;
     *outLang = stringDesc.String[0];
     return true;
@@ -61,23 +67,31 @@ bool usb_device_get_string(usb_device_t *usbDevice, uint16_t langId, uint8_t ind
         if (*outStr == NULL)
             return false;
 
-        // Use default string.     
+        // Use default string.
         char* str = *outStr;
         strcpy(str, defaultStr);
         return true;
     }
 
+    // Build transfer to get string descriptor.
+    usb_control_transfer_t transfer = { };
+    transfer.Inbound = true;
+    transfer.Type = USB_REQUEST_TYPE_STANDARD;
+    transfer.Recipient = USB_REQUEST_REC_DEVICE;
+    transfer.Request = USB_REQUEST_GET_DESCRIPTOR;
+    transfer.ValueLow = index;
+    transfer.ValueHigh = USB_DESCRIPTOR_TYPE_STRING;
+    transfer.Index = langId;
+
     // Get length of string descriptor using temporary one.
     usb_descriptor_string_t tempStringDesc = { };
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, index, USB_DESCRIPTOR_TYPE_STRING, langId, &tempStringDesc, sizeof(usb_descriptor_string_t)))
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, &tempStringDesc, sizeof(usb_descriptor_string_t)))
         return false;
-    
+
     // Allocate space for full descriptor and get it.
     usb_descriptor_string_t *stringDesc = (usb_descriptor_string_t*)kheap_alloc(tempStringDesc.Length);
     memset(stringDesc, 0, tempStringDesc.Length);
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, index, USB_DESCRIPTOR_TYPE_STRING, langId, stringDesc, tempStringDesc.Length)) {
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, stringDesc, tempStringDesc.Length)) {
         kheap_free(stringDesc);
         return false;
     }
@@ -128,7 +142,7 @@ static void usb_device_print_endpoint(usb_descriptor_endpoint_t *endpointDesc) {
         case USB_ENDPOINT_TRANSFERTYPE_CONTROL:
             transferType = "control";
             break;
-        
+
         case USB_ENDPOINT_TRANSFERTYPE_ISO:
             transferType = "isochronous";
             break;
@@ -185,105 +199,6 @@ static void usb_device_print_endpoint(usb_descriptor_endpoint_t *endpointDesc) {
     kprintf("USB:     Max packet size: %u bytes\n", endpointDesc->MaxPacketSize);
 }
 
-
-static bool usb_device_print_info(usb_device_t *usbDevice) {
-  /*  // Get full device descriptor.
-    usb_descriptor_device_t deviceDesc = { };
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_DEVICE, 0, &deviceDesc, sizeof(usb_descriptor_device_t)))
-        return false;
-
-
-
-    char *strVendor;
-    char *strProduct;
-    char *strSerial;
-    if (!usb_device_get_string(usbDevice, langId, deviceDesc.VendorString, &strVendor))
-        return false;
-    if (!usb_device_get_string(usbDevice, langId, deviceDesc.ProductString, &strProduct)) {
-        kheap_free(strVendor);
-        return false;
-    }
-    if (!usb_device_get_string(usbDevice, langId, deviceDesc.SerialNumberString, &strSerial)) {
-        kheap_free(strVendor);
-        kheap_free(strProduct);
-        return false;
-    }
-
-    // Print information.
-    kprintf("USB: Initialized device (address %u)!\n", usbDevice->Address);
-    kprintf("USB: Device data:\n");
-    kprintf("USB:     Vendor: %s\n", strVendor);
-    kprintf("USB:     Product: %s\n", strProduct);
-    kprintf("USB:     Serial number: %s\n", strSerial);
-    kprintf("USB:     Version: %u.%u | Max packet size: %u bytes\n", deviceDesc.BcdUsb >> 8, deviceDesc.BcdUsb & 0xFF, usbDevice->MaxPacketSize);
-    kprintf("USB:     Vendor ID: 0x%X | Product ID: 0x%X | Configs: %u\n", deviceDesc.VendorId, deviceDesc.ProductId, deviceDesc.NumConfigurations);
-    kprintf("USB:     Type: %s\n", usbClassDescriptions[deviceDesc.Class]);
-    kprintf("USB:     Class: 0x%X | Subclass: 0x%X | Protocol: 0x%X\n", deviceDesc.Class, deviceDesc.Subclass, deviceDesc.Protocol);
-
-    // Clean up strings.
-    kheap_free(strVendor);
-    kheap_free(strProduct);
-    kheap_free(strSerial);
-
-    // Get the first configuration.
-    usb_descriptor_configuration_t confDesc = { };
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, &confDesc, sizeof(usb_descriptor_configuration_t)))
-        return false;
-
-    // Get full configuration data (configuration descriptor + interface/endpoint descriptors).
-    uint8_t *confBuffer = kheap_alloc(confDesc.TotalLength);
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, confBuffer, confDesc.TotalLength)) {
-        kheap_free(confBuffer);
-        return false;
-    }
-
-    char *strConfiguration;
-    if (!usb_device_get_string(usbDevice, langId, confDesc.ConfigurationString, &strConfiguration))
-        return false;
-
-    kprintf("USB: Configuration 0 data:\n");
-    kprintf("USB:     Interfaces: %u\n", confDesc.NumInterfaces);
-    kprintf("USB:     Configuration value: 0x%X\n", confDesc.ConfigurationValue);
-    kprintf("USB:     Configuration string: %s\n", strConfiguration);
-    kprintf("USB:     Self-powered: %s | Remote wakeup: %s\n", confDesc.SelfPowered ? "yes" : "no", confDesc.RemoteWakeup ? "yes" : "no");
-    kprintf("USB:     Max bus power used: %u mA\n", confDesc.MaxPower * USB_MAX_POWER_UNITS);
-    kheap_free(strConfiguration);
-
-    // Search configuration data for interfaces and endpoints.
-    uint8_t *currentConfBuffer = confBuffer + sizeof(usb_descriptor_configuration_t);
-    uint8_t *endConfBuffer = confBuffer + confDesc.TotalLength;
-    while (currentConfBuffer < endConfBuffer) {
-        // Get length and type.
-        uint8_t length = currentConfBuffer[0];
-        uint8_t type = currentConfBuffer[1];
-
-        // Check type.
-        kprintf("USB: Got descriptor 0x%X, %u bytes in length\n", type, length);
-        if (type == USB_DESCRIPTOR_TYPE_INTERFACE) {
-            // Get pointer to interface descriptor and print info.
-            usb_descriptor_interface_t *interfaceDesc = (usb_descriptor_interface_t*)currentConfBuffer;
-            if (!usb_device_print_interface(usbDevice, langId, interfaceDesc)) {
-                kheap_free(confBuffer);
-                return false;
-            }
-        }
-        else if (type == USB_DESCRIPTOR_TYPE_ENDPOINT) {
-            // Get pointer to endpoint descriptor and print info.
-            usb_descriptor_endpoint_t *endpointDesc = (usb_descriptor_endpoint_t*)currentConfBuffer;
-            usb_device_print_endpoint(endpointDesc);
-        }
-        else {
-            kprintf("USB: Ignoring other descriptor 0x%X\n", type);
-        }
-
-        // Move to next descriptor.
-        currentConfBuffer += length;
-    }*/
-}
-
 usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_t speed) {
     // Allocate space for a USB device.
     usb_device_t *usbDevice = (usb_device_t*)kheap_alloc(sizeof(usb_device_t));
@@ -295,33 +210,48 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
     usbDevice->AllocAddress = parentDevice->AllocAddress;
     usbDevice->FreeAddress = parentDevice->FreeAddress;
     usbDevice->ControlTransfer = parentDevice->ControlTransfer;
+    usbDevice->InterruptTransferStart = parentDevice->InterruptTransferStart;
+    usbDevice->InterruptTransferPoll = parentDevice->InterruptTransferPoll;
+    usbDevice->InterruptTransferStop = parentDevice->InterruptTransferStop;
 
-    // Set port and speed.
+    // Set port and speed. Address is 0 as the device is in setup mode.
+    usbDevice->Address = 0;
     usbDevice->Port = port;
     usbDevice->Speed = speed;
 
-    // Packet size is unknown, so use 8 bytes to start with.
-    usbDevice->MaxPacketSize = 8;
-    usbDevice->Address = 0;
+    // Create endpoint zero.
+    usbDevice->EndpointZero = (usb_endpoint_t*)kheap_alloc(sizeof(usb_endpoint_t));
+    memset(usbDevice->EndpointZero, 0, sizeof(usb_endpoint_t));
+    usbDevice->EndpointZero->Number = 0;
+    usbDevice->EndpointZero->Type = USB_ENDPOINT_TRANSFERTYPE_CONTROL;
+    usbDevice->EndpointZero->MaxPacketSize = 8;
+
+    // Build transfer to get device descriptor.
+    usb_control_transfer_t transfer = { };
+    transfer.Inbound = true;
+    transfer.Type = USB_REQUEST_TYPE_STANDARD;
+    transfer.Recipient = USB_REQUEST_REC_DEVICE;
+    transfer.Request = USB_REQUEST_GET_DESCRIPTOR;
+    transfer.ValueLow = 0;
+    transfer.ValueHigh = USB_DESCRIPTOR_TYPE_DEVICE;
+    transfer.Index = 0;
 
     // Create descriptor object.
     usb_descriptor_device_t deviceDesc = {};
 
     // Get first 8 bytes of device descriptor. This will tell us the max packet size.
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_DEVICE, 0, &deviceDesc, usbDevice->MaxPacketSize)) {
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, &deviceDesc, usbDevice->EndpointZero->MaxPacketSize)) {
         // The command failed, so destroy device and return nothing.
         usb_device_destroy(usbDevice);
         return NULL;
     }
 
-    // Set max packet size.
-    usbDevice->MaxPacketSize = deviceDesc.MaxPacketSize;
+    // Set max packet size of endpoint zero.
+    usbDevice->EndpointZero->MaxPacketSize = deviceDesc.MaxPacketSize;
 
     // Get full device descriptor.
     deviceDesc = (usb_descriptor_device_t) { };
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_DEVICE, 0, &deviceDesc, sizeof(usb_descriptor_device_t))) {
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, &deviceDesc, sizeof(usb_descriptor_device_t))) {
         // The command failed, so destroy device and return nothing.
         usb_device_destroy(usbDevice);
         return NULL;
@@ -361,18 +291,25 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
         return NULL;
     }
 
+    // Build transfer to get configuration descriptor.
+    transfer.Inbound = true;
+    transfer.Type = USB_REQUEST_TYPE_STANDARD;
+    transfer.Recipient = USB_REQUEST_REC_DEVICE;
+    transfer.Request = USB_REQUEST_GET_DESCRIPTOR;
+    transfer.ValueLow = 0;
+    transfer.ValueHigh = USB_DESCRIPTOR_TYPE_CONFIGURATION;
+    transfer.Index = 0;
+
     // Get the first configuration.
     usb_descriptor_configuration_t confDesc = { };
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, &confDesc, sizeof(usb_descriptor_configuration_t)))
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, &confDesc, sizeof(usb_descriptor_configuration_t)))
         return false;
 
     // Get full configuration data (configuration descriptor + interface/endpoint descriptors).
     kprintf("USB: Getting configuration data for new device...\n");
     uint8_t *confBuffer = kheap_alloc(confDesc.TotalLength);
     memset(confBuffer, 0, confDesc.TotalLength);
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_CONFIGURATION, 0, confBuffer, confDesc.TotalLength)) {
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, confBuffer, confDesc.TotalLength)) {
         kheap_free(confBuffer);
         return false;
     }
@@ -402,10 +339,25 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
             interface->Subclass = interfaceDesc->InterfaceSubclass;
             interface->Protocol = interfaceDesc->InterfaceProtocol;
 
+            // Get length of current interface (search until we find the next interface, or the end).
+            uint8_t *endInterfaceBuffer = currentConfBuffer + sizeof(usb_descriptor_interface_t);
+            while (endInterfaceBuffer < endConfBuffer) {
+                // Get length and type.
+                uint8_t iLength = endInterfaceBuffer[0];
+                uint8_t iType = endInterfaceBuffer[1];
+
+                // If the descriptor is an interface, we are done.
+                if (iType == USB_DESCRIPTOR_TYPE_INTERFACE)
+                    break;
+                
+                // Move to next descriptor.
+                endInterfaceBuffer += iLength;
+            }
+
             // Search for endpoints.
             interface->NumEndpoints = 0;
             uint8_t *currentInterfaceBuffer = currentConfBuffer + sizeof(usb_descriptor_interface_t);
-            while (currentInterfaceBuffer < endConfBuffer) {
+            while (currentInterfaceBuffer < endInterfaceBuffer) {
                 // Get length and type.
                 uint8_t iLength = currentInterfaceBuffer[0];
                 uint8_t iType = currentInterfaceBuffer[1];
@@ -425,6 +377,7 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
                     endpoint->Inbound = endpointDesc->Inbound;
                     endpoint->Type = endpointDesc->TransferType;
                     endpoint->Interval = endpointDesc->Interval;
+                    endpoint->MaxPacketSize = endpointDesc->MaxPacketSize; // TODO fix
 
                     // Add endpoint to interface.
                     interface->NumEndpoints++;
@@ -435,12 +388,13 @@ usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_
                 // Move to next descriptor.
                 currentInterfaceBuffer += iLength;
             }
-            
-            if (interfaceDesc->InterfaceClass == USB_CLASS_HUB && interfaceDesc->InterfaceSubclass == 0x00) {
-                usb_hub_init(usbDevice, interfaceDesc);
-            }
-            else if (interfaceDesc->InterfaceClass == USB_CLASS_HID) {
-                usb_keyboard_init(usbDevice, interface);
+
+            // Attempt to install driver for interface.
+            uint16_t driverIndex = 0;
+            while (UsbDrivers[driverIndex].Initialize != NULL) {
+                if (UsbDrivers[driverIndex].Initialize(usbDevice, interface, currentConfBuffer, endInterfaceBuffer))
+                    break;
+                driverIndex++;
             }
         }
 
@@ -484,21 +438,42 @@ void usb_device_destroy(usb_device_t *usbDevice) {
         kheap_free(usbDevice->Interfaces);
     }
 
+    // Destroy endpoint zero.
+    if (usbDevice->EndpointZero != NULL)
+        kheap_free(usbDevice->EndpointZero);
+
     // Free device.
     kheap_free(usbDevice);
 }
 
 bool usb_device_configure(usb_device_t *usbDevice) {
+    // Build transfer to set device configuration.
+    usb_control_transfer_t transfer = { };
+    transfer.Inbound = false;
+    transfer.Type = USB_REQUEST_TYPE_STANDARD;
+    transfer.Recipient = USB_REQUEST_REC_DEVICE;
+    transfer.Request = USB_REQUEST_SET_CONFIG;
+    transfer.ValueLow = usbDevice->CurrentConfigurationValue;
+    transfer.ValueHigh = 0;
+    transfer.Index = 0;
+
     // Set configuration.
     kprintf("USB: Setting configuration on device %u to config %u...\n", usbDevice->Address, usbDevice->CurrentConfigurationValue);
-    if (!usbDevice->ControlTransfer(usbDevice, 0, false, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_SET_CONFIG, usbDevice->CurrentConfigurationValue, 0, 0, NULL, 0))
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, NULL, 0))
         return false;
-    
+
+    // Build transfer to get device configuration.
+    transfer.Inbound = true;
+    transfer.Type = USB_REQUEST_TYPE_STANDARD;
+    transfer.Recipient = USB_REQUEST_REC_DEVICE;
+    transfer.Request = USB_REQUEST_GET_CONFIG;
+    transfer.ValueLow = 0;
+    transfer.ValueHigh = 0;
+    transfer.Index = 0;
+
     // Get configuration.
     uint8_t newConfigurationValue = 0;
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_STANDARD,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_CONFIG, 0, 0, 0, &newConfigurationValue, sizeof(newConfigurationValue)))
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, &newConfigurationValue, sizeof(newConfigurationValue)))
         return false;
 
     // Ensure current config value matches desired value.

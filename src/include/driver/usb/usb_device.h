@@ -39,7 +39,22 @@
 #define USB_HUB_GENERIC             "USB hub"
 #define USB_SERIAL_GENERIC          ""
 
+typedef struct {
+    // Characteristics.
+    bool Inbound;
+    uint8_t Type;
+    uint8_t Recipient;
 
+    // Specific request.
+    uint8_t Request;
+    
+    // Value.
+    uint8_t ValueLow;
+    uint8_t ValueHigh;
+
+    // Index.
+    uint16_t Index;
+} usb_control_transfer_t;
 
 typedef struct {
     uint8_t Number;
@@ -47,6 +62,7 @@ typedef struct {
     bool Inbound;
     uint8_t Type;
     uint8_t Interval;
+    uint16_t MaxPacketSize;
 
     void *TransferInfo;
 } usb_endpoint_t;
@@ -76,18 +92,29 @@ typedef struct usb_device_t {
     // Pointer to controller that device is on.
     void *Controller;
 
+    // Address allocation and deallocation.
     bool (*AllocAddress)(struct usb_device_t* device);
-    void (*FreeAddress)(struct usb_device_t* device);   
-    bool (*ControlTransfer)(struct usb_device_t* device, uint8_t endpoint, bool inbound, uint8_t type,
-        uint8_t recipient, uint8_t requestType, uint8_t valueLo, uint8_t valueHi, uint16_t index, void *buffer, uint16_t length);
+    void (*FreeAddress)(struct usb_device_t* device);
+
+    // Control transfer.
+    bool (*ControlTransfer)(struct usb_device_t* device, usb_endpoint_t *endpoint, usb_control_transfer_t transfer, void *buffer, uint16_t length);
+
+    // Interrupt transfers.
+    void (*InterruptTransferStart)(struct usb_device_t *device, usb_endpoint_t *endpoint, uint16_t length);
+    bool (*InterruptTransferPoll)(struct usb_device_t *device, usb_endpoint_t *endpoint, void *outBuffer, uint16_t length);
+    void (*InterruptTransferStop)(struct usb_device_t *device, usb_endpoint_t *endpoint);
+
+    // Bulk transfers?
+
+    // Iso transfers?
 
     // Port, speed, and address.
     uint8_t Port;
     uint8_t Speed;
     uint8_t Address;
 
-    // Maximum packet size for endpoint zero (only 8, 16, 32, or 64 are valid).
-    uint8_t MaxPacketSize;
+    // Endpoint 0, used for device setup and other control operations.
+    usb_endpoint_t *EndpointZero;
 
     // ID info.
     uint16_t VendorId;
@@ -113,7 +140,7 @@ typedef struct usb_device_t {
 } usb_device_t;
 
 extern usb_device_t *StartUsbDevice;
-//extern usb_device_t *usb_device_create();
+extern usb_device_t *usb_device_create(usb_device_t *parentDevice, uint8_t port, uint8_t speed);
 extern void usb_device_destroy(usb_device_t *usbDevice);
 extern bool usb_device_configure(usb_device_t *usbDevice);
 

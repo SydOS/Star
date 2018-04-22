@@ -79,8 +79,18 @@ static bool usb_uhci_address_alloc(usb_device_t *usbDevice) {
     // Search for free address. Addresses start at 1 and end at 127.
     for (uint8_t i = 0; i < USB_MAX_DEVICES; i++) {
         if (!controller->AddressPool[i]) {
+            // Build transfer to set address.
+            usb_control_transfer_t transferSetAddress = { };
+            transferSetAddress.Inbound = false;
+            transferSetAddress.Type = USB_REQUEST_TYPE_STANDARD;
+            transferSetAddress.Recipient = USB_REQUEST_REC_DEVICE;
+            transferSetAddress.Request = USB_REQUEST_SET_ADDRESS;
+            transferSetAddress.ValueLow = i + 1;
+            transferSetAddress.ValueHigh = 0;
+            transferSetAddress.Index = 0;
+
             // Set the address.
-            if (!usbDevice->ControlTransfer(usbDevice, 0, false, USB_REQUEST_TYPE_STANDARD, USB_REQUEST_REC_DEVICE, USB_REQUEST_SET_ADDRESS, i + 1, 0, 0, NULL, 0))
+            if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transferSetAddress, NULL, 0))
                 return false;
 
             // Free the old address, if any.
@@ -167,7 +177,6 @@ static void usb_uhci_queue_head_add(usb_uhci_controller_t *controller, usb_uhci_
     usb_uhci_queue_head_t *end = (usb_uhci_queue_head_t*)pmm_dma_get_virtual(controller->QueueHead->PreviousQueueHead);  //(usb_uhci_queue_head_t*)pmm_dma_get_virtual(((uint8_t*)controller->QueueHead->PreviousQueueHead) - (uint32_t)(&(((usb_uhci_queue_head_t*)0)->PreviousQueueHead)));
 
     queueHead->Head = USB_UHCI_FRAME_TERMINATE;
-    uint16_t s = inw(USB_UHCI_USBSTS(controller->BaseAddress));
     end->Head = (uint32_t)pmm_dma_get_phys((uintptr_t)queueHead) | USB_UHCI_FRAME_QUEUE_HEAD;
 
     usb_uhci_queue_head_t *n = (usb_uhci_queue_head_t*)pmm_dma_get_virtual(controller->QueueHead->NextQueueHead);
@@ -183,8 +192,8 @@ static bool usb_uhci_queue_head_process(usb_uhci_controller_t *controller, usb_u
 
     // Get transfer descriptor (last 4 bits are control, so ignore them).
     usb_uhci_transfer_desc_t *transferDesc = (usb_uhci_transfer_desc_t*)pmm_dma_get_virtual(queueHead->Element & ~0xF);
-    uint16_t d = inw(USB_UHCI_FRNUM(controller->BaseAddress));
-    uint16_t s = inw(USB_UHCI_USBSTS(controller->BaseAddress));
+   // uint16_t d = inw(USB_UHCI_FRNUM(controller->BaseAddress));
+   // uint16_t s = inw(USB_UHCI_USBSTS(controller->BaseAddress));
     
   //  uint16_t pciS = pci_config_read_word(controller->PciDevice, PCI_REG_STATUS);
     
@@ -277,42 +286,41 @@ static bool usb_uhci_queue_head_wait(usb_uhci_controller_t *controller, usb_uhci
     return status;
 }
 
-static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool inbound, uint8_t type,
-    uint8_t recipient, uint8_t requestType, uint8_t valueLo, uint8_t valueHi, uint16_t index, void *buffer, uint16_t length) {
+//static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool inbound, uint8_t type,
+ //   uint8_t recipient, uint8_t requestType, uint8_t valueLo, uint8_t valueHi, uint16_t index, void *buffer, uint16_t length) {
+
+static bool usb_uhci_device_control(usb_device_t* device, usb_endpoint_t *endpoint, usb_control_transfer_t transfer, void *buffer, uint16_t length) {
     // Get the UHCI controller.
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)device->Controller;
 
     // Temporary buffer.
     void *usbBuffer = NULL;
 
-    // Get device attributes.
-    uint8_t maxPacketSize = device->MaxPacketSize;
-
     // Create USB request.
     usb_request_t *request = (usb_request_t*)usb_uhci_alloc(controller, sizeof(usb_request_t));
     memset(request, 0, sizeof(usb_request_t));
-    request->Inbound = inbound;
-    request->Type = type;
-    request->Recipient = recipient;
-    request->Request = requestType;
-    request->ValueLow = valueLo;
-    request->ValueHigh = valueHi;
-    request->Index = index;
+    request->Inbound = transfer.Inbound;
+    request->Type = transfer.Type;
+    request->Recipient = transfer.Recipient;
+    request->Request = transfer.Request;
+    request->ValueLow = transfer.ValueLow;
+    request->ValueHigh = transfer.ValueHigh;
+    request->Index = transfer.Index;
     request->Length = length;
 
     // Create SETUP transfer descriptor.
-    usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_alloc(controller, device, NULL, USB_UHCI_TD_PACKET_SETUP, 0, false, request, sizeof(usb_request_t));
+    usb_uhci_transfer_desc_t *transferDesc = usb_uhci_transfer_desc_alloc(controller, device, NULL, USB_UHCI_TD_PACKET_SETUP, endpoint->Number, false, request, sizeof(usb_request_t));
     usb_uhci_transfer_desc_t *headDesc = transferDesc;
     usb_uhci_transfer_desc_t *prevDesc = transferDesc;
 
     // Determine whether packets are to be IN or OUT.
-    uint8_t packetType = inbound ? USB_UHCI_TD_PACKET_IN : USB_UHCI_TD_PACKET_OUT;
+    uint8_t packetType = transfer.Inbound ? USB_UHCI_TD_PACKET_IN : USB_UHCI_TD_PACKET_OUT;
 
     // Create packets for data.
     if (length > 0) {
         // Create temporary buffer that the UHCI controller can use.
         usbBuffer = usb_uhci_alloc(controller, length);
-        if (!inbound)
+        if (!transfer.Inbound)
             memcpy(usbBuffer, buffer, length);
 
         uint8_t *packetPtr = (uint8_t*)usbBuffer;
@@ -324,10 +332,10 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
 
             // Determine size of packet, and cut it down if above max size.
             uint16_t remainingData = endPtr - packetPtr;
-            uint8_t packetSize = remainingData > maxPacketSize ? maxPacketSize : remainingData;
+            uint8_t packetSize = remainingData > endpoint->MaxPacketSize ? endpoint->MaxPacketSize : remainingData;
             
             // Create packet.
-            transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, 0, toggle, packetPtr, packetSize);
+            transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, endpoint->Number, toggle, packetPtr, packetSize);
 
             // Move to next packet.
             packetPtr += packetSize;
@@ -336,8 +344,8 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     }
 
     // Create status packet.
-    packetType = inbound ? USB_UHCI_TD_PACKET_OUT : USB_UHCI_TD_PACKET_IN;
-    transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, 0, true, NULL, 0);
+    packetType = transfer.Inbound ? USB_UHCI_TD_PACKET_OUT : USB_UHCI_TD_PACKET_IN;
+    transferDesc = usb_uhci_transfer_desc_alloc(controller, device, prevDesc, packetType, endpoint->Number, true, NULL, 0);
 
     // Create queue head that starts with first transfer descriptor.
     usb_uhci_queue_head_t *queueHead = usb_uhci_queue_head_alloc(controller);
@@ -350,7 +358,7 @@ static bool usb_uhci_device_control(usb_device_t *device, uint8_t endpoint, bool
     bool result = usb_uhci_queue_head_wait(controller, queueHead);
 
     // Copy data if the operation succeeded.
-    if (usbBuffer != NULL && result && inbound)
+    if (transfer.Inbound && usbBuffer != NULL && result)
         memcpy(buffer, usbBuffer, length);
 
     // Free buffers.
@@ -617,7 +625,6 @@ void usb_uhci_init(PciDevice *device) {
     // These fields are mostly meaningless as this is the root hub.
     controller->RootDevice->Port = 0;
     controller->RootDevice->Speed = USB_SPEED_FULL;
-    controller->RootDevice->MaxPacketSize = 0;
     controller->RootDevice->Address = 255;
     controller->RootDevice->VendorId = device->VendorId;
     controller->RootDevice->ProductId = device->DeviceId;

@@ -12,6 +12,8 @@
 #define USB_DESCRIPTOR_TYPE_REPORT      0x22
 #define USB_DESCRIPTOR_TYPE_PHYSICAL    0x23
 
+#define USB_HID_REQUEST_SET_REPORT      0x09
+
 // USB HID descriptor.
 typedef struct {
     // Size of this descriptor in bytes.

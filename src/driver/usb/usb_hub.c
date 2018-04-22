@@ -46,10 +46,29 @@ void usb_hub_print_desc(usb_descriptor_hub_t *hubDesc) {
 }
 
 static usb_hub_port_status_t usb_hub_reset_port(usb_hub_t *usbHub, uint8_t port) {
+    // Build transfer to reset port.
+    usb_control_transfer_t transferReset = { };
+    transferReset.Inbound = false;
+    transferReset.Type = USB_REQUEST_TYPE_CLASS;
+    transferReset.Recipient = USB_REQUEST_REC_OTHER;
+    transferReset.Request = USB_REQUEST_SET_FEATURE;
+    transferReset.ValueLow = USB_HUB_FEAT_PORT_RESET;
+    transferReset.ValueHigh = 0;
+    transferReset.Index = port;
+
+    // Build transfer to get port status.
+    usb_control_transfer_t transferStatus = { };
+    transferStatus.Inbound = true;
+    transferStatus.Type = USB_REQUEST_TYPE_CLASS;
+    transferStatus.Recipient = USB_REQUEST_REC_OTHER;
+    transferStatus.Request = USB_REQUEST_GET_STATUS;
+    transferStatus.ValueLow = 0;
+    transferStatus.ValueHigh = 0;
+    transferStatus.Index = port;
+
     // Send reset command to hub.
     kprintf("USB HUB: Resetting port %u on hub %u...\n", port, usbHub->Device->Address);
-    if (!usbHub->Device->ControlTransfer(usbHub->Device, 0, false, USB_REQUEST_TYPE_CLASS,
-        USB_REQUEST_REC_OTHER, USB_REQUEST_SET_FEATURE, USB_HUB_FEAT_PORT_RESET, 0, port, NULL, 0))
+    if (!usbHub->Device->ControlTransfer(usbHub->Device, usbHub->Device->EndpointZero, transferReset, NULL, 0))
         return (const usb_hub_port_status_t) { };
 
     // Wait for port to enable.
@@ -60,8 +79,7 @@ static usb_hub_port_status_t usb_hub_reset_port(usb_hub_t *usbHub, uint8_t port)
         sleep(10);
 
         // Get current status of port.
-        if (!usbHub->Device->ControlTransfer(usbHub->Device, 0, true, USB_REQUEST_TYPE_CLASS,
-            USB_REQUEST_REC_OTHER, USB_REQUEST_GET_STATUS, 0, 0, port, &status, sizeof(usb_hub_port_status_t)))
+        if (!usbHub->Device->ControlTransfer(usbHub->Device, usbHub->Device->EndpointZero, transferStatus, &status, sizeof(usb_hub_port_status_t)))
             return (const usb_hub_port_status_t) { };
 
         // Check if the port is disconnected, or enabled. If so, we are done.
@@ -79,11 +97,21 @@ static void usb_hub_probe(usb_hub_t *usbHub) {
 
     // Enable power on ports if each port is individually managed.
     if (usbHub->Descriptor->PowerSwitchingMode == USB_HUB_POWERSW_INDIV) {
+        // Build transfer to power up port.
+        usb_control_transfer_t transferPower = { };
+        transferPower.Inbound = false;
+        transferPower.Type = USB_REQUEST_TYPE_CLASS;
+        transferPower.Recipient = USB_REQUEST_REC_OTHER;
+        transferPower.Request = USB_REQUEST_SET_FEATURE;
+        transferPower.ValueLow = USB_HUB_FEAT_PORT_POWER;
+        transferPower.ValueHigh = 0;
+
+        // Power up ports.
         for (uint8_t port = 1; port <= portCount; port++) {
-            // If request fails, abort probe.
+            // Enable power for port. If it results in failure, abort probe.
             kprintf("USB HUB: Enabling power for port %u...\n", port);
-            if (!usbHub->Device->ControlTransfer(usbHub->Device, 0, false, USB_REQUEST_TYPE_CLASS,
-                USB_REQUEST_REC_OTHER, USB_REQUEST_SET_FEATURE, USB_HUB_FEAT_PORT_POWER, 0, port, NULL, 0))
+            transferPower.Index = port;
+            if (!usbHub->Device->ControlTransfer(usbHub->Device, usbHub->Device->EndpointZero, transferPower, NULL, 0))
                 return;
             kprintf("USB HUB: Power enabled for port %u!\n", port);
         }
@@ -137,35 +165,50 @@ static void usb_hub_probe(usb_hub_t *usbHub) {
     }
 }
 
-bool usb_hub_init(usb_device_t *usbDevice, usb_descriptor_interface_t *interfaceDesc) {
+bool usb_hub_init(usb_device_t *usbDevice, usb_interface_t *interface, uint8_t *interfaceConfBuffer, uint8_t *interfaceConfBufferEnd) {
     // Ensure class code matches.
-    if (interfaceDesc->InterfaceClass != USB_CLASS_HUB)
+    if (interface->Class != USB_CLASS_HUB || interface->Subclass != 0)
         return false;
 
-    // Get status endpoint.
-    usb_descriptor_endpoint_t *statusEndpoint = (usb_descriptor_endpoint_t*)((uint8_t*)interfaceDesc + interfaceDesc->Length);
-    if (statusEndpoint->Type != USB_DESCRIPTOR_TYPE_ENDPOINT || !statusEndpoint->Inbound || statusEndpoint->TransferType != USB_ENDPOINT_TRANSFERTYPE_INTERRUPT)
+    // Search for status IN endpoint.
+    usb_endpoint_t *endpointStatus = NULL;
+    for (uint8_t e = 0; e < interface->NumEndpoints; e++) {
+        usb_endpoint_t *endpoint = interface->Endpoints[e];
+        if (endpoint->Inbound && endpoint->Type == USB_ENDPOINT_TRANSFERTYPE_INTERRUPT) {
+            endpointStatus = endpoint;
+            break;
+        }
+    }
+    if (endpointStatus == NULL)
         return false;
 
     // Configure device if needed.
-    kprintf("USB HUB: Initializing hub %u...\n", usbDevice->Address);
+    kprintf("USB HUB: Initializing device %u...\n", usbDevice->Address);
     if (!usbDevice->Configured) {
         if (!usb_device_configure(usbDevice))
             return false;
         usbDevice->Configured = true;
     }
 
+    // Build transfer to get hub descriptor.
+    usb_control_transfer_t transfer = { };
+    transfer.Inbound = true;
+    transfer.Type = USB_REQUEST_TYPE_CLASS;
+    transfer.Recipient = USB_REQUEST_REC_DEVICE;
+    transfer.Request = USB_REQUEST_GET_DESCRIPTOR;
+    transfer.ValueLow = 0;
+    transfer.ValueHigh = USB_DESCRIPTOR_TYPE_HUB;
+    transfer.Index = 0;
+
     // Get hub descriptor length.
     uint8_t hubDescLength = 0;
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_CLASS,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_HUB, 0, &hubDescLength, sizeof(hubDescLength)))
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, &hubDescLength, sizeof(hubDescLength)))
         return false;
 
     // Get the hub descriptor.
     usb_descriptor_hub_t *hubDesc = (usb_descriptor_hub_t*)kheap_alloc(hubDescLength);
     memset(hubDesc, 0, hubDescLength);
-    if (!usbDevice->ControlTransfer(usbDevice, 0, true, USB_REQUEST_TYPE_CLASS,
-        USB_REQUEST_REC_DEVICE, USB_REQUEST_GET_DESCRIPTOR, 0, USB_DESCRIPTOR_TYPE_HUB, 0, hubDesc, hubDescLength))
+    if (!usbDevice->ControlTransfer(usbDevice, usbDevice->EndpointZero, transfer, hubDesc, hubDescLength))
         return false;
 
     // Create USB hub object.
@@ -173,8 +216,7 @@ bool usb_hub_init(usb_device_t *usbDevice, usb_descriptor_interface_t *interface
     memset(usbHub, 0, sizeof(usb_hub_t));
     usbHub->Device = usbDevice;
     usbHub->Descriptor = hubDesc;
-    usbHub->StatusEndpointAddress = statusEndpoint->EndpointNumber;
-    usbHub->StatusEndpointMaxPacketSize = statusEndpoint->MaxPacketSize;
+    usbHub->StatusEndpoint = endpointStatus;
 
     // Print info.
     usb_hub_print_desc(usbHub->Descriptor);
