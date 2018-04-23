@@ -126,14 +126,14 @@ static void kheap_dump_bin(uint32_t binIndex) {
     kheap_node_t *node = bins[binIndex].header;
 
     while (node != NULL) {
-        kprintf("NODE: 0x%X size: %u hole: %s\n", node, node->size, node->hole ? "yes" : "no");
+        kprintf_nlock("NODE: 0x%X size: %u hole: %s\n", node, node->size, node->hole ? "yes" : "no");
         node = node->nextNode;
     }
 }
 
 void kheap_dump_all_bins() {
     for (uint8_t i = 0; i < 9; i++) {
-        kprintf("Bin %u:\n", i);
+        kprintf_nlock("Bin %u:\n", i);
         kheap_dump_bin(i);
     }
 }
@@ -186,7 +186,7 @@ static bool kheap_expand(size_t size) {
         currentKernelHeapSize += PAGE_SIZE_4K;
     }
 
-    //kprintf_nlock("Heap expanded by 4KB to %u!\n", currentKernelHeapSize);
+    kprintf_nlock("KHEAP: Heap expanded by 4KB to %u bytes!\n", currentKernelHeapSize);
     return true;
 }
 
@@ -207,11 +207,13 @@ void *kheap_alloc(size_t size) {
 
     // If a chunk still couldn't be found, expand heap.
     if (node == NULL) {
-        if (!kheap_expand(size))
+        if (!kheap_expand(size)) {
+            kprintf_nlock("KHEAP: Failed to expand heap!\n");
             return NULL;
+        }
 
-        // Get bin index that the chunk should be in
-        binIndex = kheap_get_bin_index(size);
+        // Start at index 0.
+        binIndex = 0;
 
         // Try to find a good fitting chunk.
         node = kheap_get_best_fit(binIndex, size);
@@ -222,6 +224,8 @@ void *kheap_alloc(size_t size) {
     }
 
     // If the difference between the found and requested chunks is bigger than overhead, then split the chunk.
+    if (node == NULL)
+        kheap_dump_all_bins();
     if ((node->size - size) > (KHEAP_OVERHEAD + 4)) {
         // Determine where to split at.
         kheap_node_t *splitNode = (kheap_node_t*)(((uint8_t*)node + KHEAP_OVERHEAD) + size);
