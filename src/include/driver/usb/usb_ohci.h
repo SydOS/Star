@@ -106,6 +106,8 @@
 #define USB_OHCI_INTERRUPT_OWNERSHIP_CHANGE         0x40000000
 #define USB_OHCI_MASTER_INTERRUPT_ENABLE            0x80000000
 
+#define USB_OHCI_DESC_HALTED    0x1
+
 // Endpoint descriptor (16 bytes in size).
 // See 4.2 Endpoint Descriptor in the OHCI guide.
 typedef struct {
@@ -132,7 +134,21 @@ typedef struct {
 #define USB_OHCI_TD_PACKET_OUT      0x1
 #define USB_OHCI_TD_PACKET_IN       0x2
 
-// Transfer descriptor (16 bytes in size).
+#define USB_OHCI_TD_CONDITION_NOERROR           0x0
+#define USB_OHCI_TD_CONDITION_CRC               0x1
+#define USB_OHCI_TD_CONDITION_BITSTUFF          0x2
+#define USB_OHCI_TD_CONDITION_TOGGLE_MISMATCH   0x3
+#define USB_OHCI_TD_CONDITION_STALL             0x4
+#define USB_OHCI_TD_CONDITION_NOT_RESPONDING    0x5
+#define USB_OHCI_TD_CONDITION_PID_CHECK_FAILURE 0x6
+#define USB_OHCI_TD_CONDITION_UNEXPECTED_PID    0x7
+#define USB_OHCI_TD_CONDITION_DATA_OVERRUN      0x8
+#define USB_OHCI_TD_CONDITION_DATA_UNDERRUN     0x9
+#define USB_OHCI_TD_CONDITION_BUFFER_OVERRUN    0xC
+#define USB_OHCI_TD_CONDITION_BUFFER_UNDERRUN   0xD
+#define USB_OHCI_TD_CONDITION_NOT_ACCESSED      0xF
+
+// Transfer descriptor (16 bytes in size, 32).
 // See 4.3.1 General Transfer Descriptor in the OHCI guide.
 typedef struct {
     // Dword 0.
@@ -152,6 +168,10 @@ typedef struct {
     uint32_t CurrentBufferPointer;
     uint32_t NextTransferDesc;
     uint32_t BufferEnd;
+
+    // Additional info.
+    uint32_t Next;
+    uint32_t Pad[3];
 } __attribute__((packed)) usb_ohci_transfer_desc_t;
 
 // Isochronous transfer descriptor (32 bytes in size).

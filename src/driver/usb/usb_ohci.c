@@ -116,17 +116,22 @@ static usb_ohci_transfer_desc_t *usb_ohci_transfer_desc_alloc(usb_ohci_controlle
             transferDesc->InUse = true;
 
             // If a previous descriptor was specified, link this one onto it.
-            if (previousDesc != NULL)
+            if (previousDesc != NULL) {
                 previousDesc->NextTransferDesc = ((uint32_t)pmm_dma_get_phys((uintptr_t)transferDesc));
+                previousDesc->Next = previousDesc->NextTransferDesc;
+            }
 
             // No more descriptors after this. This descriptor can be specified later to change it.
             transferDesc->NextTransferDesc = 0;
+            transferDesc->Next = 0;
 
             // Populate descriptor.
             transferDesc->BufferRounding = true; // Enable buffer rounding.
             transferDesc->Direction = type; // Type of packet (SETUP, IN, or OUT).
+            transferDesc->DelayInterrupt = 0x7;
             transferDesc->DataToggle = toggle;
             transferDesc->NoToggleCarry = true;
+            transferDesc->ConditionCode = USB_OHCI_TD_CONDITION_NOT_ACCESSED; // Per Table 4-7: Completion Codes.
 
             // If there is a buffer desired, add it.
             if (data != NULL) {
@@ -224,10 +229,11 @@ static bool usb_ohci_device_control(usb_device_t* device, usb_endpoint_t *endpoi
 
     // Create SETUP transfer descriptor.
     usb_ohci_transfer_desc_t *transferDesc = usb_ohci_transfer_desc_alloc(controller, NULL, USB_OHCI_TD_PACKET_SETUP, false, request, sizeof(usb_request_t));
+    usb_ohci_transfer_desc_t *headDesc = transferDesc;
     usb_ohci_transfer_desc_t *prevDesc = transferDesc;
 
     // Create endpoint descriptor with the SETUP transfer descriptor as the head.
-    usb_ohci_endpoint_desc_t *endpointDesc = usb_ohci_endpoint_desc_alloc(controller, NULL, device, endpoint, transferDesc);
+    usb_ohci_endpoint_desc_t *endpointDesc = usb_ohci_endpoint_desc_alloc(controller, NULL, device, endpoint, headDesc);
 
     // Determine whether packets are to be IN or OUT.
     uint8_t packetType = transfer.Inbound ? USB_OHCI_TD_PACKET_IN : USB_OHCI_TD_PACKET_OUT;
@@ -263,9 +269,8 @@ static bool usb_ohci_device_control(usb_device_t* device, usb_endpoint_t *endpoi
     packetType = transfer.Inbound ? USB_OHCI_TD_PACKET_OUT : USB_OHCI_TD_PACKET_IN;
     transferDesc = usb_ohci_transfer_desc_alloc(controller, prevDesc, packetType, true, NULL, 0);
 
-    // Disable processing of control list.
+    // Add endpoint descriptor to OHCI control list. This requires disabling control transfers, adding the descriptor, and enabling them again.
     usb_ohci_write(controller, USB_OHCI_REG_CONTROL, usb_ohci_read(controller, USB_OHCI_REG_CONTROL) & ~USB_OHCI_REG_CONTROL_CONTROL_ENABLE);
-
     usb_ohci_write(controller, USB_OHCI_REG_CONTROL_HEAD_ED, (uint32_t)pmm_dma_get_phys((uintptr_t)endpointDesc));
     usb_ohci_write(controller, USB_OHCI_REG_COMMAND_STATUS, usb_ohci_read(controller, USB_OHCI_REG_COMMAND_STATUS) | USB_OHCI_REG_STATUS_CONTROL_LIST_FILLED);
     usb_ohci_write(controller, USB_OHCI_REG_CONTROL, usb_ohci_read(controller, USB_OHCI_REG_CONTROL) | USB_OHCI_REG_CONTROL_CONTROL_ENABLE);
@@ -275,14 +280,33 @@ static bool usb_ohci_device_control(usb_device_t* device, usb_endpoint_t *endpoi
     while (endpointDesc->HeadPointer != NULL)
     {
         // If a descriptor got itself halted, the transfer failed.
-        if (endpointDesc->HeadPointer & 0x1) {
+        if (endpointDesc->HeadPointer & USB_OHCI_DESC_HALTED) {
             result = false;
             break;
         }
     }
 
-    // Free up endpoint descriptor and transfer descriptors.
+    // Disable processing of control list.
+    usb_ohci_write(controller, USB_OHCI_REG_CONTROL, usb_ohci_read(controller, USB_OHCI_REG_CONTROL) & ~USB_OHCI_REG_CONTROL_CONTROL_ENABLE);
+    usb_ohci_write(controller, USB_OHCI_REG_CONTROL_HEAD_ED, 0);
+
+    // Free up endpoint descriptor.
     usb_ohci_endpoint_desc_free(endpointDesc);
+
+    // Free up transfer descriptors.
+    transferDesc = headDesc;
+    usb_ohci_transfer_desc_t *nextDesc;
+    while (transferDesc != NULL) {
+        // Get next descriptor if it exists.
+        if (transferDesc->Next)
+            nextDesc = (usb_ohci_transfer_desc_t*)(pmm_dma_get_virtual(transferDesc->Next));
+        else
+            nextDesc = NULL;
+
+        // Free transfer descriptor and move to next.
+        usb_ohci_transfer_desc_free(transferDesc);
+        transferDesc = nextDesc;
+    }
 
     // Copy data if the operation succeeded.
     if (transfer.Inbound && usbBuffer != NULL && result)
@@ -296,7 +320,11 @@ static bool usb_ohci_device_control(usb_device_t* device, usb_endpoint_t *endpoi
     return result;
 }
 
-void usb_ohci_reset(usb_ohci_controller_t *controller) {
+static void usb_ohci_device_interrupt_start(usb_device_t *device, usb_endpoint_t *endpoint, uint16_t length) {
+
+}
+
+static void usb_ohci_reset(usb_ohci_controller_t *controller) {
     // Save content of frame interval register.
     uint32_t frameIntervalReg = usb_ohci_read(controller, USB_OHCI_REG_FRAME_INTERVAL);
 
@@ -320,7 +348,7 @@ void usb_ohci_reset(usb_ohci_controller_t *controller) {
     sleep(200);
 }
 
-uint32_t usb_ohci_reset_port(usb_ohci_controller_t *controller, uint8_t port) {
+static uint32_t usb_ohci_reset_port(usb_ohci_controller_t *controller, uint8_t port) {
     uint32_t portReg = USB_OHCI_REG_RH_PORT_STATUS + (port - 1);
 
     // Get port status.
@@ -356,7 +384,7 @@ uint32_t usb_ohci_reset_port(usb_ohci_controller_t *controller, uint8_t port) {
     return usb_ohci_read(controller, portReg);
 }
 
-bool usb_ohci_probe(usb_ohci_controller_t *controller) {
+static bool usb_ohci_probe(usb_ohci_controller_t *controller) {
     // Get characteristics of root hub.
     uint32_t rootHubRegA = usb_ohci_read(controller, USB_OHCI_REG_RH_DESCRIPTOR_A);
     uint32_t rootHubRegB = usb_ohci_read(controller, USB_OHCI_REG_RH_DESCRIPTOR_B);
@@ -394,64 +422,6 @@ bool usb_ohci_probe(usb_ohci_controller_t *controller) {
                     controller->RootDevice->Children = usbDevice;
                 }
             }
-            /*memset(controller->EndpointDescPool, 0, sizeof(usb_ohci_endpoint_desc_t));
-
-            controller->EndpointDescPool->Direction = 0x0;
-            controller->EndpointDescPool->MaxPacketSize = 8;
-            controller->EndpointDescPool->HeadPointer = (uint32_t)pmm_dma_get_phys((uintptr_t)controller->TransferDescPool);
-            controller->EndpointDescPool->InUse = true;
-
-            // Create USB request.
-            usb_request_t *request = (usb_request_t*)usb_ohci_alloc(controller, sizeof(usb_request_t));
-            memset(request, 0, sizeof(usb_request_t));
-            request->Inbound = true;
-            request->Type = USB_REQUEST_TYPE_STANDARD;
-            request->Recipient = USB_REQUEST_REC_DEVICE;
-            request->Request = USB_REQUEST_GET_DESCRIPTOR;
-            request->ValueLow = 0;
-            request->ValueHigh = USB_DESCRIPTOR_TYPE_DEVICE;
-            request->Index = 0;
-            request->Length = 8;
-
-            usb_ohci_transfer_desc_t *setup = usb_ohci_transfer_desc_alloc(controller, NULL, 0, false, request, sizeof(usb_request_t));
-            //memset(setup, 0, sizeof(usb_ohci_transfer_desc_t));
-           // setup->BufferRounding = true;
-          //  setup->DataToggle = false;
-          //  setup->NoToggleCarry = true;
-          //  setup->Direction = 0x0;
-          //  setup->InUse = true;
-          //  setup->DelayInterrupt = 0x7;
-          //  setup->ContentBufferPointer = (uint32_t)pmm_dma_get_phys((uintptr_t)request);
-          //  setup->BufferEnd = setup->ContentBufferPointer + sizeof(usb_request_t) - 1;
-
-            usb_descriptor_device_t *deviceDesc = (usb_descriptor_device_t*)usb_ohci_alloc(controller, sizeof(usb_descriptor_device_t));
-            memset(deviceDesc, 0, sizeof(usb_descriptor_device_t));
-
-            usb_ohci_transfer_desc_t *desc = usb_ohci_transfer_desc_alloc(controller, setup, 0x2, true, deviceDesc, 8);
-          //  memset(desc, 0, sizeof(usb_ohci_transfer_desc_t));
-          //  desc->Direction = 0x2;
-          //  desc->InUse = true;
-          //  desc->DataToggle = true;
-          //  desc->NoToggleCarry = true;
-          //  desc->ContentBufferPointer = (uint32_t)pmm_dma_get_phys((uintptr_t)deviceDesc);
-           // desc->BufferEnd = desc->ContentBufferPointer + 8 - 1;
-           // setup->NextTransferDesc = (uint32_t)pmm_dma_get_phys((uintptr_t)desc);*/
-
-           // sleep(500);
-          //  usb_ohci_write(controller, USB_OHCI_REG_CONTROL_HEAD_ED, (uint32_t)pmm_dma_get_phys((uintptr_t)controller->EndpointDescPool));
-         //   usb_ohci_write(controller, USB_OHCI_REG_COMMAND_STATUS, usb_ohci_read(controller, USB_OHCI_REG_COMMAND_STATUS) | USB_OHCI_REG_STATUS_CONTROL_LIST_FILLED);
-         //   usb_ohci_write(controller, USB_OHCI_REG_CONTROL, usb_ohci_read(controller, USB_OHCI_REG_CONTROL) | USB_OHCI_REG_CONTROL_CONTROL_ENABLE);
-
-         //   usb_ohci_write(controller, USB_OHCI_REG_CONTROL, (usb_ohci_read(controller, USB_OHCI_REG_CONTROL) & ~USB_OHCI_REG_CONTROL_STATE_USBSUSPEND) | USB_OHCI_REG_CONTROL_STATE_USBOPERATIONAL);
-         //   control = usb_ohci_read(controller, USB_OHCI_REG_CONTROL);
-
-         /*   while(true) {
-                sleep(10);
-                control = usb_ohci_read(controller, USB_OHCI_REG_CONTROL);
-                kprintf("int 0x%X\n", usb_ohci_read(controller, USB_OHCI_REG_INTERRUPT_STATUS));
-                kprintf("frame %u\n", usb_ohci_read(controller, USB_OHCI_REG_FRAME_NUMBER));
-                kprintf("control 0x%X\n", usb_ohci_read(controller, USB_OHCI_REG_CONTROL));
-            }*/
         }
     }
 }
@@ -500,6 +470,7 @@ void usb_ohci_init(PciDevice *pciDevice) {
     controller->RootDevice->AllocAddress = usb_ohci_address_alloc;
     controller->RootDevice->FreeAddress = usb_ohci_address_free;
     controller->RootDevice->ControlTransfer = usb_ohci_device_control;
+    controller->RootDevice->InterruptTransferStart = usb_ohci_device_interrupt_start;
 
     // These fields are mostly meaningless as this is the root hub.
     controller->RootDevice->Port = 0;

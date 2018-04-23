@@ -188,10 +188,10 @@ bool usb_keyboard_init(usb_device_t *usbDevice, usb_interface_t *interface, uint
 
     usbKeyboardTmp = usbKeyboard;
     running = false;
-    usb_uhci_device_interrupt_in_start(usbDevice, usbKeyboard->DataEndpoint, sizeof(usb_keyboard_input_report_t));
-    tasking_add_process(tasking_create_process("usbkd", usb_keyboard_boop, 0, 0));
-    while (!running);
-    running = false;
+    //usbDevice->InterruptTransferStart(usbDevice, usbKeyboard->DataEndpoint, sizeof(usb_keyboard_input_report_t));
+   // tasking_add_process(tasking_create_process("usbkd", usb_keyboard_boop, 0, 0));
+    //while (!running);
+    //running = false;
 
     return true;
 }
