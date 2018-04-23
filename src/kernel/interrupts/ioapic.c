@@ -146,6 +146,10 @@ void ioapic_init() {
     if (ioApicInitialized)
         panic("IOAPIC: Attempting to initialize multiple times.\n");
 
+    // If ACPI is not supported, we cannot support an I/O APIC.
+    if (!acpi_supported())
+        return;
+
     // Search for I/O APIC entry in ACPI.
     ACPI_MADT_IO_APIC *ioApicMadt = (ACPI_MADT_IO_APIC*)acpi_search_madt(ACPI_MADT_TYPE_IO_APIC, sizeof(ACPI_MADT_IO_APIC), 0);
     if (ioApicMadt == NULL) {

@@ -60,10 +60,13 @@ void irqs_handler(IrqRegisters_t *regs) {
     // Get IRQ number.
     uint8_t irq = useLapic ? lapic_get_irq() : pic_get_irq();
 
-    // Invoke any handler registered.
-    irq_handler handler = irqHandlers[irq];
-    if (handler)
-        handler(regs, irq);
+    // Ensure IRQ is within range.
+    if (irq < irqCount) {
+        // Invoke any handler registered.
+        irq_handler handler = irqHandlers[irq];
+        if (handler)
+            handler(regs, irq);
+    }
 
     // Send EOI.
     irqs_eoi(irq);
@@ -106,6 +109,7 @@ void irqs_init(void) {
     }
 
     // Allocate space for handler array.
+    kprintf("IRQS: %u possible IRQs.\n", irqCount);
     irqHandlers = kheap_alloc(sizeof(irq_handler) * irqCount);
     memset(irqHandlers, 0, sizeof(irq_handler) * irqCount);
 

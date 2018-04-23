@@ -175,62 +175,12 @@ bool acpi_change_pic_mode(uint32_t value) {
 void acpi_init() {
     kprintf("ACPI: Initializing...\n");
 
-//AcpiDbgLevel = ACPI_LV_VERBOSITY1 ;
-
-
     ACPI_STATUS Status = AcpiInitializeSubsystem();
+    kprintf("acpi status: 0x%X\n", Status);
     Status = AcpiInitializeTables(NULL, 16, false);
+    kprintf("acpi status: 0x%X\n", Status);
     Status = AcpiLoadTables();
-
-    //Status = AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
-
-    // Get Root System Description Pointer (RSDP).
-    /*kprintf("ACPI: Searching for Root System Description Pointer (RSDP)...\n");
-    rsdp = acpi_get_rsdp();
-    if (rsdp == NULL) {
-        kprintf("ACPI: A valid RSDP couldn't be found! Aborting.\n");
-        acpiInitialized = false;
-        return;
-    }
-    kprintf("ACPI: RSDP table found at 0x%p!\n", rsdp);
-
-    // Print OEM ID and revision.
-    char oemId[7];
-    strncpy(oemId, rsdp->oemId, 6);
-    oemId[6] = '\0';
-    kprintf("ACPI:    OEM: \"%s\"\n", oemId);
-    kprintf("ACPI:    Revision: %u\n", rsdp->revision);
-    kprintf("ACPI:    RSDT: 0x%X\n", rsdp->rsdtAddress);
-    kprintf("ACPI:    XSDT: 0x%X\n", rsdp->xsdtAddress);
-
-    // Get Root System Description Table (RSDT).
-    kprintf("ACPI: Getting Root System Description Table (RSDT) at 0x%X...\n", rsdp->rsdtAddress);
-    rsdt = acpi_get_rsdt(rsdp->rsdtAddress);
-    if (rsdt == NULL) {
-        kprintf("ACPI: Couldn't get RSDT! Aborting.\n");
-        acpiInitialized = false;
-        return;
-    }
-    kprintf("ACPI: Mapped RSDT to 0x%p, size: %u bytes\n", rsdt, rsdt->header.length);
-
-    // Get Fixed ACPI Description Table (FADT).
-    kprintf("ACPI: Searching for Fixed ACPI Description Table (FADT)...\n");
-    fadt = (acpi_fadt_t*)acpi_search_rsdt(ACPI_SIGNATURE_FADT, 0);
-    if (fadt == NULL) {
-        kprintf("ACPI: Couldn't get FADT! Aborting.\n");
-        acpiInitialized = false;
-        return;
-    }
-    kprintf("ACPI: Mapped FADT to 0x%p, size: %u bytes\n", fadt, fadt->header.length);
-
-    // Get Multiple APIC Description Table (MADT).
-    kprintf("ACPI: Searching for Multiple APIC Description Table (MADT)...\n");
-    madt = (acpi_madt_t*)acpi_search_rsdt(ACPI_SIGNATURE_MADT, 0);
-    if (madt != NULL)
-        kprintf("ACPI: Mapped MADT to 0x%p, size: %u bytes\n", madt, madt->header.length);
-    else
-        kprintf("ACPI: No MADT found. APICs and SMP will not be available.\n");*/
-
+    kprintf("acpi status: 0x%X\n", Status);
     kprintf("ACPI: Initialized!\n");
     acpiInitialized = true;
 }

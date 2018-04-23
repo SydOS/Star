@@ -186,7 +186,7 @@ static bool kheap_expand(size_t size) {
         currentKernelHeapSize += PAGE_SIZE_4K;
     }
 
-    kprintf_nlock("KHEAP: Heap expanded by 4KB to %u bytes!\n", currentKernelHeapSize);
+    //kprintf_nlock("KHEAP: Heap expanded by 4KB to %u bytes!\n", currentKernelHeapSize);
     return true;
 }
 
