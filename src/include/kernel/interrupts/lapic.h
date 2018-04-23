@@ -6,10 +6,8 @@
 // Address that the local APIC is mapped to.
 
 #ifdef X86_64
-#define LAPIC_ADDRESS           0xFFFFFF00FF0B0000
 #define LAPIC_BASE_ADDR_MASK    0xFFFFFFFFFFFFF000
 #else
-#define LAPIC_ADDRESS           0xFF0B0000
 #define LAPIC_BASE_ADDR_MASK    0xFFFFF000
 #endif
 

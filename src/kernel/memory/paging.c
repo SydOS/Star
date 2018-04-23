@@ -118,6 +118,45 @@ void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress) {
     }
 }
 
+void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
+    // Ensure addresses are on 4KB boundaries.
+    if (MASK_PAGEFLAGS_4K_64BIT(startPhys) || MASK_PAGEFLAGS_4K_64BIT(endPhys))
+        panic("PAGING: Non-4KB aligned address range (0x%llX-0x%llX) specified!\n", startPhys, endPhys);
+    if (startPhys > endPhys)
+        panic("PAGING: Start address (0x%llX) is after end address (0x%llX)!\n", startPhys, endPhys);
+
+    uint32_t pageCount = ((endPhys - startPhys) / PAGE_SIZE_4K) + 1;// DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K(PhysicalAddress) + Length, PAGE_SIZE_4K);
+
+    // Get next available virtual range.
+    uintptr_t page = PAGING_FIRST_DEVICE_ADDRESS;
+    uint32_t currentCount = 0;
+    uint64_t phys;
+    while (currentCount < pageCount) {     
+        // Check if page is free.
+        if (!paging_get_phys(page, &phys))
+            currentCount++;
+        else {
+            // Move to next page.
+            page += PAGE_SIZE_4K;
+            if (page > PAGING_LAST_DEVICE_ADDRESS)
+                panic("PAGING: Out of device virtual addresses!\n");
+
+            // Start back at zero.
+            currentCount = 0;
+        }
+    }
+
+    // Check if last page is outside bounds.
+    if (page + ((pageCount - 1) * PAGE_SIZE_4K) > PAGING_LAST_DEVICE_ADDRESS)
+        panic("PAGING: Out of device virtual addresses!\n");
+
+    // Map range.
+    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), startPhys, true, true);
+
+    // Return address.
+    return (void*)(page);
+}
+
 /**
  * Unmaps a region of virtual memory without returning pages to the page stack, or unmapping non-stack memory.
  * @param startAddress The first address to unmap.
@@ -133,6 +172,10 @@ void paging_unmap_region_phys(uintptr_t startAddress, uintptr_t endAddress) {
     // Unmap range.
     for (uint32_t i = 0; i <= (endAddress - startAddress) / PAGE_SIZE_4K; i++)
         paging_unmap(startAddress + (i * PAGE_SIZE_4K));
+}
+
+void paging_device_free(uintptr_t startAddress, uintptr_t endAddress) {
+    paging_unmap_region_phys(startAddress, endAddress);
 }
 
 static void paging_pagefault_handler(ExceptionRegisters_t *regs) {

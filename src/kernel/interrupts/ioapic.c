@@ -12,6 +12,8 @@
 
 static bool ioApicInitialized = false;
 
+static void *ioApicPointer;
+
 #define INTERRUPT_MAP_MAGIC 0xDEADBEEF
 static uint32_t interrupt_redirections[24] = {
     INTERRUPT_MAP_MAGIC,
@@ -53,18 +55,18 @@ inline bool ioapic_supported() {
 
 static void ioapic_write(uint8_t offset, uint32_t value) {
     // Fill the I/O APIC's register selection memory area with our requested register offset.
-    *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOREGSL) = offset;
+    *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOREGSL) = offset;
 
     // Write data into the I/O APIC's data window memory area.
-    *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOWIN) = value;
+    *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOWIN) = value;
 }
 
 static uint32_t ioapic_read(uint8_t offset) {
     // Fill the I/O APIC's register selection memory area with our requested register offset.
-    *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOREGSL) = offset;
+    *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOREGSL) = offset;
 
     // Read the result from the I/O APIC's data window memory area.
-    return *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOWIN);
+    return *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOWIN);
 }
 
 uint8_t ioapic_id() {
@@ -160,11 +162,11 @@ void ioapic_init() {
 
     // Map I/O APIC to virtual memory.
     kprintf("IOAPIC: Initializing I/O APIC %u at 0x%X...\n", ioApicMadt->Id, ioApicMadt->Address);
-    paging_map(IOAPIC_ADDRESS, ioApicMadt->Address, true, true);
+    ioApicPointer = paging_device_alloc(ioApicMadt->Address, ioApicMadt->Address);
 
     // Get info about I/O APIC.
     uint8_t maxInterrupts = ioapic_max_interrupts();
-    kprintf("IOAPIC: Mapped I/O APIC to 0x%p!\n", IOAPIC_ADDRESS);
+    kprintf("IOAPIC: Mapped I/O APIC to 0x%p!\n", ioApicPointer);
     kprintf("IOAPIC:     ID: %u\n", ioapic_id());
     kprintf("IOAPIC:     Version: 0x%X.\n", ioapic_version());
     kprintf("IOPAIC:     Max interrupts: %u\n", maxInterrupts);

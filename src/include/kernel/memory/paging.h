@@ -79,6 +79,13 @@ enum {
     PAGING_PAGE_GLOBAL          = 0x80
 };
 
+#ifdef X86_64
+
+#else
+#define PAGING_FIRST_DEVICE_ADDRESS 0xF0000000
+#define PAGING_LAST_DEVICE_ADDRESS  (PAGE_TABLES_ADDRESS - PAGE_SIZE_4K)
+#endif
+
 extern void paging_change_directory(uintptr_t directoryPhysicalAddr);
 extern void paging_flush_tlb();
 extern void paging_flush_tlb_address(uintptr_t address);
@@ -90,6 +97,9 @@ extern void paging_map_region(uintptr_t startAddress, uintptr_t endAddress, bool
 extern void paging_map_region_phys(uintptr_t startAddress, uintptr_t endAddress, uint64_t startPhys, bool kernel, bool writeable);
 extern void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress);
 extern void paging_unmap_region_phys(uintptr_t startAddress, uintptr_t endAddress);
+
+extern void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys);
+extern void paging_device_free(uintptr_t startAddress, uintptr_t endAddress);
 
 extern void paging_init();
 

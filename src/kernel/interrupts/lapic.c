@@ -9,7 +9,7 @@
 #include <kernel/memory/paging.h>
 
 extern void _irq_empty(void);
-
+static void *lapicPointer;
 
 bool lapic_supported(void) {
     // Check for the APIC feature.
@@ -37,12 +37,12 @@ bool lapic_enabled(void) {
 
 static uint32_t lapic_read(uint16_t offset) {
     // Read value from LAPIC.
-    return *(volatile uint32_t*)((uintptr_t)(LAPIC_ADDRESS + offset));
+    return *(volatile uint32_t*)((uintptr_t)(lapicPointer + offset));
 }
 
 static void lapic_write(uint16_t offset, uint32_t value) {
     // Send data to LAPIC.
-    *(volatile uint32_t*)((uintptr_t)(LAPIC_ADDRESS + offset)) = value;
+    *(volatile uint32_t*)((uintptr_t)(lapicPointer + offset)) = value;
     (void)lapic_read(LAPIC_REG_ID);
 }
 
@@ -132,7 +132,6 @@ int16_t lapic_get_irq(void) {
 
 void lapic_setup(void) {
     // Map LAPIC and get info.
-    kprintf("LAPIC: Mapped to 0x%p\n", LAPIC_ADDRESS);
     kprintf("LAPIC: x2 APIC: %s\n", lapic_x2apic() ? "yes" : "no");
     kprintf("LAPIC: ID: %u\n", lapic_id());
     kprintf("LAPIC: Version: 0x%x\n", lapic_version());
@@ -150,8 +149,9 @@ void lapic_setup(void) {
 void lapic_init(void) {
     // Get the base address of the local APIC and map it.
     uint32_t base = lapic_get_base();
-    paging_map(LAPIC_ADDRESS, base, true, true);
-    kprintf("LAPIC: Initializing LAPIC at 0x%p...\n", base);
+    lapicPointer = paging_device_alloc(base, base);
+    
+    kprintf("LAPIC: Mapped LAPIC at 0x%X to 0x%p...\n", base, lapicPointer);
     idt_open_interrupt_gate(LAPIC_SPURIOUS_INT, (uintptr_t)_irq_empty);
 
     lapic_setup();

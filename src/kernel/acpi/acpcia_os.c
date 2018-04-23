@@ -13,16 +13,6 @@
 
 #include <kernel/interrupts/irqs.h>
 
-#ifdef X86_64
-#define ACPI_TEMP_ADDRESS   0xFFFFFF00FEF00000
-#define ACPI_FIRST_ADDRESS  0xFFFFFF00FEF01000
-#define ACPI_LAST_ADDRESS   0xFFFFFF00FEFFF000
-#else
-#define ACPI_TEMP_ADDRESS   0xFEF00000
-#define ACPI_FIRST_ADDRESS  0xFEF01000
-#define ACPI_LAST_ADDRESS   0xFEFFF000
-#endif
-
 
 // ACPI RDSP signature.
 #define ACPI_RSDP_PATTERN1  "RSD "
@@ -78,41 +68,16 @@ ACPI_STATUS AcpiOsPhysicalTableOverride ( ACPI_TABLE_HEADER *ExistingTable, ACPI
 void *AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length) {
     uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K(PhysicalAddress) + Length, PAGE_SIZE_4K);
 
-    // Get next available virtual range.
-    uintptr_t page = ACPI_FIRST_ADDRESS;
-    uint32_t currentCount = 0;
-    uint64_t phys;
-    while (currentCount < pageCount) {     
-        // Check if page is free.
-        if (!paging_get_phys(page, &phys))
-            currentCount++;
-        else {
-            // Move to next page.
-            page += PAGE_SIZE_4K;
-            if (page > ACPI_LAST_ADDRESS)
-                panic("ACPI: Out of virtual addresses!\n");
+    // Allocate address space.
+    return paging_device_alloc(MASK_PAGE_4K(PhysicalAddress), MASK_PAGE_4K(PhysicalAddress) + ((pageCount - 1) * PAGE_SIZE_4K)) + MASK_PAGEFLAGS_4K(PhysicalAddress);
 
-            // Start back at zero.
-            currentCount = 0;
-        }
-    }
-
-    // Check if last page is outside bounds.
-    if (page + ((pageCount - 1) * PAGE_SIZE_4K) > ACPI_LAST_ADDRESS)
-        panic("ACPI: Out of virtual addresses!\n");
-
-    // Map range.
-    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), MASK_PAGE_4K(PhysicalAddress), true, true);
-
-    // Return address.
-    return page + MASK_PAGEFLAGS_4K(PhysicalAddress);
 }
 
 void AcpiOsUnmapMemory(void *where, ACPI_SIZE length) {
     // Get page count and unmap table.
     uint32_t pageCount = DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K((uintptr_t)where) + length, PAGE_SIZE_4K);
     page_t startPage = MASK_PAGE_4K((uintptr_t)where);
-    paging_unmap_region_phys(startPage, startPage + ((pageCount - 1) * PAGE_SIZE_4K));
+    paging_device_free(startPage, startPage + ((pageCount - 1) * PAGE_SIZE_4K));
 }
 
 ACPI_STATUS AcpiOsGetPhysicalAddress(void *LogicalAddress, ACPI_PHYSICAL_ADDRESS *PhysicalAddress) {
