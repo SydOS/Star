@@ -283,6 +283,11 @@ void pci_display() {
             kprintf("  - DETECTED UHCI USB CONTROLLER\n");
             usb_uhci_init(device);
         }
+        else if (device->Class == 0x0C && device->Subclass == 0x03 && pci_config_read_byte(device, PCI_REG_PROG_IF) == 0x10) {
+            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+            kprintf("  - DETECTED OHCI USB CONTROLLER\n");
+            usb_ohci_init(device);
+        }
     }
     kprintf("%u total PCI devices\n", pciDevicesLength);
 }
