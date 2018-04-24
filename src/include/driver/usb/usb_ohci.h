@@ -218,6 +218,8 @@ typedef struct {
 typedef struct {
     PciDevice *PciDevice;
     uint32_t BaseAddress;
+
+    uint32_t *BasePointer;
     uintptr_t BaseAddressVirt;
 
 

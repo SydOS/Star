@@ -200,16 +200,16 @@ static bool usb_ohci_address_alloc(usb_device_t *usbDevice) {
 
 static uint32_t usb_ohci_read(usb_ohci_controller_t *controller, uint8_t reg) {
     // Read the result from the OHCI controller's memory.
-    return *(volatile uint32_t*)(controller->BaseAddressVirt + reg);
+    return *(volatile uint32_t*)((uintptr_t)controller->BasePointer + reg);
 }
 
 static void usb_ohci_write(usb_ohci_controller_t *controller, uint8_t reg, uint32_t value) {
     // Write to the OHCI controller's memory.
-    *(volatile uint32_t*)(controller->BaseAddressVirt + reg) = value;
+    *(volatile uint32_t*)((uintptr_t)controller->BasePointer + reg) = value;
 }
 
 static bool usb_ohci_device_control(usb_device_t* device, usb_endpoint_t *endpoint, usb_control_transfer_t transfer, void *buffer, uint16_t length) {
-    // Get the UHCI controller.
+    // Get the OHCI controller.
     usb_ohci_controller_t *controller = (usb_ohci_controller_t*)device->Controller;
 
     // Temporary buffer.
@@ -321,7 +321,30 @@ static bool usb_ohci_device_control(usb_device_t* device, usb_endpoint_t *endpoi
 }
 
 static void usb_ohci_device_interrupt_start(usb_device_t *device, usb_endpoint_t *endpoint, uint16_t length) {
+    // Get the OHCI controller.
+    usb_ohci_controller_t *controller = (usb_ohci_controller_t*)device->Controller;
 
+    // Temporary buffer.
+    void *usbBuffer = usb_ohci_alloc(controller, length);
+
+    // Create SETUP transfer descriptor.
+    usb_ohci_transfer_desc_t *transferDesc = usb_ohci_transfer_desc_alloc(controller, NULL, USB_OHCI_TD_PACKET_IN, false, usbBuffer, length);
+
+    // Create endpoint descriptor with the SETUP transfer descriptor as the head.
+    usb_ohci_endpoint_desc_t *endpointDesc = usb_ohci_endpoint_desc_alloc(controller, NULL, device, endpoint, transferDesc);
+
+    for (int i = 0; i < 32; i++)
+        controller->Hcca->InterruptTable[i] = (uint32_t)pmm_dma_get_phys((uintptr_t)endpointDesc);
+    usb_ohci_write(controller, USB_OHCI_REG_CONTROL, usb_ohci_read(controller, USB_OHCI_REG_CONTROL) | USB_OHCI_REG_CONTROL_PERIOD_ENABLE);
+
+    while(true) {
+       // kprintf("");
+       sleep(100);
+        kprintf("st 0x%X\n", usb_ohci_read(controller, USB_OHCI_REG_INTERRUPT_STATUS));
+        if (transferDesc->ConditionCode != 0xF) {
+            kprintf("");
+        }
+    }
 }
 
 static void usb_ohci_reset(usb_ohci_controller_t *controller) {
@@ -429,13 +452,12 @@ static bool usb_ohci_probe(usb_ohci_controller_t *controller) {
 void usb_ohci_init(PciDevice *pciDevice) {
     kprintf("OHCI: Initializing...\n");
 
+    // Create controller object and map to memory.
     usb_ohci_controller_t *controller = (usb_ohci_controller_t*)kheap_alloc(sizeof(usb_ohci_controller_t));
     memset(controller, 0, sizeof(usb_ohci_controller_t));
-
-    kprintf("OHCI: Mapping controller...\n");
     controller->BaseAddress = pciDevice->BAR[0] & PCI_BAR_MEMORY_MASK;
-    paging_map(0xFF000000 + (controller->BaseAddress & 0xFFFF), controller->BaseAddress, true, true);
-    controller->BaseAddressVirt = 0xFF000000 + (controller->BaseAddress & 0xFFFF);
+    controller->BasePointer = (uint32_t*)paging_device_alloc(controller->BaseAddress, controller->BaseAddress);
+    kprintf("OHCI: Mapping controller at 0x%X to 0x%p...\n", controller->BaseAddress, controller->BasePointer);
 
     // Get version and ensure we can support it.
     uint32_t version = usb_ohci_read(controller, USB_OHCI_REG_REVISION) & USB_OHCI_REG_REVISION_MASK;
@@ -514,7 +536,6 @@ void usb_ohci_init(PciDevice *pciDevice) {
     // Reset the controller.
     usb_ohci_reset(controller);
     control = usb_ohci_read(controller, USB_OHCI_REG_CONTROL);
-
 
     // Probe.
     usb_ohci_probe(controller);

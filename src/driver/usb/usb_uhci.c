@@ -621,6 +621,7 @@ void usb_uhci_init(PciDevice *device) {
     controller->RootDevice->AllocAddress = usb_uhci_address_alloc;
     controller->RootDevice->FreeAddress = usb_uhci_address_free;
     controller->RootDevice->ControlTransfer = usb_uhci_device_control;
+    controller->RootDevice->InterruptTransferStart = usb_uhci_device_interrupt_in_start;
 
     // These fields are mostly meaningless as this is the root hub.
     controller->RootDevice->Port = 0;
