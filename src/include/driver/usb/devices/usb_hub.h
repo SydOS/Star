@@ -2,8 +2,8 @@
 #define USB_HUB_H
 
 #include <main.h>
-#include <driver/usb/usb_descriptors.h>
-#include <driver/usb/usb_device.h>
+#include <driver/usb/devices/usb_descriptors.h>
+#include <driver/usb/devices/usb_device.h>
 
 #define USB_HUB_POWERSW_GANGED      0x0
 #define USB_HUB_POWERSW_INDIV       0x1

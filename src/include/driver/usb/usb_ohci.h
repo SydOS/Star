@@ -5,7 +5,7 @@
 #include <kernel/memory/paging.h>
 #include <driver/pci.h>
 
-#include <driver/usb/usb_device.h>
+#include <driver/usb/devices/usb_device.h>
 
 //
 // Control and status.

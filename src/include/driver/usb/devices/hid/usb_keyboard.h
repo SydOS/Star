@@ -2,8 +2,8 @@
 #define USB_KEYBOARD_H
 
 #include <main.h>
-#include <driver/usb/usb_device.h>
-#include <driver/usb/usb_hid.h>
+#include <driver/usb/devices/usb_device.h>
+#include <driver/usb/devices/hid/usb_hid.h>
 
 #define USB_KEYBOARD_NO_EVENT               0x00
 #define USB_KEYBOARD_ERROR_ROLLOVER         0x01

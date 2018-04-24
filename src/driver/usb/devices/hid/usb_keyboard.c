@@ -2,11 +2,11 @@
 #include <tools.h>
 #include <kprint.h>
 #include <string.h>
-#include <driver/usb/usb_keyboard.h>
-#include <driver/usb/usb_hid.h>
-#include <driver/usb/usb_device.h>
-#include <driver/usb/usb_requests.h>
-#include <driver/usb/usb_descriptors.h>
+#include <driver/usb/devices/hid/usb_keyboard.h>
+#include <driver/usb/devices/hid/usb_hid.h>
+#include <driver/usb/devices/usb_device.h>
+#include <driver/usb/devices/usb_requests.h>
+#include <driver/usb/devices/usb_descriptors.h>
 #include <libs/keyboard.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>

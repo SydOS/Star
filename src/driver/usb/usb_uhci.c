@@ -6,9 +6,9 @@
 #include <math.h>
 #include <driver/usb/usb_uhci.h>
 
-#include <driver/usb/usb_descriptors.h>
-#include <driver/usb/usb_requests.h>
-#include <driver/usb/usb_device.h>
+#include <driver/usb/devices/usb_descriptors.h>
+#include <driver/usb/devices/usb_requests.h>
+#include <driver/usb/devices/usb_device.h>
 
 #include <kernel/interrupts/irqs.h>
 #include <kernel/memory/kheap.h>

@@ -2,10 +2,10 @@
 #include <tools.h>
 #include <kprint.h>
 #include <string.h>
-#include <driver/usb/usb_hub.h>
-#include <driver/usb/usb_device.h>
-#include <driver/usb/usb_requests.h>
-#include <driver/usb/usb_descriptors.h>
+#include <driver/usb/devices/usb_hub.h>
+#include <driver/usb/devices/usb_device.h>
+#include <driver/usb/devices/usb_requests.h>
+#include <driver/usb/devices/usb_descriptors.h>
 
 #include <kernel/memory/kheap.h>
 

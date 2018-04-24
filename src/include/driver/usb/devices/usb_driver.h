@@ -2,7 +2,7 @@
 #define USB_DRIVER_H
 
 #include <main.h>
-#include <driver/usb/usb_device.h>
+#include <driver/usb/devices/usb_device.h>
 
 // Driver object.
 typedef struct {

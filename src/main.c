@@ -22,7 +22,7 @@
 #include <libs/keyboard.h>
 #include <driver/rtc.h>
 
-#include <driver/usb/usb_device.h>
+#include <driver/usb/devices/usb_device.h>
 
 #include <acpi.h>
 

@@ -4,7 +4,7 @@
 #include <libs/keyboard.h>
 
 #include <driver/ps2/ps2_keyboard.h>
-#include <driver/usb/usb_keyboard.h>
+#include <driver/usb/devices/hid/usb_keyboard.h>
 
 struct key_mapping
 {
