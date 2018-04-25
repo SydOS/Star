@@ -32,12 +32,13 @@ int16_t ata_check_status(ata_channel_t *channel, bool master) {
     return ATA_CHK_STATUS_OK;
 }
 
-static void ata_callback_isa(IrqRegisters_t *regs, uint8_t irqNum) {
+static bool ata_callback_isa(irq_regs_t *regs, uint8_t irqNum) {
     kprintf_nlock("ATA: ISA IRQ%u raised!\n", irqNum);
     if (irqNum == IRQ_PRI_ATA)
         isaPrimary->InterruptTriggered = true;
     else if (irqNum == IRQ_SEC_ATA)
         isaSecondary->InterruptTriggered = true;
+    return true;
 }
 
 static bool ata_callback_pci(pci_device_t *device) {

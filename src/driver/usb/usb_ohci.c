@@ -449,6 +449,10 @@ static bool usb_ohci_probe(usb_ohci_controller_t *controller) {
     }
 }
 
+static bool usb_ohci_irq_handler(pci_device_t *pciDevice) {
+    return true;
+}
+
 bool usb_ohci_init(pci_device_t *pciDevice) {
     // Is the PCI device an OHCI controller?
     if (!(pciDevice->Class == PCI_CLASS_SERIAL_BUS && pciDevice->Subclass == PCI_SUBCLASS_SERIAL_BUS_USB && pciDevice->Interface == PCI_INTERFACE_SERIAL_BUS_USB_OHCI))
@@ -522,6 +526,9 @@ bool usb_ohci_init(pci_device_t *pciDevice) {
     else
         StartUsbDevice = controller->RootDevice;
 
+    pciDevice->DriverObject = controller;
+    pciDevice->InterruptHandler = usb_ohci_irq_handler;
+
     // Initialize host controller area.
     controller->Hcca = (usb_ohci_controller_comm_area_t*)usb_ohci_alloc(controller, sizeof(usb_ohci_controller_comm_area_t));
     memset(controller->Hcca, 0, sizeof(usb_ohci_controller_comm_area_t));
@@ -539,6 +546,8 @@ bool usb_ohci_init(pci_device_t *pciDevice) {
     // Reset the controller.
     usb_ohci_reset(controller);
     control = usb_ohci_read(controller, USB_OHCI_REG_CONTROL);
+
+    usb_ohci_write(controller, USB_OHCI_REG_INTERRUPT_ENABLE, 0xFFFFFFFF);
 
     // Probe.
     usb_ohci_probe(controller);

@@ -57,14 +57,19 @@ typedef struct {
     
     // Stack segment.
     uintptr_t ss;   
-} __attribute__((packed)) IrqRegisters_t;
+} __attribute__((packed)) irq_regs_t;
 
-typedef void (*irq_handler)(IrqRegisters_t *regs, uint8_t irqNum);
+typedef bool (*irq_handler_func_t)(irq_regs_t *regs, uint8_t irqNum);
+
+typedef struct irq_handler_t {
+    struct irq_handler_t *Next;
+    irq_handler_func_t HandlerFunc;
+} irq_handler_t;
 
 extern void irqs_eoi(uint8_t irq);
-extern void irqs_install_handler(uint8_t irq, irq_handler handler);
-extern void irqs_remove_handler(uint8_t irq);
-extern bool irqs_handler_mapped(uint8_t irq);
+extern void irqs_install_handler(uint8_t irq, irq_handler_func_t handlerFunc);
+extern void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc);
+extern bool irqs_handler_mapped(uint8_t irq, irq_handler_func_t handlerFunc);
 extern void irqs_init(void);
 
 #endif

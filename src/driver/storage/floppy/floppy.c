@@ -18,9 +18,10 @@ extern bool floppy_init_dma();
 /**
  * Handles IRQ6 firings
  */
-static void floppy_callback(IrqRegisters_t* regs, uint8_t irq) {
+static bool floppy_callback(irq_regs_t* regs, uint8_t irq) {
 	// Set our trigger value.
 	irqTriggered = true;
+	return true;
 }
 
 /**

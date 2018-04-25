@@ -15,7 +15,7 @@ extern void _irq_common(void);
 
 // Array of IRQ handler pointers.
 static uint8_t irqCount = 0;
-static irq_handler *irqHandlers;
+static irq_handler_t **irqHandlers;
 
 // Do we send EOIs to the LAPIC instead of the PIC?
 static bool useLapic = false;
@@ -29,43 +29,85 @@ void irqs_eoi(uint8_t irq) {
 }
 
 // Installs an IRQ handler.
-void irqs_install_handler(uint8_t irq, irq_handler handler) {
+void irqs_install_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
     // Ensure IRQ is valid.
     if (irq >= irqCount)
         panic("IRQS: IRQ out of range.\n");
 
-    // Add handler for IRQ to array.
+    // Create handler object.
+    irq_handler_t *handler = kheap_alloc(sizeof(irq_handler_t));
+    memset(handler, 0, sizeof(irq_handler_t));
+
+    // Add handler.
+    handler->HandlerFunc = handlerFunc;
+    if (irqHandlers[irq] != NULL)
+        handler->Next = irqHandlers[irq];
     irqHandlers[irq] = handler;
-    kprintf("IRQS: Handler for IRQ%u installed!\n", irq);
+    kprintf("IRQS: Handler 0x%p for IRQ%u installed!\n", handlerFunc, irq);
 }
 
 // Removes an IRQ handler.
-void irqs_remove_handler(uint8_t irq) {
+void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
     // Ensure IRQ is valid.
     if (irq >= irqCount)
         panic("IRQS: IRQ out of range.\n");
 
-    // Null out handler for IRQ in array.
-    irqHandlers[irq] = 0;
-    kprintf("IRQS: Handler for IRQ%u removed!\n", irq);
+    // Try to find handler function.
+    irq_handler_t *prevHandler = NULL;
+    irq_handler_t *handler = irqHandlers[irq];
+    while (handler != NULL) {
+        if (handler->HandlerFunc == handlerFunc)
+            break;
+        prevHandler = handler;
+        handler = handler->Next;
+    }
+
+    // If handler is still NULL, we couldn't find the specified handler function.
+    if (handler == NULL) {
+        kprintf("IRQS: Unable to find and remove handler 0x%p for IRQ%u!\n", handlerFunc, irq);
+        return;
+    }
+
+    // Remove handler.
+    if (prevHandler != NULL)
+        prevHandler->Next = handler->Next;
+    else
+        irqHandlers[irq] = handler->Next;
+    kheap_free(handler);
+    kprintf("IRQS: Handler 0x%p for IRQ%u removed!\n", handlerFunc, irq);
 }
 
-bool irqs_handler_mapped(uint8_t irq) {
-    // Check if handler is present.
-    return irqHandlers[irq] != 0;
+bool irqs_handler_mapped(uint8_t irq, irq_handler_func_t handlerFunc) {
+    // Ensure IRQ is valid.
+    if (irq >= irqCount)
+        panic("IRQS: IRQ out of range.\n");
+
+    // Try to find IRQ handler.
+    irq_handler_t *handler = irqHandlers[irq];
+    while (handler != NULL) {
+        if (handler->HandlerFunc == handlerFunc)
+            return true;
+        handler = handler->Next;
+    }
+    return false;
 }
 
 // Handler for IRQss.
-void irqs_handler(IrqRegisters_t *regs) {
+void irqs_handler(irq_regs_t *regs) {
     // Get IRQ number.
     uint8_t irq = useLapic ? lapic_get_irq() : pic_get_irq();
 
     // Ensure IRQ is within range.
     if (irq < irqCount) {
-        // Invoke any handler registered.
-        irq_handler handler = irqHandlers[irq];
-        if (handler)
-            handler(regs, irq);
+        // Invoke registered handlers.
+        irq_handler_t *handler = irqHandlers[irq];
+        while (handler != NULL) {
+            if (handler->HandlerFunc != NULL) {
+                if (handler->HandlerFunc(regs, irq))
+                    break;
+            }
+            handler = handler->Next;
+        }
     }
 
     // Send EOI.
@@ -110,8 +152,8 @@ void irqs_init(void) {
 
     // Allocate space for handler array.
     kprintf("IRQS: %u possible IRQs.\n", irqCount);
-    irqHandlers = kheap_alloc(sizeof(irq_handler) * irqCount);
-    memset(irqHandlers, 0, sizeof(irq_handler) * irqCount);
+    irqHandlers = kheap_alloc(sizeof(irq_handler_t) * irqCount);
+    memset(irqHandlers, 0, sizeof(irq_handler_t) * irqCount);
 
     // Open gates in IDT.
     for (uint8_t irq = 0; irq < irqCount; irq++)

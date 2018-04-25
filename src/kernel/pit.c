@@ -13,7 +13,7 @@
 static uint64_t ticks = 0;
 
 // Return the number of ticks elapsed.
-uint64_t pit_ticks() {
+uint64_t pit_ticks(void) {
 	return ticks;
 }
 
@@ -50,17 +50,18 @@ void pit_startcounter(uint32_t freq, uint8_t counter, uint8_t mode) {
 }
 
 // Callback for PIT channel 0 on IRQ0.
-static void pit_callback(IrqRegisters_t *regs, uint8_t irqNum) {	
+static bool pit_callback(irq_regs_t *regs, uint8_t irqNum) {	
 	// Increment the number of ticks.
 	ticks++;
 
 	// Change tasks every 5ms.
 	if (ticks % 5 == 0)
 		tasking_tick(regs);
+	return true;
 }
 
 // Initialize the PIT.
-void pit_init() {
+void pit_init(void) {
 	// Start main timer at 1 tick = 2 ms.
 	pit_startcounter(1000, PIT_CMD_COUNTER0, PIT_CMD_MODE_SQUAREWAVEGEN);
 

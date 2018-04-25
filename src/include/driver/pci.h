@@ -91,12 +91,15 @@ typedef struct pci_device_t {
 
     pci_base_register_t BaseAddresses[PCI_BAR_COUNT];
 
+    // PCI config space interrupt info.
     uint8_t InterruptPin;
     uint8_t InterruptLine;
-    uint8_t InterruptApic;
+
+    // Actual interrupt number in use by device.
+    uint8_t InterruptNo;
 
     // Interrupt handler.
-    void *InterruptHandler;
+    bool (*InterruptHandler)(struct pci_device_t *pciDevice);
     void *DriverObject;
 } pci_device_t;
 
@@ -110,7 +113,7 @@ typedef struct {
 // Driver array.
 extern const pci_driver_t PciDrivers[];
 
-typedef bool (*pci_handler)(pci_device_t *pciDevice);
+typedef bool (*pci_handler_t)(pci_device_t *pciDevice);
 
 char* pci_class_descriptions[255];
 

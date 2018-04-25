@@ -13,32 +13,21 @@
 // PCI devices.
 pci_device_t *PciDevices = NULL;
 
-static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
+static bool pci_irq_callback(irq_regs_t *regs, uint8_t irqNum) {
     kprintf_nlock("PCI: IRQ %u raised!\n", irqNum);
 
-    // Search through PCI devices until we find the device that raised the interrupt.
-   /* for (uint16_t i = 0; i < pciDevicesLength; i++) {
-        // Get pointer to device.
-        pci_device_t *device = &pciDevices[i];
-
-        // Does the device match the IRQ raised?
-        if (device->InterruptLine == irqNum) {
-            kprintf_nlock("%X:%X status: 0x%X\n", device->VendorId, device->DeviceId, pci_config_read_word(device, PCI_REG_STATUS));
-
-            // Call any handler registered.
-            pci_handler handler = (pci_handler)device->InterruptHandler;
-            if (handler)
-                if (handler(device))
-                    return;
+    // Call handlers of devices that are on the raised IRQ, until the IRQ is handled.
+    pci_device_t *pciDevice = PciDevices;
+    while (pciDevice != NULL) {
+        // Ensure device's IRQ matches and there is an interrupt handler.
+        if (pciDevice->InterruptNo == irqNum) {
+            kprintf_nlock("%X:%X status: 0x%X\n", pciDevice->VendorId, pciDevice->DeviceId, pci_config_read_word(pciDevice, PCI_REG_STATUS));
+            if ((pciDevice->InterruptHandler != NULL) && pciDevice->InterruptHandler(pciDevice))
+                return true;
         }
-    }*/
-}
 
-static void pci_install_irq_handler_apic(uint8_t irq) {
-    if (!(irqs_handler_mapped(irq))) {
-        // Map to APIC and add handler.
-        ioapic_enable_interrupt_pci(ioapic_remap_interrupt(irq), IRQ_OFFSET + irq);
-        irqs_install_handler(irq, pci_irq_callback);
+        // Move to next device.
+        pciDevice = pciDevice->Next;
     }
 }
 
@@ -188,6 +177,7 @@ pci_device_t *pci_get_device(uint8_t bus, uint8_t device, uint8_t function, ACPI
     }
 
     // Find device in ACPI PRT table.
+    pciDevice->InterruptNo = pciDevice->InterruptLine;
     if (routingBuffer->Pointer != NULL) {
         ACPI_PCI_ROUTING_TABLE *table = routingBuffer->Pointer;
         while (((uintptr_t)table < (uintptr_t)routingBuffer->Pointer + routingBuffer->Length) && table->Length) {
@@ -198,8 +188,7 @@ pci_device_t *pci_get_device(uint8_t bus, uint8_t device, uint8_t function, ACPI
                 }
                 else {
                     kprintf("IRQ: Pin 0x%X, Address 0x%llX, Global interrupt: 0x%X\n", table->Pin, table->Address, table->SourceIndex);
-                    pciDevice->InterruptLine = (uint8_t)table->SourceIndex;
-                    pci_install_irq_handler_apic(pciDevice->InterruptLine);
+                    pciDevice->InterruptNo = (uint8_t)table->SourceIndex;
                 }
                 break;
             }        
@@ -211,6 +200,28 @@ pci_device_t *pci_get_device(uint8_t bus, uint8_t device, uint8_t function, ACPI
 
     // Return the device.
     return pciDevice;
+}
+
+static void pci_add_device(pci_device_t *pciDevice, pci_device_t *parentPciDevice) {
+    pciDevice->Parent = parentPciDevice;
+    if (PciDevices != NULL) {
+        pci_device_t *lastDevice = PciDevices;
+        while (lastDevice->Next != NULL)
+            lastDevice = lastDevice->Next;
+        lastDevice->Next = pciDevice;
+    }
+    else
+        PciDevices = pciDevice;
+
+    // Enable interrupt.
+    if ((pciDevice->InterruptNo > 0) && !(irqs_handler_mapped(pciDevice->InterruptNo, pci_irq_callback))) {
+        // Open up the interrupt in the APIC if needed.
+        if (pciDevice->InterruptNo >= IRQ_ISA_COUNT)
+            ioapic_enable_interrupt_pci(ioapic_remap_interrupt(pciDevice->InterruptNo), IRQ_OFFSET + pciDevice->InterruptNo);
+
+        // Install our PCI handler for the IRQ. This handler calls device handlers as required.
+        irqs_install_handler(pciDevice->InterruptNo, pci_irq_callback);
+    }
 }
 
 /**
@@ -241,15 +252,7 @@ static void pci_check_busses(uint8_t bus, pci_device_t *parentPciDevice) {
 
         // Add device.
         pci_print_info(pciDevice);
-        pciDevice->Parent = parentPciDevice;
-        if (PciDevices != NULL) {
-            pci_device_t *lastDevice = PciDevices;
-            while (lastDevice->Next != NULL)
-                lastDevice = lastDevice->Next;
-            lastDevice->Next = pciDevice;
-        }
-        else
-            PciDevices = pciDevice;
+        pci_add_device(pciDevice, parentPciDevice);
 
         // If the card reports more than one function, let's scan those too.
         if ((pciDevice->HeaderType & PCI_HEADER_TYPE_MULTIFUNC) != 0) {
@@ -263,11 +266,7 @@ static void pci_check_busses(uint8_t bus, pci_device_t *parentPciDevice) {
 
                 // Add device.
                 pci_print_info(funcDevice);
-                pciDevice->Parent = parentPciDevice;
-                pci_device_t *lastDevice = PciDevices;
-                while (lastDevice->Next != NULL)
-                    lastDevice = lastDevice->Next;
-                lastDevice->Next = funcDevice;
+                pci_add_device(funcDevice, parentPciDevice);
             }
         }
 

@@ -11,12 +11,12 @@
 //extern void _irq18();
 //extern void _irq19();
 
-void test_handler(IrqRegisters_t* regs, uint8_t irq) {
+/*void test_handler(IrqRegisters_t* regs, uint8_t irq) {
 kprintf_nlock("Test: APIC INT %d\n", irq);
 
 	// Send EOI
     lapic_eoi();
-}
+}*/
 
 struct RTL8139 {
 	bool UsesEEPROM;

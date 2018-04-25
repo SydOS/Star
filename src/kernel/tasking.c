@@ -102,9 +102,8 @@ Process* tasking_create_process(char* name, uintptr_t addr, uintptr_t ecx, uintp
     memset((void*)process->StackBottom, 0, 4096);
 
     // Set up registers.
-    process->StackTop -= sizeof(IrqRegisters_t);
-    process->Regs = (IrqRegisters_t*)process->StackTop;
-
+    process->StackTop -= sizeof(irq_regs_t);
+    process->Regs = (irq_regs_t*)process->StackTop;
 
     process->Regs->flags = 0x00000202;
     process->Regs->ip = addr;
@@ -132,7 +131,7 @@ static void tasking_exec() {
     asm volatile ("jmp _irq_exit");
 }
 
-void tasking_tick(IrqRegisters_t *regs) {
+void tasking_tick(irq_regs_t *regs) {
     // Is tasking enabled?
     if (!taskingEnabled)
         return;
