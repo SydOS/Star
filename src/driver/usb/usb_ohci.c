@@ -449,10 +449,13 @@ static bool usb_ohci_probe(usb_ohci_controller_t *controller) {
     }
 }
 
-void usb_ohci_init(pci_device_t *pciDevice) {
-    kprintf("OHCI: Initializing...\n");
+bool usb_ohci_init(pci_device_t *pciDevice) {
+    // Is the PCI device an OHCI controller?
+    if (!(pciDevice->Class == PCI_CLASS_SERIAL_BUS && pciDevice->Subclass == PCI_SUBCLASS_SERIAL_BUS_USB && pciDevice->Interface == PCI_INTERFACE_SERIAL_BUS_USB_OHCI))
+        return false;
 
     // Create controller object and map to memory.
+    kprintf("OHCI: Initializing...\n");
     usb_ohci_controller_t *controller = (usb_ohci_controller_t*)kheap_alloc(sizeof(usb_ohci_controller_t));
     memset(controller, 0, sizeof(usb_ohci_controller_t));
     controller->BaseAddress = pciDevice->BaseAddresses[0].BaseAddress;
@@ -464,7 +467,7 @@ void usb_ohci_init(pci_device_t *pciDevice) {
     if (version < USB_OHCI_MIN_VERSION) {
         kprintf("OHCI: Controller version is too low, aborting! (%u.%u)\n", version >> 4, version & 0xF);
         kheap_free(controller);
-        return;
+        return false;
     }
     kprintf("OHCI: Controller version: %u.%u\n", version >> 4, version & 0xF);
 
@@ -483,7 +486,7 @@ void usb_ohci_init(pci_device_t *pciDevice) {
     if (controller->RootDevice == NULL) {
         kprintf("OHCI: Failed to create root device!\n");
         kheap_free(controller);
-        return;
+        return false;
     }
 
     // No parent means it is on the root hub.
@@ -540,5 +543,5 @@ void usb_ohci_init(pci_device_t *pciDevice) {
     // Probe.
     usb_ohci_probe(controller);
 
-
+    return true;
 }

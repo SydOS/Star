@@ -10,25 +10,14 @@
 
 #include <acpi.h>
 
-// Array of PCI device drivers.
-const pci_driver_t PciDrivers[] = {
-
-
-    // End driver.
-    { "", NULL }
-};
-
 // PCI devices.
-pci_device_t *StartPciDevice = NULL;
-
-static pci_device_t *pciDevices = NULL;
-static size_t pciDevicesLength = 0;
+pci_device_t *PciDevices = NULL;
 
 static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
     kprintf_nlock("PCI: IRQ %u raised!\n", irqNum);
 
     // Search through PCI devices until we find the device that raised the interrupt.
-    for (uint16_t i = 0; i < pciDevicesLength; i++) {
+   /* for (uint16_t i = 0; i < pciDevicesLength; i++) {
         // Get pointer to device.
         pci_device_t *device = &pciDevices[i];
 
@@ -42,7 +31,7 @@ static void pci_irq_callback(IrqRegisters_t *regs, uint8_t irqNum) {
                 if (handler(device))
                     return;
         }
-    }
+    }*/
 }
 
 static void pci_install_irq_handler_apic(uint8_t irq) {
@@ -125,11 +114,9 @@ void pci_print_info(pci_device_t *pciDevice) {
     kprintf("  - %s\n", pci_class_descriptions[pciDevice->Class]);
 
     // Print base addresses.
-    kprintf("  - BARS: ");
     for (uint8_t i = 0; i < PCI_BAR_COUNT; i++)
         if (pciDevice->BaseAddresses[i].BaseAddress)
-            kprintf(" %u: 0x%X", i + 1, pciDevice->BaseAddresses[i].BaseAddress);
-    kprintf("\n");
+            kprintf("  - BAR%u: 0x%X (%s)\n", i + 1, pciDevice->BaseAddresses[i].BaseAddress, pciDevice->BaseAddresses[i].PortMapped ? "port-mapped" : "memory-mapped");
 
     // Interrupt info
     if(pciDevice->InterruptPin != 0) { 
@@ -175,6 +162,7 @@ pci_device_t *pci_get_device(uint8_t bus, uint8_t device, uint8_t function, ACPI
     pciDevice->RevisionId = pci_config_read_byte(pciDevice, PCI_REG_REVISION_ID);
     pciDevice->Class = pci_config_read_byte(pciDevice, PCI_REG_CLASS);
     pciDevice->Subclass = pci_config_read_byte(pciDevice, PCI_REG_SUBCLASS);
+    pciDevice->Interface = pci_config_read_byte(pciDevice, PCI_REG_PROG_IF);
     pciDevice->HeaderType = pci_config_read_byte(pciDevice, PCI_REG_HEADER_TYPE);
 
     // Get interrupt info.
@@ -245,36 +233,38 @@ static void pci_check_busses(uint8_t bus, pci_device_t *parentPciDevice) {
 
     // Check each device on bus
     kprintf("PCI: Enumerating devices on bus %u...\n", bus);
-    for (uint8_t device = 0; device < 32; device++) {
+    for (uint8_t device = 0; device < PCI_NUM_DEVICES; device++) {
         // Get info on the device and print info
         pci_device_t *pciDevice = pci_get_device(bus, device, 0, &buffer);
         if (pciDevice == NULL)
             continue;
 
         // Add device.
+        pci_print_info(pciDevice);
         pciDevice->Parent = parentPciDevice;
-        if (StartPciDevice != NULL) {
-            pci_device_t *lastDevice = StartPciDevice;
+        if (PciDevices != NULL) {
+            pci_device_t *lastDevice = PciDevices;
             while (lastDevice->Next != NULL)
                 lastDevice = lastDevice->Next;
             lastDevice->Next = pciDevice;
         }
         else
-            StartPciDevice = pciDevice;
+            PciDevices = pciDevice;
 
         // If the card reports more than one function, let's scan those too.
         if ((pciDevice->HeaderType & PCI_HEADER_TYPE_MULTIFUNC) != 0) {
             vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
             kprintf("  - Scanning other functions on multifunction device!\n");
             // Check each function on the device
-            for (int t_function = 1; t_function < 8; t_function++) {
-                pci_device_t *funcDevice = pci_get_device(bus, device, t_function, &buffer);
+            for (uint8_t func = 1; func < PCI_NUM_FUNCTIONS; func++) {
+                pci_device_t *funcDevice = pci_get_device(bus, device, func, &buffer);
                 if (funcDevice == NULL)
                     continue;
 
                 // Add device.
+                pci_print_info(funcDevice);
                 pciDevice->Parent = parentPciDevice;
-                pci_device_t *lastDevice = StartPciDevice;
+                pci_device_t *lastDevice = PciDevices;
                 while (lastDevice->Next != NULL)
                     lastDevice = lastDevice->Next;
                 lastDevice->Next = funcDevice;
@@ -304,71 +294,56 @@ static void pci_check_busses(uint8_t bus, pci_device_t *parentPciDevice) {
     vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 }
 
-void pci_display() {
-    /*for (uint16_t i = 0; i < pciDevicesLength; i++)
-    {
-        PciDevice *device = pciDevices+i;
-        kprintf("Device %u: status: 0x%X\n", i, pci_config_read_word(device, PCI_REG_STATUS));
-        pci_print_info(device);
+static void pci_load_drivers(void) {
+    // Run through devices and load drivers.
+    kprintf("PCI: Loading drivers for devices...\n");
+    pci_device_t *pciDevice = PciDevices;
+    while (pciDevice != NULL) {
+        pci_print_info(pciDevice);
 
-        
-    // Check if the device is the RTL8139
-        if(device->VendorId == 0x10EC && device->DeviceId == 0x8139) {
-            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-            kprintf("  - DETECTED RTL8139\n");
-            rtl8139_init(device);
+        // Attempt to find driver.
+        uint16_t driverIndex = 0;
+        while (PciDrivers[driverIndex].Initialize != NULL) {
+            if (PciDrivers[driverIndex].Initialize(pciDevice))
+                break;
+            driverIndex++;
         }
-        else if (device->Class == 1 && device->Subclass == 1) {
-            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-            kprintf("  - DETECTED ATA CONTROLLER\n");
-            ata_init(device);
-        }
-        else if (device->Class == 0x0C && device->Subclass == 0x03 && pci_config_read_byte(device, PCI_REG_PROG_IF) == 0x00) {
-            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-            kprintf("  - DETECTED UHCI USB CONTROLLER\n");
-            usb_uhci_init(device);
-        }
-        else if (device->Class == 0x0C && device->Subclass == 0x03 && pci_config_read_byte(device, PCI_REG_PROG_IF) == 0x10) {
-            vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-            kprintf("  - DETECTED OHCI USB CONTROLLER\n");
-            usb_ohci_init(device);
-        }
+
+        // Move to next device.
+        pciDevice = pciDevice->Next;
     }
-    kprintf("%u total PCI devices\n", pciDevicesLength);*/
 }
 
 /**
  * Set various variables the PCI driver uses
  */
 void pci_init(void) {
-    pci_class_descriptions[0x00] = "Unclassified device";
-    pci_class_descriptions[0x01] = "Mass storage controller";
-    pci_class_descriptions[0x02] = "Network controller";
-    pci_class_descriptions[0x03] = "Display controller";
-    pci_class_descriptions[0x04] = "Multimedia controller";
-    pci_class_descriptions[0x05] = "Memory controller";
-    pci_class_descriptions[0x06] = "Bridge";
-    pci_class_descriptions[0x07] = "Communication controller";
-    pci_class_descriptions[0x08] = "Generic system peripheral";
-    pci_class_descriptions[0x09] = "Input device controller";
-    pci_class_descriptions[0x0A] = "Docking station";
-    pci_class_descriptions[0x0B] = "Processor";
-    pci_class_descriptions[0x0C] = "Serial bus controller";
-    pci_class_descriptions[0x0D] = "Wireless controller";
-    pci_class_descriptions[0x0E] = "Intelligent controller";
-    pci_class_descriptions[0x0F] = "Satellite communications controller";
-    pci_class_descriptions[0x10] = "Encryption controller";
-    pci_class_descriptions[0x11] = "Signal processing controller";
+    pci_class_descriptions[PCI_CLASS_NONE] = "Unclassified device";
+    pci_class_descriptions[PCI_CLASS_MASS_STORAGE] = "Mass storage controller";
+    pci_class_descriptions[PCI_CLASS_NETWORK] = "Network controller";
+    pci_class_descriptions[PCI_CLASS_DISPLAY] = "Display controller";
+    pci_class_descriptions[PCI_CLASS_MULTIMEDIA] = "Multimedia controller";
+    pci_class_descriptions[PCI_CLASS_MEMORY] = "Memory controller";
+    pci_class_descriptions[PCI_CLASS_BRIDGE] = "Bridge";
+    pci_class_descriptions[PCI_CLASS_SIMPLE_COMM] = "Communication controller";
+    pci_class_descriptions[PCI_CLASS_BASE_SYSTEM] = "Generic system peripheral";
+    pci_class_descriptions[PCI_CLASS_INPUT] = "Input device controller";
+    pci_class_descriptions[PCI_CLASS_DOCKING] = "Docking station";
+    pci_class_descriptions[PCI_CLASS_PROCESSOR] = "Processor";
+    pci_class_descriptions[PCI_CLASS_SERIAL_BUS] = "Serial bus controller";
+    pci_class_descriptions[PCI_CLASS_WIRELESS] = "Wireless controller";
+    pci_class_descriptions[PCI_CLASS_INTELLIGENT_IO] = "Intelligent controller";
+    pci_class_descriptions[PCI_CLASS_SATELLITE_COMM] = "Satellite communications controller";
+    pci_class_descriptions[PCI_CLASS_ENCRYPTION] = "Encryption controller";
+    pci_class_descriptions[PCI_CLASS_DATA_ACQUISITION] = "Signal processing controller";
     pci_class_descriptions[0x12] = "Processing accelerators";
     pci_class_descriptions[0x13] = "Non-Essential Instrumentation";
     pci_class_descriptions[0x40] = "Coprocessor";
-    pci_class_descriptions[0xFF] = "Unassigned class";
-
-    // Ensure array is reset.
-    pciDevices = NULL;
-    pciDevicesLength = 0;
+    pci_class_descriptions[PCI_CLASS_UNKNOWN] = "Unassigned class";
 
     // Begin scanning at bus 0.
     pci_check_busses(0, NULL);
-	pci_display();
+
+    // Load drivers for devices.
+	pci_load_drivers();
 }

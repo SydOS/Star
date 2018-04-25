@@ -238,4 +238,6 @@ typedef struct {
     usb_device_t *RootDevice;
 } usb_ohci_controller_t;
 
+extern bool usb_ohci_init(pci_device_t *pciDevice);
+
 #endif

@@ -5,6 +5,9 @@
 #include <driver/pci_classes.h>
 #include <kernel/interrupts/irqs.h>
 
+#define PCI_NUM_DEVICES             32
+#define PCI_NUM_FUNCTIONS           8
+
 // PCI configuration space registers.
 #define PCI_REG_VENDOR_ID           0x00 // 2
 #define PCI_REG_DEVICE_ID           0x02 // 2
@@ -68,7 +71,6 @@ typedef struct {
 typedef struct pci_device_t {
     // Relations to other devices.
     struct pci_device_t *Parent;
-    struct pci_device_t *FirstChild;
     struct pci_device_t *Next;
 
     uintptr_t ConfigurationAddress;
@@ -84,6 +86,7 @@ typedef struct pci_device_t {
     uint8_t RevisionId;
     uint8_t Class;
     uint8_t Subclass;
+    uint8_t Interface;
     uint8_t HeaderType;
 
     pci_base_register_t BaseAddresses[PCI_BAR_COUNT];

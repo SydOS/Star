@@ -511,10 +511,13 @@ void usb_callback() {
     pci_config_write_word(device, PCI_REG_STATUS, 0x8);
 }
 
-void usb_uhci_init(pci_device_t *pciDevice) {
-    kprintf("UHCI: Initializing...\n");
+bool usb_uhci_init(pci_device_t *pciDevice) {
+    // Is the PCI device an OHCI controller?
+    if (!(pciDevice->Class == PCI_CLASS_SERIAL_BUS && pciDevice->Subclass == PCI_SUBCLASS_SERIAL_BUS_USB && pciDevice->Interface == PCI_INTERFACE_SERIAL_BUS_USB_UHCI))
+        return false;
 
     // Create UHCI controller object.
+    kprintf("UHCI: Initializing...\n");
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)kheap_alloc(sizeof(usb_uhci_controller_t));
     memset(controller, 0, sizeof(usb_uhci_controller_t));
     pciDevice->DriverObject = controller;
@@ -551,7 +554,7 @@ void usb_uhci_init(pci_device_t *pciDevice) {
     if (!usb_uhci_reset(controller)) {
         kprintf("UHCI: Failed to reset controller! Aborting.\n");
         kheap_free(controller);
-        return;
+        return false;
     }
 
     // Ensure controller and interrupts are disabled.
@@ -612,7 +615,7 @@ void usb_uhci_init(pci_device_t *pciDevice) {
     if (controller->RootDevice == NULL) {
         kprintf("UHCI: Failed to create root device!\n");
         kheap_free(controller);
-        return;
+        return false;
     }
 
     // No parent means it is on the root hub.
@@ -676,4 +679,6 @@ void usb_uhci_init(pci_device_t *pciDevice) {
             kprintf("UHCI: Port %u is disabled!\n", port);
         }
     }
+
+    return true;
 }

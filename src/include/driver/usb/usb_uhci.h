@@ -167,4 +167,6 @@ typedef struct {
     usb_device_t *RootDevice;
 } usb_uhci_controller_t;
 
+extern bool usb_uhci_init(pci_device_t *pciDevice);
+
 #endif
