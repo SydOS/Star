@@ -449,13 +449,13 @@ static bool usb_ohci_probe(usb_ohci_controller_t *controller) {
     }
 }
 
-void usb_ohci_init(PciDevice *pciDevice) {
+void usb_ohci_init(pci_device_t *pciDevice) {
     kprintf("OHCI: Initializing...\n");
 
     // Create controller object and map to memory.
     usb_ohci_controller_t *controller = (usb_ohci_controller_t*)kheap_alloc(sizeof(usb_ohci_controller_t));
     memset(controller, 0, sizeof(usb_ohci_controller_t));
-    controller->BaseAddress = pciDevice->BAR[0] & PCI_BAR_MEMORY_MASK;
+    controller->BaseAddress = pciDevice->BaseAddresses[0].BaseAddress;
     controller->BasePointer = (uint32_t*)paging_device_alloc(controller->BaseAddress, controller->BaseAddress);
     kprintf("OHCI: Mapping controller at 0x%X to 0x%p...\n", controller->BaseAddress, controller->BasePointer);
 

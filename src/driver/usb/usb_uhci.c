@@ -504,36 +504,36 @@ static bool usb_uhci_reset(usb_uhci_controller_t *controller) {
 usb_uhci_controller_t *testcontroller;
 void usb_callback() {
     kprintf_nlock("IRQ usb\n");
-    PciDevice *device = testcontroller->PciDevice;
+    pci_device_t *device = testcontroller->PciDevice;
     kprintf_nlock("status: 0x%X\n", pci_config_read_word(device, PCI_REG_STATUS));
     kprintf_nlock("usb status: 0x%X\n", inw(USB_UHCI_USBSTS(testcontroller->BaseAddress)));
     outw(USB_UHCI_USBSTS(testcontroller->BaseAddress), 0x3F);
     pci_config_write_word(device, PCI_REG_STATUS, 0x8);
 }
 
-void usb_uhci_init(PciDevice *device) {
+void usb_uhci_init(pci_device_t *pciDevice) {
     kprintf("UHCI: Initializing...\n");
 
     // Create UHCI controller object.
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)kheap_alloc(sizeof(usb_uhci_controller_t));
     memset(controller, 0, sizeof(usb_uhci_controller_t));
-    device->DriverObject = controller;
+    pciDevice->DriverObject = controller;
     testcontroller = controller;
 
     // Store PCI device object, port I/O base address, and specification version.
-    controller->PciDevice = device;
-    controller->BaseAddress = (device->BAR[4] & PCI_BAR_PORT_MASK);
-    controller->SpecVersion = pci_config_read_byte(device, USB_UHCI_PCI_REG_RELEASE_NUM);
+    controller->PciDevice = pciDevice;
+    controller->BaseAddress = pciDevice->BaseAddresses[4].BaseAddress;
+    controller->SpecVersion = pci_config_read_byte(pciDevice, USB_UHCI_PCI_REG_RELEASE_NUM);
     kprintf("UHCI: Controller located at 0x%X, version 0x%X.\n", controller->BaseAddress, controller->SpecVersion);
 
     // Enable PCI busmaster and port I/O, if not already enabled.
-    uint16_t pciCmd = pci_config_read_word(device, PCI_REG_COMMAND);
-    pci_config_write_word(device, PCI_REG_COMMAND, pciCmd | 0x01 | 0x04);
+    uint16_t pciCmd = pci_config_read_word(pciDevice, PCI_REG_COMMAND);
+    pci_config_write_word(pciDevice, PCI_REG_COMMAND, pciCmd | 0x01 | 0x04);
     kprintf("UHCI: Original PCI command register value: 0x%X\n", pciCmd);
-    kprintf("UHCI: Current PCI command register value: 0x%X\n", pci_config_read_word(device, PCI_REG_COMMAND));
+    kprintf("UHCI: Current PCI command register value: 0x%X\n", pci_config_read_word(pciDevice, PCI_REG_COMMAND));
 
     // Get value of legacy status register.
-    uint16_t legacyReg = pci_config_read_word(device, USB_UHCI_PCI_REG_LEGACY);
+    uint16_t legacyReg = pci_config_read_word(pciDevice, USB_UHCI_PCI_REG_LEGACY);
 
     // Perform a global reset of the UHCI controller.
     kprintf("UHCI: Performing global reset...\n");
@@ -544,7 +544,7 @@ void usb_uhci_init(PciDevice *device) {
     sleep(1);
 
     // Reset legacy status.
-    pci_config_write_word(device, USB_UHCI_PCI_REG_LEGACY, USB_UHCI_PCI_LEGACY_STATUS);
+    pci_config_write_word(pciDevice, USB_UHCI_PCI_REG_LEGACY, USB_UHCI_PCI_LEGACY_STATUS);
 
     // Reset host controller.
     kprintf("UHCI: Resetting controller...\n");
@@ -587,13 +587,13 @@ void usb_uhci_init(PciDevice *device) {
     outw(USB_UHCI_FRNUM(controller->BaseAddress), 0);
 
     // Set PIRQ.
-    pci_config_write_word(device, USB_UHCI_PCI_REG_LEGACY, USB_UHCI_PCI_LEGACY_PIRQ);
+    pci_config_write_word(pciDevice, USB_UHCI_PCI_REG_LEGACY, USB_UHCI_PCI_LEGACY_PIRQ);
 
     // Start up controller and enable interrupts.
     kprintf("UHCI: Starting controller...\n");
     outw(USB_UHCI_USBCMD(controller->BaseAddress), USB_UHCI_STATUS_RUN | USB_UHCI_STATUS_CONFIGURE | USB_UHCI_STATUS_64_BYTE_PACKETS);
     outw(USB_UHCI_USBINTR(controller->BaseAddress), 0xF);
-    irqs_install_handler(device->InterruptLine, usb_callback);
+    irqs_install_handler(pciDevice->InterruptLine, usb_callback);
 
     // Clear port status bits.
     for (uint16_t port = 0; port < 2; port++)
@@ -627,8 +627,8 @@ void usb_uhci_init(PciDevice *device) {
     controller->RootDevice->Port = 0;
     controller->RootDevice->Speed = USB_SPEED_FULL;
     controller->RootDevice->Address = 255;
-    controller->RootDevice->VendorId = device->VendorId;
-    controller->RootDevice->ProductId = device->DeviceId;
+    controller->RootDevice->VendorId = pciDevice->VendorId;
+    controller->RootDevice->ProductId = pciDevice->DeviceId;
     controller->RootDevice->Class = USB_CLASS_HUB;
     controller->RootDevice->Subclass = 0;
     controller->RootDevice->Protocol = 0;

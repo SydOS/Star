@@ -40,7 +40,7 @@ static void ata_callback_isa(IrqRegisters_t *regs, uint8_t irqNum) {
         isaSecondary->InterruptTriggered = true;
 }
 
-static bool ata_callback_pci(PciDevice *device) {
+static bool ata_callback_pci(pci_device_t *device) {
     // Is the interrupt bit in the PCI status register set?
     if (pci_config_read_word(device, PCI_REG_STATUS) & ATA_PCI_STATUS_INTERRUPT) {
         kprintf_nlock("ATA: PCI interrupt raised!\n");
@@ -396,8 +396,8 @@ void ata_reset_identify(ata_channel_t *channel) {
     }*/
 }
 
-void ata_init(PciDevice *device) {
-    kprintf("ATA: Initializing controller on PCI bus %u device %u function %u...\n", device->Bus, device->Device, device->Function);
+void ata_init(pci_device_t *device) {
+  /*  kprintf("ATA: Initializing controller on PCI bus %u device %u function %u...\n", device->Bus, device->Device, device->Function);
 
     // Create ATA device object.
     ata_device_t *ataDevice = (ata_device_t*)kheap_alloc(sizeof(ata_device_t));
@@ -458,7 +458,7 @@ void ata_init(PciDevice *device) {
     kprintf("ATA: Primary channel IRQ: IRQ%u, Secondary: IRQ%u\n", ataDevice->Primary.Interrupt, ataDevice->Secondary.Interrupt);
 
     // Get bus master info.
-    if ((pi & ATA_PCI_PIF_BUSMASTER) && (device->BAR[4] & PCI_BAR_PORT_MASK)) {
+    if ((pi & ATA_PCI_PIF_BUSMASTER) && device->BaseAddresses[4].PortMapped) {
         kprintf("ATA: Bus Master supported.\n");
         ataDevice->Primary.BusMasterCapable = true;
         ataDevice->Secondary.BusMasterCapable = true;
@@ -478,7 +478,7 @@ void ata_init(PciDevice *device) {
     ata_reset_identify(&ataDevice->Primary);
     ata_reset_identify(&ataDevice->Secondary);
     kprintf("ATA: Initialized!\n");
-
+*/
 
 
     // ===== DEMO ======

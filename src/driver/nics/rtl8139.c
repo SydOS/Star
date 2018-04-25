@@ -26,7 +26,7 @@ struct RTL8139 {
 	uint8_t MACAddress[6];
 };
 
-bool rtl_callbac(PciDevice *device) {
+bool rtl_callbac(pci_device_t *device) {
 	
 kprintf_nlock("Clearing RTL8139 interrupt\n");
 struct RTL8139 *rtl = (struct RTL8139*)device->DriverObject;
@@ -35,15 +35,15 @@ return true;
 	
 }
 
-void rtl8139_init(PciDevice* dev) {
+void rtl8139_init(pci_device_t* dev) {
 	// Allocate RTL8139 struct
 	struct RTL8139 *rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
 	dev->DriverObject = rtl;
 	dev->InterruptHandler = rtl_callbac;
 
 	// Setup base address
-	for(uint8_t i = 0; i < 6; i++)
-		if ((rtl->BaseAddress = dev->BAR[i]) != 0) break;
+	//for(uint8_t i = 0; i < 6; i++)
+	//	if ((rtl->BaseAddress = dev->BAR[i]) != 0) break;
 
 	rtl->BaseAddress = rtl->BaseAddress - 1;
 

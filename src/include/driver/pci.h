@@ -2,6 +2,7 @@
 #define PCI_H
 
 #include <main.h>
+#include <driver/pci_classes.h>
 #include <kernel/interrupts/irqs.h>
 
 // PCI configuration space registers.
@@ -44,51 +45,79 @@
 #define PCI_HEADER_TYPE_MULTIFUNC	0x80
 #define PCI_BAR_COUNT				6
 
+#define PCI_BAR_MEMORY_MASK			0xFFFFFFF0
 #define PCI_BAR_PORT_MASK			0xFFFFFFFC
-#define PCI_BAR_MEMORY_MASK			0xFFFFFFF8
 
+#define PCI_BAR_TYPE_MEMORY			0x0
+#define PCI_BAR_TYPE_PORT			0x1
 
+#define PCI_BAR_BITS32				0x0
+#define PCI_BAR_BITS64				0x4
+
+#define PCI_BAR_PREFETCHABLE		0x8
+
+typedef struct {
+    bool PortMapped;
+    bool AddressIs64bits;
+    bool Prefetchable;
+
+    uint32_t BaseAddress;
+} pci_base_register_t;
 
 // PCI device structure.
+typedef struct pci_device_t {
+    // Relations to other devices.
+    struct pci_device_t *Parent;
+    struct pci_device_t *FirstChild;
+    struct pci_device_t *Next;
+
+    uintptr_t ConfigurationAddress;
+    uint8_t Bus;
+    uint8_t Device;
+    uint8_t Function;
+
+    uint16_t VendorId;
+    uint16_t DeviceId;
+    uint16_t SubVendorId;
+    uint16_t SubDeviceId;
+
+    uint8_t RevisionId;
+    uint8_t Class;
+    uint8_t Subclass;
+    uint8_t HeaderType;
+
+    pci_base_register_t BaseAddresses[PCI_BAR_COUNT];
+
+    uint8_t InterruptPin;
+    uint8_t InterruptLine;
+    uint8_t InterruptApic;
+
+    // Interrupt handler.
+    void *InterruptHandler;
+    void *DriverObject;
+} pci_device_t;
+
+// Driver object.
 typedef struct {
-	uintptr_t ConfigurationAddress;
-	uint8_t Bus;
-	uint8_t Device;
-	uint8_t Function;
+    char *Name;
 
-	uint16_t VendorId;
-	uint16_t DeviceId;
-	uint16_t SubVendorId;
-	uint16_t SubDeviceId;
+    bool (*Initialize)(pci_device_t *pciDevice);
+} pci_driver_t;
 
-	uint8_t RevisionId;
-	uint8_t Class;
-	uint8_t Subclass;
-	uint8_t HeaderType;
+// Driver array.
+extern const pci_driver_t PciDrivers[];
 
-	uint32_t BAR[PCI_BAR_COUNT];
-
-	uint8_t InterruptPin;
-	uint8_t InterruptLine;
-	uint8_t InterruptApic;
-
-	// Interrupt handler.
-	void *InterruptHandler;
-	void *DriverObject;
-} PciDevice;
-
-typedef bool (*pci_handler)(PciDevice *device);
+typedef bool (*pci_handler)(pci_device_t *pciDevice);
 
 char* pci_class_descriptions[255];
 
-extern uint32_t pci_config_read_dword(PciDevice *device, uint8_t reg);
-extern uint16_t pci_config_read_word(PciDevice *device, uint8_t reg);
-extern uint8_t pci_config_read_byte(PciDevice *device, uint8_t reg);
-extern void pci_config_write_dword(PciDevice *device, uint8_t reg, uint32_t value);
-extern void pci_config_write_word(PciDevice *device, uint8_t reg, uint16_t value);
-extern void pci_config_write_byte(PciDevice *device, uint8_t reg, uint8_t value);
+extern uint32_t pci_config_read_dword(pci_device_t *pciDevice, uint8_t reg);
+extern uint16_t pci_config_read_word(pci_device_t *pciDevice, uint8_t reg);
+extern uint8_t pci_config_read_byte(pci_device_t *pciDevice, uint8_t reg);
+extern void pci_config_write_dword(pci_device_t *pciDevice, uint8_t reg, uint32_t value);
+extern void pci_config_write_word(pci_device_t *pciDevice, uint8_t reg, uint16_t value);
+extern void pci_config_write_byte(pci_device_t *pciDevice, uint8_t reg, uint8_t value);
 
-extern void pci_check_busses(uint8_t bus, uint8_t device);
-extern void pci_init();
+extern void pci_init(void);
 
 #endif

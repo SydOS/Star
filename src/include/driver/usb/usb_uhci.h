@@ -147,7 +147,7 @@ typedef struct {
 #define USB_UHCI_QH_POOL_COUNT          USB_UHCI_QH_POOL_SIZE / sizeof(usb_uhci_queue_head_t)
 
 typedef struct {
-    PciDevice *PciDevice;
+    pci_device_t *PciDevice;
     uint32_t BaseAddress;
     uint8_t SpecVersion;
     uint32_t *FrameList;

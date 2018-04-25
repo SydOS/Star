@@ -216,7 +216,7 @@ typedef struct {
 } __attribute__((packed)) usb_ohci_controller_comm_area_t;
 
 typedef struct {
-    PciDevice *PciDevice;
+    pci_device_t *PciDevice;
     uint32_t BaseAddress;
 
     uint32_t *BasePointer;
