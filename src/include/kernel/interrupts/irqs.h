@@ -67,6 +67,7 @@ typedef struct irq_handler_t {
 } irq_handler_t;
 
 extern uint8_t irqs_get_count(void);
+extern bool irqs_irq_executing(void);
 extern void irqs_eoi(uint8_t irq);
 extern void irqs_install_handler(uint8_t irq, irq_handler_func_t handlerFunc);
 extern void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc);

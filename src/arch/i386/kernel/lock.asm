@@ -21,14 +21,12 @@ spinlock_lock:
     push edx
     popfd
 
-    ; Disable interrupts if they are enabled.
+    ; Save state of interrupts.
     and edx, 0x200
     mov [eax+4], edx
-    cmp edx, 0
-    jz .spinlock_lock_ret
+    
+    ; Disable interrupts.
     cli
-
-.spinlock_lock_ret:
 	ret
 
 global spinlock_release

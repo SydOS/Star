@@ -10,7 +10,7 @@
 
 // Based on code from https://github.com/CCareaga/heap_allocator. Licensed under the MIT.
 
-static lock_t kheap_lock;
+static lock_t kheap_lock = { };
 static size_t currentKernelHeapSize;
 static kheap_bin_t bins[KHEAP_BIN_COUNT];
 
@@ -128,14 +128,14 @@ static void kheap_dump_bin(uint32_t binIndex) {
     kheap_node_t *node = bins[binIndex].header;
 
     while (node != NULL) {
-        kprintf_nlock("NODE: 0x%X size: %u hole: %s\n", node, node->size, node->hole ? "yes" : "no");
+        kprintf("NODE: 0x%X size: %u hole: %s\n", node, node->size, node->hole ? "yes" : "no");
         node = node->nextNode;
     }
 }
 
 void kheap_dump_all_bins() {
     for (uint8_t i = 0; i < 9; i++) {
-        kprintf_nlock("Bin %u:\n", i);
+        kprintf("Bin %u:\n", i);
         kheap_dump_bin(i);
     }
 }
@@ -188,7 +188,7 @@ static bool kheap_expand(size_t size) {
         currentKernelHeapSize += PAGE_SIZE_4K;
     }
 
-    //kprintf_nlock("KHEAP: Heap expanded by 4KB to %u bytes!\n", currentKernelHeapSize);
+    //kprintf("KHEAP: Heap expanded by 4KB to %u bytes!\n", currentKernelHeapSize);
     return true;
 }
 
@@ -213,7 +213,7 @@ void *kheap_alloc(size_t size) {
     // If a chunk still couldn't be found, expand heap.
     if (node == NULL) {
         if (!kheap_expand(size)) {
-            kprintf_nlock("KHEAP: Failed to expand heap!\n");
+            kprintf("KHEAP: Failed to expand heap!\n");
             return NULL;
         }
 

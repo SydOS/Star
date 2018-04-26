@@ -505,9 +505,9 @@ static bool usb_uhci_callback(pci_device_t *pciDevice) {
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)pciDevice->DriverObject;
     uint16_t status = inw(USB_UHCI_USBSTS(controller->BaseAddress));
     if (status & 0x3F) {
-        kprintf_nlock("IRQ uhci\n");
-        kprintf_nlock("status: 0x%X\n", pci_config_read_word(pciDevice, PCI_REG_STATUS));
-        kprintf_nlock("usb status: 0x%X\n", status);
+        kprintf("IRQ uhci\n");
+        kprintf("status: 0x%X\n", pci_config_read_word(pciDevice, PCI_REG_STATUS));
+        kprintf("usb status: 0x%X\n", status);
         outw(USB_UHCI_USBSTS(controller->BaseAddress), 0x3F);
         pci_config_write_word(pciDevice, PCI_REG_STATUS, 0x8);
         return true;

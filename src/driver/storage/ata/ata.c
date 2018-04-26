@@ -33,7 +33,7 @@ int16_t ata_check_status(ata_channel_t *channel, bool master) {
 }
 
 static bool ata_callback_isa(irq_regs_t *regs, uint8_t irqNum) {
-    kprintf_nlock("ATA: ISA IRQ%u raised!\n", irqNum);
+    kprintf("ATA: ISA IRQ%u raised!\n", irqNum);
     if (irqNum == IRQ_PRI_ATA)
         isaPrimary->InterruptTriggered = true;
     else if (irqNum == IRQ_SEC_ATA)
@@ -44,7 +44,7 @@ static bool ata_callback_isa(irq_regs_t *regs, uint8_t irqNum) {
 static bool ata_callback_pci(pci_device_t *device) {
     // Is the interrupt bit in the PCI status register set?
     if (pci_config_read_word(device, PCI_REG_STATUS) & ATA_PCI_STATUS_INTERRUPT) {
-        kprintf_nlock("ATA: PCI interrupt raised!\n");
+        kprintf("ATA: PCI interrupt raised!\n");
         ata_device_t *ataDevice = (ata_device_t*)device->DriverObject;
 
         // Is busmastering enabled on primary channel?

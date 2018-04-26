@@ -28,7 +28,7 @@ struct RTL8139 {
 
 bool rtl_callbac(pci_device_t *device) {
 	
-kprintf_nlock("Clearing RTL8139 interrupt\n");
+kprintf("Clearing RTL8139 interrupt\n");
 struct RTL8139 *rtl = (struct RTL8139*)device->DriverObject;
 outw(rtl->BaseAddress + 0x3E, 0xFFFF);
 return true;

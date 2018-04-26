@@ -132,6 +132,7 @@ void acpica_thread(void) {
 
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
     tasking_add_process(tasking_create_process("acpica", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context));
+    kprintf("in interrupt? %s\n", irqs_irq_executing() ? "yes" : "no");
     return (AE_OK);
 }
 
@@ -200,7 +201,7 @@ return (AE_OK);
 static void *context;
 static ACPI_OSD_HANDLER handler;
 static bool acpi_callback(irq_regs_t *regs, uint8_t irqNum) {
-    kprintf_nlock("ACPI: SCI triggered!\n");
+    kprintf("ACPI: SCI triggered!\n");
     handler(context);
     return false;
 }
@@ -262,7 +263,7 @@ ACPI_STATUS AcpiOsWritePort ( ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Widt
 }
 
 ACPI_STATUS AcpiOsReadPciConfiguration (ACPI_PCI_ID *PciId, UINT32 Reg, UINT64 *Value, UINT32 Width) {
-    kprintf_nlock("ACPI: read pci.\n");
+    kprintf("ACPI: read pci.\n");
 
     uint32_t address = PCI_PORT_ENABLE_BIT | (uint32_t)(PciId->Bus << 16) | (uint32_t)(PciId->Device << 11) |
         (uint32_t)(PciId->Function << 8) | (uint8_t)(Reg & 0xfc);

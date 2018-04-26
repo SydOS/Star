@@ -218,9 +218,9 @@ Path.Pointer = Buffer;
 }
 
 static UINT32 acpi_button(void *Context) {
-    kprintf_nlock("ACPI: Button fixed triggered\n");
+    kprintf("ACPI: Button fixed triggered\n");
     ACPI_STATUS status = AcpiReset();
-    kprintf_nlock("ACPI: Reset status: %d", status);
+    kprintf("ACPI: Reset status: %d", status);
     outb(0x64, 0xFE);
     return 0;
 }

@@ -13,16 +13,14 @@
 // http://web.archive.org/web/20021016204550/http://panda.cs.ndsu.nodak.edu:80/~achapwes/PICmicro/mouse/mouse.html
 
 // Mouse types.
-enum
-{
+enum {
     PS2_MOUSE_TYPE_STANDARD         = 0x00, // Standard PS/2 mouse.
     PS2_MOUSE_TYPE_WHEEL            = 0x03, // Mouse with scroll wheel.
     PS2_MOUSE_TYPE_FIVEBUTTON       = 0x04  // 5-button mouse.
 };
 
 // Mouse packet masks.
-enum
-{
+enum {
     PS2_MOUSE_PACKET_LEFT_BTN       = 0x01,
     PS2_MOUSE_PACKET_RIGHT_BTN      = 0x02,
     PS2_MOUSE_PACKET_MIDDLE_BTN     = 0x04,
@@ -49,12 +47,10 @@ enum
 static uint8_t mouse_type = PS2_MOUSE_TYPE_STANDARD;
 
 // Sends a command to the mouse.
-uint8_t ps2_mouse_send_cmd(uint8_t cmd)
-{
+uint8_t ps2_mouse_send_cmd(uint8_t cmd) {
     // Send command to mouse.
     uint8_t response = 0;
-    for (uint8_t i = 0; i < 10; i++)
-    {
+    for (uint8_t i = 0; i < 10; i++) {
         ps2_send_cmd_response(PS2_CMD_WRITE_MOUSE_IN);
         response = ps2_send_data_response(cmd);
 
@@ -68,10 +64,8 @@ uint8_t ps2_mouse_send_cmd(uint8_t cmd)
 }
 
 // Initializes a mouse.
-void ps2_mouse_connect(bool from_irq)
-{
-    if (from_irq)
-    {
+void ps2_mouse_connect(bool from_irq) {
+    if (from_irq) {
         // Read the current configuration byte.
         uint8_t config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
         //kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
@@ -104,17 +98,15 @@ void ps2_mouse_connect(bool from_irq)
     uint8_t mouse_id = ps2_mouse_send_cmd(PS2_DATA_IDENTIFY);
 
     // If ID is an ACK or something, try to get the ID again.
-    for (uint8_t i = 0; i < 50; i++)
-    {
+    for (uint8_t i = 0; i < 50; i++) {
         if (mouse_id == PS2_DATA_RESPONSE_SELFTEST_PASS || mouse_id == PS2_DATA_RESPONSE_ACK)
             mouse_id = ps2_get_data();
         else
             break;
     }
     
-    if (mouse_id == PS2_MOUSE_TYPE_WHEEL)
-    {
-        kprintf_nlock("Intellimouse detected.\n");
+    if (mouse_id == PS2_MOUSE_TYPE_WHEEL) {
+        kprintf("Intellimouse detected.\n");
         mouse_type = mouse_id;
 
         // Attempt to enter 5-button mode.
@@ -130,23 +122,20 @@ void ps2_mouse_connect(bool from_irq)
         mouse_id = ps2_mouse_send_cmd(PS2_DATA_IDENTIFY);
 
         // If ID is an ACK or something, try to get the ID again.
-        for (uint8_t i = 0; i < 50; i++)
-        {
+        for (uint8_t i = 0; i < 50; i++) {
             if (mouse_id == PS2_DATA_RESPONSE_SELFTEST_PASS || mouse_id == PS2_DATA_RESPONSE_ACK)
                 mouse_id = ps2_get_data();
             else
                 break;
         }
 
-        if (mouse_id == PS2_MOUSE_TYPE_FIVEBUTTON)
-        {
-            kprintf_nlock("5-button mouse detected.\n");
+        if (mouse_id == PS2_MOUSE_TYPE_FIVEBUTTON) {
+            kprintf("5-button mouse detected.\n");
             mouse_type = mouse_id;
         }
     }
 
-    if (from_irq)
-    {
+    if (from_irq) {
         // Read the current configuration byte.
         uint8_t config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
         //kprintf("Initial PS/2 configuration byte: 0x%X\n", config);
@@ -162,16 +151,15 @@ void ps2_mouse_connect(bool from_irq)
     }
 
     // If the ID is 0xFE at this point, likely no mouse is present.
-    if (mouse_id == PS2_DATA_RESPONSE_RESEND)
-    {
-        kprintf_nlock("A working mouse couldn't be found!\n");
+    if (mouse_id == PS2_DATA_RESPONSE_RESEND) {
+        kprintf("A working mouse couldn't be found!\n");
         return;
     } 
 
-    kprintf_nlock("PS/2 mouse ID: 0x%X\n", mouse_id);
+    kprintf("PS/2 mouse ID: 0x%X\n", mouse_id);
     
     ps2_mouse_send_cmd(PS2_DATA_ENABLE);
-    kprintf_nlock("PS/2 mouse installed!\n");
+    kprintf("PS/2 mouse installed!\n");
 }
 
 // Processes a packet.
@@ -186,18 +174,16 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
     int16_t z = 0;
 
     // Get mouse wheel.
-    if (packet_size == 4)
-    {   
-        if (mouse_type == PS2_MOUSE_TYPE_FIVEBUTTON)
-        {
+    if (packet_size == 4) {   
+        if (mouse_type == PS2_MOUSE_TYPE_FIVEBUTTON) {
             // Check last two bits of last packet. If not zero, throw packet out.
             if (mouse_bytes[3] & PS2_MOUSE_PACKET_MAGIC_BIT6 || mouse_bytes[3] & PS2_MOUSE_PACKET_MAGIC_BIT7)
                 return;
 
             if (mouse_bytes[3] & PS2_MOUSE_PACKET_FOURTH_BTN)
-                kprintf_nlock("Fourth mouse button pressed!\n");
+                kprintf("Fourth mouse button pressed!\n");
             if (mouse_bytes[3] & PS2_MOUSE_PACKET_FIFTH_BTN)
-                kprintf_nlock("Fifth mouse button pressed!\n");
+                kprintf("Fifth mouse button pressed!\n");
         }
 
         // Get Z-value (wheel).
@@ -209,15 +195,15 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
         return;
 
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_LEFT_BTN)
-        kprintf_nlock("Left mouse button pressed!\n");
+        kprintf("Left mouse button pressed!\n");
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_RIGHT_BTN)
-        kprintf_nlock("Right mouse button pressed!\n");
+        kprintf("Right mouse button pressed!\n");
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_MIDDLE_BTN)
-        kprintf_nlock("Middle mouse button pressed!\n");
+        kprintf("Middle mouse button pressed!\n");
 
     // Print status.
     if (x != 0 || y != 0 || z != 0)
-        kprintf_nlock("Mouse moved: X: %i Y: %i Z: %i\n", x, y, z);
+        kprintf("Mouse moved: X: %i Y: %i Z: %i\n", x, y, z);
 }
 
 // Callback for mouse on IRQ12.
@@ -232,8 +218,7 @@ static bool ps2_mouse_callback(irq_regs_t *regs, uint8_t irqNum) {
     mouse_bytes[cycle++] = data;
 
     // If the data is a self-test complete command, it's likely a new mouse connected.
-    if (last_data == PS2_DATA_RESPONSE_SELFTEST_PASS && data == PS2_MOUSE_TYPE_STANDARD)
-    {
+    if (last_data == PS2_DATA_RESPONSE_SELFTEST_PASS && data == PS2_MOUSE_TYPE_STANDARD) {
         // Initialize mouse.
         last_data = data;
         ps2_mouse_connect(true);
@@ -245,23 +230,20 @@ static bool ps2_mouse_callback(irq_regs_t *regs, uint8_t irqNum) {
     last_data = data;
 
     // If the data is just an ACK, throw it out.
-    if (data == PS2_DATA_RESPONSE_ACK)
-    {
+    if (data == PS2_DATA_RESPONSE_ACK) {
         cycle = 0;
         return true;
     }
 
     // Ensure first byte is valid. If not, reset the packet cycle.
-    if ((mouse_bytes[0] & PS2_MOUSE_PACKET_MAGIC) != PS2_MOUSE_PACKET_MAGIC)
-    {
+    if ((mouse_bytes[0] & PS2_MOUSE_PACKET_MAGIC) != PS2_MOUSE_PACKET_MAGIC) {
         cycle = 0;
         return true;
     }
 
     // Have we reached the final byte?
     if ((mouse_type == PS2_MOUSE_TYPE_STANDARD && cycle == 3) || (mouse_type == PS2_MOUSE_TYPE_WHEEL && cycle == 4) ||
-        (mouse_type == PS2_MOUSE_TYPE_FIVEBUTTON && cycle == 4))
-    {
+        (mouse_type == PS2_MOUSE_TYPE_FIVEBUTTON && cycle == 4)) {
         // Process packet and reset cycle.
         ps2_mouse_process_packet(mouse_bytes, cycle);
         cycle = 0;

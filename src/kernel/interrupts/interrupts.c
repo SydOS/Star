@@ -8,6 +8,28 @@
 #include <kernel/interrupts/irqs.h>
 #include <driver/vga.h>
 
+static bool interruptsEnabled = false;
+
+#define FLAGS_IF 0x200
+
+void interrupts_enable(void) {
+    asm volatile ("sti");
+    interruptsEnabled = true;
+}
+
+void interrupts_disable(void) {
+    asm volatile ("cli");
+    interruptsEnabled = false;
+}
+
+bool interrupts_enabled(void) {
+    // Get FLAGS.
+    uintptr_t flags = 0;
+  //  asm volatile ("movl ")
+
+    return interruptsEnabled;
+}
+
 /**
  * Enable non-maskable interrupts
  */

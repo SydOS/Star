@@ -24,6 +24,11 @@ uint8_t irqs_get_count(void) {
     return irqCount;
 }
 
+static bool irqExecuting = false;
+bool irqs_irq_executing(void) {
+    return irqExecuting;
+}
+
 void irqs_eoi(uint8_t irq) {
     // Send EOI to LAPIC or PIC.
     if (useLapic)
@@ -99,6 +104,7 @@ bool irqs_handler_mapped(uint8_t irq, irq_handler_func_t handlerFunc) {
 // Handler for IRQss.
 void irqs_handler(irq_regs_t *regs) {
     // Get IRQ number.
+    irqExecuting = true;
     uint8_t irq = useLapic ? lapic_get_irq() : pic_get_irq();
 
     // Ensure IRQ is within range.
@@ -116,6 +122,7 @@ void irqs_handler(irq_regs_t *regs) {
 
     // Send EOI.
     irqs_eoi(irq);
+    irqExecuting = false;
 }
 
 void irqs_init(void) {

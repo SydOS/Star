@@ -36,7 +36,7 @@ void panic(const char *format, ...) {
 	va_start(args, format);
 
 	// Show panic.
-	kprintf_nlock("\nPANIC:\n");
+	kprintf("\nPANIC:\n");
 	kprintf_va(format, args);
 	kprintf("\n\nHalted.");
 
