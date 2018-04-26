@@ -20,6 +20,10 @@ static irq_handler_t **irqHandlers;
 // Do we send EOIs to the LAPIC instead of the PIC?
 static bool useLapic = false;
 
+uint8_t irqs_get_count(void) {
+    return irqCount;
+}
+
 void irqs_eoi(uint8_t irq) {
     // Send EOI to LAPIC or PIC.
     if (useLapic)

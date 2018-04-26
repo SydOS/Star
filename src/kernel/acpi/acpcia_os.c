@@ -202,7 +202,7 @@ static ACPI_OSD_HANDLER handler;
 static bool acpi_callback(irq_regs_t *regs, uint8_t irqNum) {
     kprintf_nlock("ACPI: SCI triggered!\n");
     handler(context);
-    return true;
+    return false;
 }
 
 ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLER Handler, void *Context) {

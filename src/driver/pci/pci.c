@@ -108,8 +108,8 @@ void pci_print_info(pci_device_t *pciDevice) {
             kprintf("  - BAR%u: 0x%X (%s)\n", i + 1, pciDevice->BaseAddresses[i].BaseAddress, pciDevice->BaseAddresses[i].PortMapped ? "port-mapped" : "memory-mapped");
 
     // Interrupt info
-    if(pciDevice->InterruptPin != 0) { 
-        kprintf("  - Interrupt PIN %d Line %d\n", pciDevice->InterruptPin, pciDevice->InterruptLine);
+    if(pciDevice->InterruptNo != 0) { 
+        kprintf("  - Interrupt %u (Pin %u Line %u\n", pciDevice->InterruptNo, pciDevice->InterruptPin, pciDevice->InterruptLine);
     }
 }
 
@@ -197,6 +197,9 @@ pci_device_t *pci_get_device(uint8_t bus, uint8_t device, uint8_t function, ACPI
             table = (uintptr_t)table + table->Length;
         }
     }
+
+    if (pciDevice->InterruptNo >= irqs_get_count())
+        pciDevice->InterruptNo = 0;
 
     // Return the device.
     return pciDevice;

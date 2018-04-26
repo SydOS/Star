@@ -550,7 +550,7 @@ bool usb_ohci_init(pci_device_t *pciDevice) {
     usb_ohci_write(controller, USB_OHCI_REG_INTERRUPT_ENABLE, 0xFFFFFFFF);
 
     // Probe.
-    usb_ohci_probe(controller);
+    //usb_ohci_probe(controller);
 
     return true;
 }

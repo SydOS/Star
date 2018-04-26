@@ -501,14 +501,18 @@ static bool usb_uhci_reset(usb_uhci_controller_t *controller) {
     return false;
 }
 
-usb_uhci_controller_t *testcontroller;
-void usb_callback() {
-    kprintf_nlock("IRQ usb\n");
-    pci_device_t *device = testcontroller->PciDevice;
-    kprintf_nlock("status: 0x%X\n", pci_config_read_word(device, PCI_REG_STATUS));
-    kprintf_nlock("usb status: 0x%X\n", inw(USB_UHCI_USBSTS(testcontroller->BaseAddress)));
-    outw(USB_UHCI_USBSTS(testcontroller->BaseAddress), 0x3F);
-    pci_config_write_word(device, PCI_REG_STATUS, 0x8);
+static bool usb_uhci_callback(pci_device_t *pciDevice) {
+    usb_uhci_controller_t *controller = (usb_uhci_controller_t*)pciDevice->DriverObject;
+    uint16_t status = inw(USB_UHCI_USBSTS(controller->BaseAddress));
+    if (status & 0x3F) {
+        kprintf_nlock("IRQ uhci\n");
+        kprintf_nlock("status: 0x%X\n", pci_config_read_word(pciDevice, PCI_REG_STATUS));
+        kprintf_nlock("usb status: 0x%X\n", status);
+        outw(USB_UHCI_USBSTS(controller->BaseAddress), 0x3F);
+        pci_config_write_word(pciDevice, PCI_REG_STATUS, 0x8);
+        return true;
+    }
+    return false;
 }
 
 bool usb_uhci_init(pci_device_t *pciDevice) {
@@ -521,7 +525,7 @@ bool usb_uhci_init(pci_device_t *pciDevice) {
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)kheap_alloc(sizeof(usb_uhci_controller_t));
     memset(controller, 0, sizeof(usb_uhci_controller_t));
     pciDevice->DriverObject = controller;
-    testcontroller = controller;
+    pciDevice->InterruptHandler = usb_uhci_callback;
 
     // Store PCI device object, port I/O base address, and specification version.
     controller->PciDevice = pciDevice;
@@ -596,7 +600,6 @@ bool usb_uhci_init(pci_device_t *pciDevice) {
     kprintf("UHCI: Starting controller...\n");
     outw(USB_UHCI_USBCMD(controller->BaseAddress), USB_UHCI_STATUS_RUN | USB_UHCI_STATUS_CONFIGURE | USB_UHCI_STATUS_64_BYTE_PACKETS);
     outw(USB_UHCI_USBINTR(controller->BaseAddress), 0xF);
-    irqs_install_handler(pciDevice->InterruptLine, usb_callback);
 
     // Clear port status bits.
     for (uint16_t port = 0; port < 2; port++)
