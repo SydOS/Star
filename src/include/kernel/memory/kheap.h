@@ -41,6 +41,6 @@ typedef struct kheap_bin kheap_bin_t;
 extern void *kheap_alloc(size_t size);
 extern void kheap_free(void *ptr);
 extern void *kheap_realloc(void *oldPtr, size_t newSize);
-extern void kheap_init();
+extern void kheap_init(void);
 
 #endif

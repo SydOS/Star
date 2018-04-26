@@ -6,9 +6,11 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/pmm.h>
+#include <kernel/lock.h>
 
 // Based on code from https://github.com/CCareaga/heap_allocator. Licensed under the MIT.
 
+static lock_t kheap_lock;
 static size_t currentKernelHeapSize;
 static kheap_bin_t bins[KHEAP_BIN_COUNT];
 
@@ -195,6 +197,9 @@ static void kheap_contract() {
 }
 
 void *kheap_alloc(size_t size) {
+    // Lock.
+    spinlock_lock(&kheap_lock);
+
     // Get bin index that the chunk should be in
     uint32_t binIndex = kheap_get_bin_index(size);
 
@@ -261,10 +266,16 @@ void *kheap_alloc(size_t size) {
     // As the chunk is in use, clear the next and previous node fields.
     node->previousNode = NULL;
     node->nextNode = NULL;
+
+    // Unlock and return allocation.
+    spinlock_release(&kheap_lock);
     return (uint8_t*)node + KHEAP_HEADER_OFFSET;
 }
 
 void kheap_free(void *ptr) {
+    // Lock.
+    spinlock_lock(&kheap_lock);
+
     // Get header of node to free.
     kheap_node_t *header = (kheap_node_t*)((uint8_t*)ptr - KHEAP_HEADER_OFFSET);
 
@@ -272,6 +283,9 @@ void kheap_free(void *ptr) {
     if (header == (kheap_node_t*)KHEAP_START) {
         header->hole = true;
         kheap_add_node(kheap_get_bin_index(header->size), header);
+        
+        // Unlock.
+        spinlock_release(&kheap_lock);
         return;
     }
 
@@ -314,6 +328,9 @@ void kheap_free(void *ptr) {
     // Chunk is now a hole, place it in correct bin.
     header->hole = true;
     kheap_add_node(kheap_get_bin_index(header->size), header);
+
+    // Unlock.
+    spinlock_release(&kheap_lock);
 }
 
 void *kheap_realloc(void *oldPtr, size_t newSize) {
@@ -341,7 +358,7 @@ void *kheap_realloc(void *oldPtr, size_t newSize) {
     return newPtr;
 }
 
-void kheap_init() {
+void kheap_init(void) {
     kprintf("KHEAP: Initializing at 0x%p...\n", KHEAP_START);
 
     // Start with 4MB heap.
