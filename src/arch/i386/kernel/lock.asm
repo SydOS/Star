@@ -10,10 +10,25 @@ spinlock_lock:
     mov eax, [esp+4]
 
 .loop:
-    ; Attemp to lock object.
+    ; Attempt to lock object.
     lock bts dword [eax], 0
     pause
 	jc .loop
+
+    ; Get EFLAGS register.
+    pushfd
+    pop edx
+    push edx
+    popfd
+
+    ; Disable interrupts if they are enabled.
+    and edx, 0x200
+    mov [eax+4], edx
+    cmp edx, 0
+    jz .spinlock_lock_ret
+    cli
+
+.spinlock_lock_ret:
 	ret
 
 global spinlock_release
@@ -23,4 +38,12 @@ spinlock_release:
 
     ; Release lock.
     mov dword [eax], 0
+
+    ; Enable interrupts if they were enabled before.
+    mov edx, [eax+4]
+    cmp edx, 0
+    jz .spinlock_release_ret
+    sti
+
+.spinlock_release_ret:
     ret

@@ -5,7 +5,7 @@
 #include <kernel/lock.h>
 #include <string.h>
 
-lock_t kprintf_mutex = 0;
+lock_t kprintf_mutex = { };
 
 // Print a single character.
 void kputchar(char c)
