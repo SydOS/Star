@@ -4,6 +4,7 @@
 #include <driver/pci.h>
 
 #include <kernel/memory/kheap.h>
+#include <kernel/interrupts/ioapic.h>
 #include <driver/vga.h>
 
 #include <kernel/interrupts/irqs.h>
@@ -194,7 +195,7 @@ pci_device_t *pci_get_device(uint8_t bus, uint8_t device, uint8_t function, ACPI
             }        
 
             // Move to next entry.
-            table = (uintptr_t)table + table->Length;
+            table = (ACPI_PCI_ROUTING_TABLE *)((uintptr_t)table + table->Length);
         }
     }
 

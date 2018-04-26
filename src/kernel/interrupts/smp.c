@@ -9,6 +9,7 @@
 #include <kernel/gdt.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/ioapic.h>
 #include <kernel/interrupts/lapic.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>

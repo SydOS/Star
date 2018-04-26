@@ -110,7 +110,7 @@ typedef struct {
     uint16_t Reserved2 : 2;
 
     // Token.
-    uint8_t PacketType;
+    uint8_t PacketType : 8;
     uint8_t DeviceAddress : 7;
     uint8_t Endpoint : 4;
     bool DataToggle : 1;

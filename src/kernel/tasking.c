@@ -15,6 +15,14 @@ Process* currentProcess = 0;
 uint32_t lpid = 0;
 bool taskingEnabled = false;
 
+static inline void tasking_freeze() {
+    taskingEnabled = false;
+}
+
+static inline void tasking_unfreeze() {
+    taskingEnabled = true;
+}
+
 void _kill() {
     // Pause tasking.
     tasking_freeze();
@@ -53,14 +61,6 @@ void __notified(int sig) {
 }
 
 // -----------------------------------------------------------------------------
-
-inline void tasking_freeze() {
-    taskingEnabled = false;
-}
-
-inline void tasking_unfreeze() {
-    taskingEnabled = true;
-}
 
 int tasking_add_process(Process* newProcess) {
     // Pause tasking.

@@ -108,7 +108,7 @@ void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress) {
 
     // Unmap range, freeing page frames.
     for (uint32_t i = 0; i <= (endAddress - startAddress) / PAGE_SIZE_4K; i++) {
-        uintptr_t frame = 0;
+        uint64_t frame = 0;
         bool mapped = paging_get_phys(startAddress + (i * PAGE_SIZE_4K), &frame);
         paging_unmap(startAddress + (i * PAGE_SIZE_4K));
 

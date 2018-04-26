@@ -175,8 +175,7 @@ void ps2_mouse_connect(bool from_irq)
 }
 
 // Processes a packet.
-static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
-{
+static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size) {
     // If either overflow value is set, ignore it.
     if (mouse_bytes[0] & PS2_MOUSE_PACKET_OVERFLOW_X || mouse_bytes[0] & PS2_MOUSE_PACKET_OVERFLOW_Y)
         return;
@@ -222,8 +221,7 @@ static void ps2_mouse_process_packet(uint8_t mouse_bytes[], uint8_t packet_size)
 }
 
 // Callback for mouse on IRQ12.
-static void ps2_mouse_callback()
-{	
+static bool ps2_mouse_callback(irq_regs_t *regs, uint8_t irqNum) {	
     // Get data.
     uint8_t data = ps2_get_data();
     static uint8_t last_data = 0;
@@ -240,7 +238,7 @@ static void ps2_mouse_callback()
         last_data = data;
         ps2_mouse_connect(true);
         cycle = 0;
-        return;
+        return true;
     }
 
     // Save data.
@@ -250,14 +248,14 @@ static void ps2_mouse_callback()
     if (data == PS2_DATA_RESPONSE_ACK)
     {
         cycle = 0;
-        return;
+        return true;
     }
 
     // Ensure first byte is valid. If not, reset the packet cycle.
     if ((mouse_bytes[0] & PS2_MOUSE_PACKET_MAGIC) != PS2_MOUSE_PACKET_MAGIC)
     {
         cycle = 0;
-        return;
+        return true;
     }
 
     // Have we reached the final byte?
@@ -268,11 +266,11 @@ static void ps2_mouse_callback()
         ps2_mouse_process_packet(mouse_bytes, cycle);
         cycle = 0;
     }
+    return true;
 }
 
 // Initializes the mouse.
-void ps2_mouse_init()
-{
+void ps2_mouse_init(void) {
     // Register IRQ12 for the mouse.
     irqs_install_handler(IRQ_MOUSE, ps2_mouse_callback);
 

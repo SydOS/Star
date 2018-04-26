@@ -49,7 +49,7 @@ uint32_t ioapic_remap_interrupt(uint32_t interrupt) {
     return interrupt;
 }
 
-inline bool ioapic_supported() {
+bool ioapic_supported(void) {
     return ioApicInitialized;
 }
 
@@ -69,15 +69,15 @@ static uint32_t ioapic_read(uint8_t offset) {
     return *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOWIN);
 }
 
-uint8_t ioapic_id() {
+uint8_t ioapic_id(void) {
     return (uint8_t)((ioapic_read(IOAPIC_REG_ID) >> 24) & 0xF);
 }
 
-uint8_t ioapic_version() {
+uint8_t ioapic_version(void) {
     return (uint8_t)(ioapic_read(IOAPIC_REG_VERSION) & 0xFF);
 }
 
-uint8_t ioapic_max_interrupts() {
+uint8_t ioapic_max_interrupts(void) {
     return (uint8_t)(((ioapic_read(IOAPIC_REG_VERSION) >> 16) & 0xFF) + 1);
 }
 
@@ -143,7 +143,7 @@ void ioapic_disable_interrupt(uint8_t interrupt) {
     ioapic_set_redirection_entry(interrupt, entry);
 }
 
-void ioapic_init() {
+void ioapic_init(void) {
     // Only initialize once.
     if (ioApicInitialized)
         panic("IOAPIC: Attempting to initialize multiple times.\n");

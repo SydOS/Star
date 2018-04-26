@@ -3,6 +3,7 @@
 #include <driver/serial.h>
 #include <driver/vga.h>
 #include <kernel/lock.h>
+#include <string.h>
 
 lock_t kprintf_mutex = 0;
 
@@ -41,8 +42,6 @@ void kputstring(const char *str, size_t max)
         }
     }
     else {
-        size_t len = strlen(str);
-        
         while (*str && max) {
             kputchar(*str);
             str++;
@@ -136,6 +135,7 @@ void kprint_hex(uint64_t num, bool capital, uint8_t width) {
 }
 
 void kprintf(const char* format, ...) {
+    // Lock.
     spinlock_lock(&kprintf_mutex);
 
     // Get args.
@@ -145,6 +145,7 @@ void kprintf(const char* format, ...) {
     // Call va_list kprintf.
     kprintf_va(format, args);
 
+    // Release lock.
     spinlock_release(&kprintf_mutex);
 }
 

@@ -166,7 +166,7 @@ uint16_t ps2_keyboard_get_last_key(void *Driver) {
 }
 
 // Callback for keyboard on IRQ1.
-static void ps2_keyboard_callback()
+static bool ps2_keyboard_callback(irq_regs_t *regs, uint8_t irqNum)
 {	
     // Read data from keyboard.
     uint8_t data = ps2_get_data();
@@ -174,12 +174,12 @@ static void ps2_keyboard_callback()
 
     // If the data is just an ACK, throw it out.
     if (data == PS2_DATA_RESPONSE_ACK)
-        return;
+        return true;
 
     // Do we have an extended code? If so, return and handle the actual code the next time around.
     if (data == PS2_KEYBOARD_SCANCODE_EXTENDED1 || data == PS2_KEYBOARD_SCANCODE_EXTENDED2) {
         extended = true;
-        return;
+        return true;
     }
 
     // Reset extended status.
@@ -268,6 +268,7 @@ static void ps2_keyboard_callback()
         vga_putchar(keyboard_layout_us[key].shift_ascii);
     else
         vga_putchar(keyboard_layout_us[key].ascii);*/
+    return true;
 }
 
 // Initializes the keyboard.

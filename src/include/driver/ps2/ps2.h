@@ -104,13 +104,14 @@ enum
 #define PS2_DATA_PORT   0x60
 #define PS2_CMD_PORT    0x64
 
-extern void ps2_wait_send();
-extern void ps2_wait_receive();
+extern void ps2_wait_send(void);
+extern void ps2_wait_receive(void);
 extern void ps2_send_cmd(uint8_t cmd);
 extern uint8_t ps2_send_cmd_response(uint8_t cmd);
 extern void ps2_send_data(uint8_t data);
 extern uint8_t ps2_send_data_response(uint8_t data);
-extern uint8_t ps2_get_data();
-extern uint8_t ps2_get_status();
-extern void ps2_flush();
-extern void ps2_init();
+extern uint8_t ps2_get_data(void);
+extern uint8_t ps2_get_status(void);
+extern void ps2_flush(void);
+extern void ps2_reset_system(void);
+extern void ps2_init(void);
