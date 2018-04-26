@@ -3,6 +3,7 @@
 #include <io.h>
 #include <kernel/interrupts/ioapic.h>
 
+#include <acpi.h>
 #include <kernel/acpi/acpi.h>
 #include <kernel/interrupts/interrupts.h>
 #include <kernel/memory/paging.h>
@@ -11,8 +12,18 @@
 
 static bool ioApicInitialized = false;
 
+static void *ioApicPointer;
+
 #define INTERRUPT_MAP_MAGIC 0xDEADBEEF
-static uint32_t interrupt_redirections[IRQ_COUNT] = {
+static uint32_t interrupt_redirections[24] = {
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
+    INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC,
     INTERRUPT_MAP_MAGIC,
@@ -44,18 +55,18 @@ inline bool ioapic_supported() {
 
 static void ioapic_write(uint8_t offset, uint32_t value) {
     // Fill the I/O APIC's register selection memory area with our requested register offset.
-    *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOREGSL) = offset;
+    *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOREGSL) = offset;
 
     // Write data into the I/O APIC's data window memory area.
-    *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOWIN) = value;
+    *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOWIN) = value;
 }
 
 static uint32_t ioapic_read(uint8_t offset) {
     // Fill the I/O APIC's register selection memory area with our requested register offset.
-    *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOREGSL) = offset;
+    *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOREGSL) = offset;
 
     // Read the result from the I/O APIC's data window memory area.
-    return *(volatile uint32_t*)(IOAPIC_ADDRESS + IOAPIC_IOWIN);
+    return *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOWIN);
 }
 
 uint8_t ioapic_id() {
@@ -105,6 +116,24 @@ void ioapic_enable_interrupt(uint8_t interrupt, uint8_t vector) {
     kprintf("IOAPIC: Mapped interrupt %u to 0x%X\n", interrupt, vector);
 }
 
+void ioapic_enable_interrupt_pci(uint8_t interrupt, uint8_t vector) {
+    // Get entry for interrupt.
+    ioapic_redirection_entry_t entry = ioapic_get_redirection_entry(interrupt);
+
+    // Set entry fields.
+    entry.interruptVector = vector;
+    entry.deliveryMode = IOAPIC_DELIVERY_FIXED;
+    entry.destinationMode = IOAPIC_DEST_MODE_PHYSICAL;
+    entry.triggerMode = 1;
+    entry.interruptInputPolarity = 1;
+    entry.interruptMask = false;
+    entry.destinationField = 0;
+
+    // Save entry to I/O APIC.
+    ioapic_set_redirection_entry(interrupt, entry);
+    kprintf("IOAPIC: Mapped interrupt %u to 0x%X\n", interrupt, vector);
+}
+
 void ioapic_disable_interrupt(uint8_t interrupt) {
     // Get entry for interrupt and mask it.
     ioapic_redirection_entry_t entry = ioapic_get_redirection_entry(interrupt);
@@ -119,8 +148,12 @@ void ioapic_init() {
     if (ioApicInitialized)
         panic("IOAPIC: Attempting to initialize multiple times.\n");
 
+    // If ACPI is not supported, we cannot support an I/O APIC.
+    if (!acpi_supported())
+        return;
+
     // Search for I/O APIC entry in ACPI.
-    acpi_madt_entry_io_apic_t *ioApicMadt = (acpi_madt_entry_io_apic_t*)acpi_search_madt(ACPI_MADT_STRUCT_IO_APIC, 12, 0);
+    ACPI_MADT_IO_APIC *ioApicMadt = (ACPI_MADT_IO_APIC*)acpi_search_madt(ACPI_MADT_TYPE_IO_APIC, sizeof(ACPI_MADT_IO_APIC), 0);
     if (ioApicMadt == NULL) {
         kprintf("IOAPIC: No I/O APIC found or ACPI is disabled. Aborting.\n");
         ioApicInitialized = false;
@@ -128,12 +161,12 @@ void ioapic_init() {
     }
 
     // Map I/O APIC to virtual memory.
-    kprintf("IOAPIC: Initializing I/O APIC %u at 0x%X...\n", ioApicMadt->ioApicId, ioApicMadt->ioApicAddress);
-    paging_map(IOAPIC_ADDRESS, ioApicMadt->ioApicAddress, true, true);
+    kprintf("IOAPIC: Initializing I/O APIC %u at 0x%X...\n", ioApicMadt->Id, ioApicMadt->Address);
+    ioApicPointer = paging_device_alloc(ioApicMadt->Address, ioApicMadt->Address);
 
     // Get info about I/O APIC.
     uint8_t maxInterrupts = ioapic_max_interrupts();
-    kprintf("IOAPIC: Mapped I/O APIC to 0x%X!\n", IOAPIC_ADDRESS);
+    kprintf("IOAPIC: Mapped I/O APIC to 0x%p!\n", ioApicPointer);
     kprintf("IOAPIC:     ID: %u\n", ioapic_id());
     kprintf("IOAPIC:     Version: 0x%X.\n", ioapic_version());
     kprintf("IOPAIC:     Max interrupts: %u\n", maxInterrupts);
@@ -143,12 +176,12 @@ void ioapic_init() {
         ioapic_disable_interrupt(i);
 
     // Search for any interrupt remappings.
-    acpi_madt_entry_interrupt_override_t *override = (acpi_madt_entry_interrupt_override_t*)acpi_search_madt(ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE, 10, 0);
+    ACPI_MADT_INTERRUPT_OVERRIDE *override = (ACPI_MADT_INTERRUPT_OVERRIDE*)acpi_search_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, 10, 0);
     while (override != NULL) {
         // Add override.
-        kprintf("IOAPIC: Mapping interrupt %u to interrupt %u.\n", override->source, override->globalSystemInterrupt);
-        interrupt_redirections[override->source] = override->globalSystemInterrupt;
-        override = (acpi_madt_entry_interrupt_override_t*)acpi_search_madt(ACPI_MADT_STRUCT_INTERRUPT_OVERRIDE, 10, ((uintptr_t)override) + 1);
+        kprintf("IOAPIC: Mapping interrupt %u to interrupt %u.\n", override->SourceIrq, override->GlobalIrq);
+        interrupt_redirections[override->SourceIrq] = override->GlobalIrq;
+        override = (ACPI_MADT_INTERRUPT_OVERRIDE*)acpi_search_madt(ACPI_MADT_TYPE_INTERRUPT_OVERRIDE, 10, ((uintptr_t)override) + 1);
     }
 
     kprintf("IOAPIC: Initialized!\n");

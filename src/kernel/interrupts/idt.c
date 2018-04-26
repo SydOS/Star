@@ -4,26 +4,36 @@
 #include <kernel/interrupts/idt.h>
 
 // Create an IDT.
-idt_entry_t idt[IDT_ENTRIES];
-idt_ptr_t idtPtr;
+static idt_entry_t idt[IDT_ENTRIES];
+static idt_ptr_t idtPtr;
 
 // Sets an entry in the IDT.
 void idt_set_gate(uint8_t gate, uintptr_t base, uint16_t selector, uint8_t flags) {
     // The base address of the interrupt routine.
-    idt[gate].baseLow = base & 0xFFFF;
+    idt[gate].BaseLow = base & 0xFFFF;
 
     // The segment of the IDT entry.
-    idt[gate].selector = selector;
-    idt[gate].unused = 0;
-    idt[gate].flags = flags;
+    idt[gate].Selector = selector;
+    idt[gate].Unused = 0;
+    idt[gate].Flags = flags;
 
 #ifdef X86_64
-    idt[gate].baseMiddle = (base >> 16) & 0xFFFF;
-    idt[gate].baseHigh = (base >> 32) & 0xFFFFFFFF;
-    idt[gate].unused2 = 0;
+    idt[gate].BaseMiddle = (base >> 16) & 0xFFFF;
+    idt[gate].BaseHigh = (base >> 32) & 0xFFFFFFFF;
+    idt[gate].Unused2 = 0;
 #else
-    idt[gate].baseHigh = (base >> 16) & 0xFFFF;
+    idt[gate].BaseHigh = (base >> 16) & 0xFFFF;
 #endif
+}
+
+void idt_open_interrupt_gate(uint8_t gate, uintptr_t base) {
+    // Open an interrupt gate.
+    idt_set_gate(gate, base, 0x08, 0x8E);
+}
+
+void idt_close_interrupt_gate(uint8_t gate) {
+    // Close an interrupt gate.
+    idt_set_gate(gate, 0, 0, 0);
 }
 
 void idt_load() {
@@ -37,8 +47,8 @@ void idt_init() {
     kprintf("IDT: Initializing...\n");
 
     // Set up the IDT pointer and limit.
-    idtPtr.limit = (sizeof(idt_entry_t) * IDT_ENTRIES) - 1;
-    idtPtr.base = (uintptr_t)&idt;
+    idtPtr.Limit = (sizeof(idt_entry_t) * IDT_ENTRIES) - 1;
+    idtPtr.Base = (uintptr_t)&idt;
 
     // Clear out the IDT with zeros.
     memset(&idt, 0, sizeof(idt_entry_t) * IDT_ENTRIES);

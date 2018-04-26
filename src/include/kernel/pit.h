@@ -50,8 +50,8 @@ enum {
 
 #define PIT_BASE_FREQ 1193182
 
-extern uint64_t pit_ticks();
-extern void pit_init();
+extern uint64_t pit_ticks(void);
+extern void pit_init(void);
 extern void pit_startcounter(uint32_t freq, uint8_t counter, uint8_t mode);
 
 #endif

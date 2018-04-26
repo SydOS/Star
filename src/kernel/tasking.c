@@ -6,167 +6,153 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/main.h>
 #include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/irqs.h>
 
 extern void _isr_exit();
 
-PROCESS* c = 0;
+// Current process.
+Process* currentProcess = 0;
 uint32_t lpid = 0;
 bool taskingEnabled = false;
 
-// -----------------------------------------------------------------------------
-
-void schedule_noirq() {
-	if(!taskingEnabled) return;
-	asm volatile("int $0x2e");
-	return;
-}
-
 void _kill() {
-	// Kill a process
-	/*if(c->pid == 1) { pit_set_task(0); kprintf("Idle can't be killed!"); }
-	kprintf("Killing process %s (%d)\n", c->name, c->pid);
-	pit_set_task(0);
-	kheap_free((void *)c->stacktop);
-	kheap_free(c);
-	kheap_free(c->cr3);
-	c->prev->next = c->next;
-	c->next->prev = c->prev;
-	pit_set_task(1);
-	schedule_noirq();*/
+    // Pause tasking.
+    tasking_freeze();
+
+    // Remove task.
+    currentProcess->Prev->Next = currentProcess->Next;
+    currentProcess->Next->Prev = currentProcess->Prev;
+
+    // Free memory.
+    kheap_free((void *)currentProcess->StackBottom);
+    kheap_free(currentProcess);
+
+    // Resume tasking.
+    tasking_unfreeze();
 }
 
 void __notified(int sig) {
-	// Notify and kill process
-	switch(sig) {
-		case SIG_ILL:
-			kprintf("Received SIGILL, terminating!\n");
-			_kill();
-			break;
-		case SIG_TERM:
-			kprintf("Received SIGTERM, terminating!\n");
-			_kill();
-			break;
-		case SIG_SEGV:
-			kprintf("Received SIGSEGV, terminating!\n");
-			_kill();
-			break;
-		default:
-			kprintf("Received unknown SIG!\n");
-			return;
-	}
+    // Notify and kill process
+    switch(sig) {
+        case SIG_ILL:
+            kprintf("Received SIGILL, terminating!\n");
+            _kill();
+            break;
+        case SIG_TERM:
+            kprintf("Received SIGTERM, terminating!\n");
+            _kill();
+            break;
+        case SIG_SEGV:
+            kprintf("Received SIGSEGV, terminating!\n");
+            _kill();
+            break;
+        default:
+            kprintf("Received unknown SIG!\n");
+            return;
+    }
 }
 
 // -----------------------------------------------------------------------------
 
-/* add process but take care of others also! */
-int tasking_add_process(PROCESS* p)
-{
-	taskingEnabled = false;
-	__addProcess(p);
-	taskingEnabled = true;
-	return p->pid;
+inline void tasking_freeze() {
+    taskingEnabled = false;
 }
 
-void kernel_main_thread() {
-	taskingEnabled = true;
-	kernel_late();
+inline void tasking_unfreeze() {
+    taskingEnabled = true;
 }
 
-/* This adds a process while no others are running! */
-void __addProcess(PROCESS* p)
-{
-	p->next = c->next;
-	p->next->prev = p;
-	p->prev = c;
-	c->next = p;
+int tasking_add_process(Process* newProcess) {
+    // Pause tasking.
+    tasking_freeze();
+
+    // Add process into mix.
+    newProcess->Next = currentProcess->Next;
+    newProcess->Next->Prev = newProcess;
+    newProcess->Prev = currentProcess;
+    currentProcess->Next = newProcess;
+
+    // Resume tasking.
+    tasking_unfreeze();
+
+    // Return the PID.
+    return newProcess->Pid;
 }
 
-PROCESS* tasking_create_process(char* name, uintptr_t addr) {
-	// Allocate memory for process.
-	kprintf("Allocating memory for process \"%s\"...\n", name);
-	PROCESS* process = (PROCESS*)kheap_alloc(sizeof(PROCESS));
-	memset(process, 0, sizeof(PROCESS));
+void kernel_main_thread(void) {
+    tasking_unfreeze();
+    kernel_late();
+}
 
+Process* tasking_create_process(char* name, uintptr_t addr, uintptr_t ecx, uintptr_t edx) {
+    // Allocate memory for process.
+    Process* process = (Process*)kheap_alloc(sizeof(Process));
+    memset(process, 0, sizeof(Process));
 
-	kprintf("Setting up process\n");
-	process->name = name;
-	process->pid = ++lpid;
-	process->state = PROCESS_STATE_ALIVE;
-	process->notify = __notified;
+    // Set up process fields.
+    process->Name = name;
+    process->Pid = ++lpid;
+    process->State = PROCESS_STATE_ALIVE;
+    process->Notify = __notified;
 
-	kprintf("Allocating memory for stack\n");
-	process->stack_bottom = (uintptr_t)kheap_alloc(4096);
-	//asm volatile("mov %%cr3, %%eax":"=a"(process->cr3));
+    // Allocate space for stack.
+    process->StackBottom = (uintptr_t)kheap_alloc(4096);
+    process->StackTop = process->StackBottom + 4096;
+    uintptr_t stackTop = process->StackTop;
+    memset((void*)process->StackBottom, 0, 4096);
 
-	process->stack_top = process->stack_bottom + 4096;
-	memset((void*)process->stack_bottom, 0, 4096);
+    // Set up registers.
+    process->StackTop -= sizeof(irq_regs_t);
+    process->Regs = (irq_regs_t*)process->StackTop;
 
-	process->stack_top -= sizeof(registers_t);
-	process->regs = (registers_t*)process->stack_top;
+    process->Regs->flags = 0x00000202;
+    process->Regs->ip = addr;
+    process->Regs->bp = stackTop;
+    process->Regs->sp = process->StackTop;
+    process->Regs->cx = ecx;	
+    process->Regs->dx = edx;	
 
-	kprintf("Setting up stack...\n");
+    process->Regs->cs = 0x8;
+    process->Regs->ds = 0x10;
+    process->Regs->fs = 0x10;
+    process->Regs->es = 0x10;
+    process->Regs->gs = 0x10;
+    return process;
+}
+
+static void tasking_exec() {
+    // Send EOI and change out stacks.
+    irqs_eoi(0);
 #ifdef X86_64
-	process->regs->rflags = 0x00000202;
-	process->regs->cs = 0x8;
-	process->regs->rip = addr;
-	process->regs->rbp = process->stack_top;
-	process->regs->rsp = process->stack_top;
-	process->regs->ds = 0x10;
-	process->regs->fs = 0x10;
-	process->regs->es = 0x10;
-	process->regs->gs = 0x10;
+    asm volatile ("mov %0, %%rsp" : : "r"(currentProcess->Regs));
 #else
-	process->regs->eflags = 0x00000202;
-	process->regs->cs = 0x8;
-	process->regs->eip = addr;
-	process->regs->ebp = process->stack_top;
-	process->regs->esp = process->stack_top;
-	process->regs->ds = 0x10;
-	process->regs->fs = 0x10;
-	process->regs->es = 0x10;
-	process->regs->gs = 0x10;
+    asm volatile ("mov %0, %%esp" : : "r"(currentProcess->Regs));
 #endif
-	return process;
+    asm volatile ("jmp _irq_exit");
 }
 
-void tasking_tick(registers_t *regs) {
-	// Is tasking enabled?
-	if (!taskingEnabled)
-		return;
+void tasking_tick(irq_regs_t *regs) {
+    // Is tasking enabled?
+    if (!taskingEnabled)
+        return;
 
-	// Save registers and move to next task.
-	c->regs = regs;
-	c = c->next;
+    // Save registers and move to next task.
+    currentProcess->Regs = regs;
+    currentProcess = currentProcess->Next;
 
-	// Send EOI and change out stack.
-	interrupts_eoi(0);
-#ifdef X86_64
-	asm volatile ("mov %0, %%rsp" : : "r"(c->regs));
-#else
-	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
-#endif
-	asm volatile ("jmp _isr_exit");
-}
-
-void tasking_exec() {
-	interrupts_eoi(0);
-#ifdef X86_64
-	asm volatile ("mov %0, %%rsp" : : "r"(c->regs));
-#else
-	asm volatile ("mov %0, %%esp" : : "r"(c->regs));
-#endif
-	asm volatile ("jmp _isr_exit");
+    // Jump to next task.
+    tasking_exec();
 }
 
 void tasking_init() {
-	// Start up kernel task.
-	asm volatile ("cli");
-	kprintf("Creating kernel task...\n");
-	c = tasking_create_process("kernel", (uintptr_t)kernel_main_thread);
-	c->next = c;
-	c->prev = c;
-	asm volatile ("sti");
+    // Set up kernel task.
+    interrupts_disable();
+    kprintf("Creating kernel task...\n");
+    currentProcess = tasking_create_process("kernel", (uintptr_t)kernel_main_thread, 0, 0);
+    currentProcess->Next = currentProcess;
+    currentProcess->Prev = currentProcess;
+    interrupts_enable();
 
-	// Start tasking!
-	tasking_exec();
+    // Start tasking!
+    tasking_exec();
 }

@@ -31,13 +31,23 @@ void kputchar_hex(uint8_t num, bool capital, bool pad)
 }
 
 // Print a string.
-void kputstring(const char *str)
+void kputstring(const char *str, size_t max)
 {
     // Print out string.
-    while (*str)
-    {
-        kputchar(*str);
-        str++;
+    if (max == 0) {
+        while (*str) {
+            kputchar(*str);
+            str++;
+        }
+    }
+    else {
+        size_t len = strlen(str);
+        
+        while (*str && max) {
+            kputchar(*str);
+            str++;
+            max--;
+        }
     }
 }
 
@@ -72,7 +82,7 @@ void kprint_int(int64_t num)
         buffer[i--] = '-';
 
     // Print out numeral.
-    kputstring(&buffer[i + 1]);
+    kputstring(&buffer[i + 1], 0);
 }
 
 // Print an unsigned integer.
@@ -98,36 +108,35 @@ void kprint_uint(uint64_t num)
     }
 
     // Print out numeral.
-    kputstring(&buffer[i + 1]);
+    kputstring(&buffer[i + 1], 0);
 }
 
 // Print unsigned int as hexadecimal.
-void kprint_hex(uint64_t num, bool capital, bool pad)
-{
-    // If zero, just print zero.
-    if (num == 0)
-    {
-        kputchar('0');
-        return;
-    }
-
+void kprint_hex(uint64_t num, bool capital, uint8_t width) {
     bool first = true;
+    for (int8_t i = sizeof(num) - 1; i >= 0; i--) {
+        // Get byte.
+        const uint8_t byte = (num >> (8 * i)) & 0xFF;
 
-    for (int32_t i = sizeof(num) - 1; i >= 0; i--)
-    {
-        const uint8_t byte =(num >> (8 * i)) & 0xFF;
-
-        if (first && byte == 0)
+        // Are we wanting to ouput a certain width?
+        if (width && (i * 2) >= width) {
             continue;
+        }
+        else if (width == 0) { // No width specified
+            // If we have yet to hit the first non-zero byte, just continue to the next one.
+            if (first && byte == 0 && i > 0)
+                continue;
+        }
 
         // Print hex byte.
-        kputchar_hex(byte, capital, !first ? true : pad);
+        kputchar_hex(byte, capital, !first ? true : width > 0);
         first = false;
+        width -= 2;
     }
 }
 
 void kprintf(const char* format, ...) {
-    //spinlock_lock(&kprintf_mutex);
+    spinlock_lock(&kprintf_mutex);
 
     // Get args.
     va_list args;
@@ -136,7 +145,16 @@ void kprintf(const char* format, ...) {
     // Call va_list kprintf.
     kprintf_va(format, args);
 
-    //spinlock_release(&kprintf_mutex);
+    spinlock_release(&kprintf_mutex);
+}
+
+void kprintf_nlock(const char* format, ...) {
+    // Get args.
+    va_list args;
+    va_start(args, format);
+
+    // Call va_list kprintf.
+    kprintf_va(format, args);
 }
 
 // https://en.wikipedia.org/wiki/Printf_format_string
@@ -157,6 +175,35 @@ void kprintf_va(const char* format, va_list args) {
         {
             // Get type of formatting.
             char f = *format++;
+
+            // Ignore justify for now.
+            if (f == '-')
+                f = *format++;
+
+            // Ignore 0.
+            if (f == '0')
+                f = *format++;
+
+            // Check width.
+            size_t width = 0;
+            size_t precision = 0;
+            if (f >= '0' && f <= '9') {
+                width += f - '0';
+                f = *format++;
+            }
+
+            // Ignore justify for now.
+            if (f == '.') {
+                f = *format++;
+
+                // Check width.
+                if (f >= '0' && f <= '9') {
+                    precision += f - '0';
+                    f = *format++;
+                }
+            }
+
+
 
             // Do we have a long long?
             if (f == 'l' && *format++ == 'l')
@@ -192,17 +239,17 @@ void kprintf_va(const char* format, va_list args) {
                     
                     // Print hexadecimal.
                     case 'x':
-                        kprint_hex((uint64_t)va_arg(args, uint64_t), false, false);
+                        kprint_hex((uint64_t)va_arg(args, uint64_t), false, width);
                         break;
 
                     // Print hexadecimal (uppercase).
                     case 'X':
-                        kprint_hex((uint64_t)va_arg(args, uint64_t), true, false);
+                        kprint_hex((uint64_t)va_arg(args, uint64_t), true, width);
                         break;
 
                     // Print string.
                     case 's':
-                        kputstring((const char*)va_arg(args, const char*));
+                        kputstring((const char*)va_arg(args, const char*), width);
                         break;
 
                     // Print character.
@@ -244,12 +291,12 @@ void kprintf_va(const char* format, va_list args) {
                     
                     // Print hexadecimal.
                     case 'x':
-                        kprint_hex((uint32_t)va_arg(args, uint32_t), false, false);
+                        kprint_hex((uint32_t)va_arg(args, uint32_t), false, width);
                         break;
 
                     // Print hexadecimal (uppercase).
                     case 'X':
-                        kprint_hex((uint32_t)va_arg(args, uint32_t), true, false);
+                        kprint_hex((uint32_t)va_arg(args, uint32_t), true, width);
                         break;
 
                     // Print pointer as hex.
@@ -260,7 +307,7 @@ void kprintf_va(const char* format, va_list args) {
 
                     // Print string.
                     case 's':
-                        kputstring((const char*)va_arg(args, const char*));
+                        kputstring((const char*)va_arg(args, const char*), width);
                         break;
 
                     // Print character.

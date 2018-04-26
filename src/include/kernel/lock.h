@@ -3,7 +3,9 @@
 
 #include <main.h>
 
-typedef volatile uint32_t lock_t;
+typedef volatile uintptr_t lock_t;
+
+
 
 
 

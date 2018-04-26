@@ -10,19 +10,10 @@ spinlock_lock:
     mov eax, [esp+4]
 
 .loop:
-
-	bt dword[eax], 0
-
+    ; Attemp to lock object.
+    lock bts dword [eax], 0
+    pause
 	jc .loop
-
-
-
-	lock bts dword[eax], 0
-
-	jc .loop
-
-
-
 	ret
 
 global spinlock_release
@@ -31,5 +22,5 @@ spinlock_release:
     mov eax, [esp+4]
 
     ; Release lock.
-    btr dword [eax], 0
+    mov dword [eax], 0
     ret

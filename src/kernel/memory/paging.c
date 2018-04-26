@@ -4,7 +4,7 @@
 #include <string.h>
 #include <kernel/memory/paging.h>
 
-#include <kernel/interrupts/interrupts.h>
+#include <kernel/interrupts/exceptions.h>
 #include <kernel/memory/pmm.h>
 
 // http://www.rohitab.com/discuss/topic/31139-tutorial-paging-memory-mapping-with-a-recursive-page-directory/
@@ -118,6 +118,45 @@ void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress) {
     }
 }
 
+void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
+    // Ensure addresses are on 4KB boundaries.
+    if (MASK_PAGEFLAGS_4K_64BIT(startPhys) || MASK_PAGEFLAGS_4K_64BIT(endPhys))
+        panic("PAGING: Non-4KB aligned address range (0x%llX-0x%llX) specified!\n", startPhys, endPhys);
+    if (startPhys > endPhys)
+        panic("PAGING: Start address (0x%llX) is after end address (0x%llX)!\n", startPhys, endPhys);
+
+    uint32_t pageCount = ((endPhys - startPhys) / PAGE_SIZE_4K) + 1;// DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K(PhysicalAddress) + Length, PAGE_SIZE_4K);
+
+    // Get next available virtual range.
+    uintptr_t page = PAGING_FIRST_DEVICE_ADDRESS;
+    uint32_t currentCount = 0;
+    uint64_t phys;
+    while (currentCount < pageCount) {     
+        // Check if page is free.
+        if (!paging_get_phys(page, &phys))
+            currentCount++;
+        else {
+            // Move to next page.
+            page += PAGE_SIZE_4K;
+            if (page > PAGING_LAST_DEVICE_ADDRESS)
+                panic("PAGING: Out of device virtual addresses!\n");
+
+            // Start back at zero.
+            currentCount = 0;
+        }
+    }
+
+    // Check if last page is outside bounds.
+    if (page + ((pageCount - 1) * PAGE_SIZE_4K) > PAGING_LAST_DEVICE_ADDRESS)
+        panic("PAGING: Out of device virtual addresses!\n");
+
+    // Map range.
+    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), startPhys, true, true);
+
+    // Return address.
+    return (void*)(page);
+}
+
 /**
  * Unmaps a region of virtual memory without returning pages to the page stack, or unmapping non-stack memory.
  * @param startAddress The first address to unmap.
@@ -135,10 +174,14 @@ void paging_unmap_region_phys(uintptr_t startAddress, uintptr_t endAddress) {
         paging_unmap(startAddress + (i * PAGE_SIZE_4K));
 }
 
-static void paging_pagefault_handler(registers_t *regs) {
+void paging_device_free(uintptr_t startAddress, uintptr_t endAddress) {
+    paging_unmap_region_phys(startAddress, endAddress);
+}
+
+static void paging_pagefault_handler(ExceptionRegisters_t *regs) {
     page_t addr;
     asm volatile ("mov %%cr2, %0" : "=r"(addr));
-#ifdef X86_64
+/*#ifdef X86_64
     kprintf("RAX: 0x%p, RBX: 0x%p, RCX: 0x%p, RDX: 0x%p\n", regs->rax, regs->rbx, regs->rcx, regs->rdx);
     kprintf("RSI: 0x%p, RDI: 0x%p, RBP: 0x%p, RSP: 0x%p\n", regs->rsi, regs->rdi, regs->rbp, regs->rsp);
     kprintf("RIP: 0x%p, RFLAGS: 0x%p\n", regs->rip, regs->rflags);
@@ -146,7 +189,10 @@ static void paging_pagefault_handler(registers_t *regs) {
     kprintf("EAX: 0x%p, EBX: 0x%p, ECX: 0x%p, EDX: 0x%p\n", regs->eax, regs->ebx, regs->ecx, regs->edx);
     kprintf("ESI: 0x%p, EDI: 0x%p, EBP: 0x%p, ESP: 0x%p\n", regs->esi, regs->edi, regs->ebp, regs->esp);
     kprintf("EIP: 0x%p, EFLAGS: 0x%p\n", regs->eip, regs->eflags);
-#endif
+#endif*/
+    kprintf("EAX: 0x%p, EBX: 0x%p, ECX: 0x%p, EDX: 0x%p\n", regs->ax, regs->bx, regs->cx, regs->dx);
+    kprintf("ESI: 0x%p, EDI: 0x%p, EBP: 0x%p, ESP: 0x%p\n", regs->si, regs->di, regs->bp, regs->sp);
+    kprintf("EIP: 0x%p, EFLAGS: 0x%p\n", regs->ip, regs->flags);
     panic("PAGING: Page fault at 0x%X!\n", addr);
 }
 
@@ -157,7 +203,7 @@ void paging_init() {
     kprintf("PAGING: Initializing...\n");
 
     // Wire up page fault handler.
-    interrupts_isr_install_handler(ISR_EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
+    exceptions_install_handler(EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
 
 #ifdef X86_64
     // Setup 4-level (long mode) paging.
