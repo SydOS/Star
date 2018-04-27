@@ -3,32 +3,56 @@
 
 #include <main.h>
 
+#define GDT32_ENTRIES 6
+#define GDT64_ENTRIES 5
+
+#define GDT_PRIVILEGE_KERNEL    0x0
+#define GDT_PRIVILEGE_USER      0x3
+
 // This structure contains the value of one GDT entry.
 // We use the attribute 'packed' to tell GCC not to change
 // any of the alignment in the structure.
-struct gdt_entry {
-    uint16_t limitLow;          // The lower 16 bits of the limit.
-    uint16_t baseLow;           // The lower 16 bits of the base.
-    uint8_t  baseMiddle;        // The next 8 bits of the base.
-    uint8_t  access;            // Access flags, determine what ring this segment can be used in.
-    uint8_t  granularity;       // Limit and flags
-    uint8_t  baseHigh;          // The last 8 bits of the base.
-} __attribute__((packed));
-typedef struct gdt_entry gdt_entry_t;
+typedef struct {
+    // Low 16 bits of limit.
+    uint16_t LimitLow : 16;
+
+    // Low 24 bits of base address.
+    uint32_t BaseLow : 24;
+
+    // Access bits.
+    bool Accessed : 1;
+    bool Writeable : 1;
+    bool DirectionConforming : 1;
+    bool Executable : 1;
+    bool DescriptorBit : 1;
+    uint8_t Privilege : 2;
+    bool Present : 1;
+
+    // High 4 bits of limit.
+    uint8_t LimitHigh : 4;
+
+    // Flags bits.
+    uint8_t ReservedZero : 1;
+    bool Is64Bits : 1;
+    bool Is32Bits : 1;
+    bool IsLimit4K : 1;
+
+    // High 8 bits of base address.
+    uint8_t BaseHigh : 8;
+} __attribute__((packed)) gdt_entry_t;
 
 // This struct describes a GDT pointer. It points to the start of
 // our array of GDT entries, and is in the format required by the
 // lgdt instruction.
-struct gdt_ptr {
-    uint16_t limit;               // The upper 16 bits of all selector limits.
-    uintptr_t base;               // The address of the first gdt_entry_t struct.
-} __attribute__((packed));
-typedef struct gdt_ptr gdt_ptr_t;
+typedef struct {
+    // The upper 16 bits of all selector limits.
+    uint16_t Limit;
 
-#define GDT32_ENTRIES 5
-#define GDT64_ENTRIES 5
+    // The address of the first gdt_entry_t struct.               
+    uintptr_t Base;
+} __attribute__((packed)) gdt_ptr_t;
 
-extern void gdt_load();
-extern void gdt_init();
+extern void gdt_load(void);
+extern void gdt_init(void);
 
 #endif

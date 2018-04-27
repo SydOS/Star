@@ -19,3 +19,10 @@ _gdt_load:
 	jmp 0x08:.flush2
 .flush2:
 	ret
+
+global _gdt_flush_tss
+_gdt_flush_tss:
+	; Load TSS segment into the processor.
+	mov ax, 0x2B
+	ltr ax
+	ret

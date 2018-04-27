@@ -193,7 +193,7 @@ static void paging_pagefault_handler(ExceptionRegisters_t *regs) {
     kprintf("EAX: 0x%p, EBX: 0x%p, ECX: 0x%p, EDX: 0x%p\n", regs->ax, regs->bx, regs->cx, regs->dx);
     kprintf("ESI: 0x%p, EDI: 0x%p, EBP: 0x%p, ESP: 0x%p\n", regs->si, regs->di, regs->bp, regs->sp);
     kprintf("EIP: 0x%p, EFLAGS: 0x%p\n", regs->ip, regs->flags);
-    panic("PAGING: Page fault at 0x%X!\n", addr);
+    panic("PAGING: Page fault at 0x%X (0x%X)!\n", addr, regs->errorCode);
 }
 
 /**
