@@ -96,38 +96,25 @@ thread_t *tasking_thread_create(char* name, uintptr_t addr, uintptr_t ecx, uintp
     memset((void*)thread->StackBottom, 0, 4096);
 
     thread->SS = userLevel ? 0x23 : 0x10;
-    if (userLevel) {
-        stackTop -= 4;
-        *((uint32_t*)stackTop) = thread->SS;
-        stackTop -= 4;
-        *((uint32_t*)stackTop) = thread->StackTop;
-        
-        //thread->Regs->ss= 0x23;
-        //thread->Regs->flags = 0x0;
-    }
 
     // Set up registers.
     stackTop -= sizeof(irq_regs_t);
+    thread->SP = stackTop;
     thread->Regs = (irq_regs_t*)stackTop;
-
-    thread->Regs->FLAGS = 0x00000202;
+    thread->Regs->FLAGS = 0x202;
     thread->Regs->IP = addr;
     thread->Regs->BP = thread->StackTop;
-    thread->SP = stackTop;
-    thread->Regs->SP = stackTop;
+    thread->Regs->SP = thread->StackTop;
     thread->Regs->SS = thread->SS;
     thread->Regs->CX = ecx;	
     thread->Regs->DX = edx;	
-
     thread->Regs->CS = userLevel ? 0x1B : 0x8;
     thread->Regs->DS = userLevel ? 0x23 : 0x10;
     thread->Regs->FS = userLevel ? 0x23 : 0x10;
     thread->Regs->ES = userLevel ? 0x23 : 0x10;
     thread->Regs->GS = userLevel ? 0x23 : 0x10;
-//thread->Regs->usersp = thread->Regs->sp;
 
-
-
+    // Return the thread.
     thread->Next = thread;
     thread->Prev = thread;
     return thread;
@@ -268,7 +255,7 @@ static void kernel_main_thread(void) {
 }
 
 void tasking_init(void) {
-    // Set up kernel task.
+    // Disable interrupts, we don't want to screw the following code up.
     interrupts_disable();
 
     // Create kernel thread.
@@ -279,11 +266,16 @@ void tasking_init(void) {
     kernelProcess->Prev = kernelProcess;
     currentProcess = kernelProcess;
 
-    uintptr_t sp;
-    asm volatile ("mov %%rsp, %0" : "=r" (sp));
-    gdt_tss_set_kernel_stack(sp);
-    interrupts_enable();
-
+    // Set kernel stack pointer.
+    uintptr_t kernelStack;
+#if X86_64
+    asm volatile ("mov %%rsp, %0" : "=r"(kernelStack));
+#else
+    asm volatile ("mov %%esp, %0" : "=r"(kernelStack));
+#endif
+    gdt_tss_set_kernel_stack(kernelStack);
+    
     // Start tasking!
+    interrupts_enable();
     tasking_exec();
 }
