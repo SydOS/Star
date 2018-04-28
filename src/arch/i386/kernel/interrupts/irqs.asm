@@ -11,9 +11,15 @@ _irq_empty:
 extern irqs_handler
 global _irq_common
 _irq_common:
-    ; The processor has already pushed SS, user ESP, EFLAGS, CS, and EIP to the stack.
-    ; Push general registers (EAX, ECX, EDX, EBX, EBP, ESP, ESI, and EDI) to stack.
-    pushad
+    ; The processor has already pushed SS, ESP, EFLAGS, CS, and EIP to the stack.
+    ; Push general registers (EAX, EBX, ECX, EDX, EBP, ESI, and EDI) to stack.
+    push eax
+    push ebx
+    push ecx
+    push edx
+    push ebp
+    push esi
+    push edi
 
     ; Push segments to stack.
     push ds
@@ -38,14 +44,20 @@ _irq_common:
 
 global _irq_exit
 _irq_exit:
-; Restore segments.
+    ; Restore segments.
     pop gs
     pop fs
     pop es
     pop ds
 
-    ; Restore general registers (EDI, ESI, ESP, EBP, EBX, EDX, ECX, and EAX).
-    popad
+    ; Restore general registers (EDI, ESI, EBP, EDX, ECX, EBX, and EAX).
+    pop edi
+    pop esi
+    pop ebp
+    pop edx
+    pop ecx
+    pop ebx
+    pop eax
 
-    ; Continue execution.
+    ; Continue execution. This restores EIP, CS, EFLAGS, ESP, and SS, and re-enables interrupts.
     iretd

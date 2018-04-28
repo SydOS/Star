@@ -27,36 +27,24 @@ enum {
 // Defines registers for IRQ callbacks.
 typedef struct {
     // Extra segments and data segment.
-    uintptr_t gs, fs, es, ds;
+    uintptr_t GS, FS, ES, DS;
 
 #ifdef X86_64
     // Extra x64 registers.
-    uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
+    uint64_t R8, R9, R10, R11, R12, R13, R14, R15;
 #endif
     // Destination index, source index, base pointer.
-    uintptr_t di, si, bp;
-
-#ifndef X86_64
-    // Stack pointer (only in 32-bit).
-    uintptr_t sp;
-#endif
+    uintptr_t DI, SI, BP;
 
     // Base, data, counter, and accumulator registers.
-    uintptr_t bx, dx, cx, ax;
+    uintptr_t DX, CX, BX, AX;
 
     // Instruction pointer, code segment, and flags.
-    uintptr_t ip, cs, flags;
+    uintptr_t IP, CS, FLAGS;
     
-#ifdef X86_64
-    // Stack pointer (only in 64-bit).
-    uintptr_t sp;
-#else
-    // Stack pointer used when changing rings (only in 32-bit).
-    uintptr_t usersp;
-#endif
-    
-    // Stack segment.
-    uintptr_t ss;   
+    // Stack pointer and stack segment. In 32-bit these are only used when changing rings.
+    uintptr_t SP;
+    uintptr_t SS;   
 } __attribute__((packed)) irq_regs_t;
 
 typedef bool (*irq_handler_func_t)(irq_regs_t *regs, uint8_t irqNum);

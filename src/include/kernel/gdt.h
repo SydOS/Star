@@ -3,8 +3,12 @@
 
 #include <main.h>
 
+#ifdef X86_64
+#define GDT32_ENTRIES 5
+#define GDT64_ENTRIES 7
+#else
 #define GDT32_ENTRIES 6
-#define GDT64_ENTRIES 5
+#endif
 
 #define GDT_PRIVILEGE_KERNEL    0x0
 #define GDT_PRIVILEGE_USER      0x3
@@ -48,11 +52,29 @@ typedef struct {
     // The upper 16 bits of all selector limits.
     uint16_t Limit;
 
-    // The address of the first gdt_entry_t struct.               
+    // The address of the first GDT entry.               
     uintptr_t Base;
 } __attribute__((packed)) gdt_ptr_t;
 
+#define GDT_NULL_INDEX          0
+#define GDT_KERNEL_CODE_INDEX   1
+#define GDT_KERNEL_DATA_INDEX   2
+#define GDT_USER_CODE_INDEX     3
+#define GDT_USER_DATA_INDEX     4
+#define GDT_TSS_INDEX           5
+
+#define GDT_NULL_OFFSET         (uint8_t)(GDT_NULL_INDEX * sizeof(gdt_entry_t))
+#define GDT_KERNEL_CODE_OFFSET  (uint8_t)(GDT_KERNEL_CODE_INDEX * sizeof(gdt_entry_t))
+#define GDT_KERNEL_DATA_OFFSET  (uint8_t)(GDT_KERNEL_DATA_INDEX * sizeof(gdt_entry_t))
+#define GDT_USER_CODE_OFFSET    (uint8_t)(GDT_USER_CODE_INDEX * sizeof(gdt_entry_t))
+#define GDT_USER_DATA_OFFSET    (uint8_t)(GDT_USER_DATA_INDEX * sizeof(gdt_entry_t))
+#define GDT_TSS_OFFSET          (uint8_t)(GDT_TSS_INDEX * sizeof(gdt_entry_t))
+
+#define GDT_SELECTOR_RPL_RING3  0x3
+
+extern void gdt_tss_set_kernel_stack(uintptr_t stack);
 extern void gdt_load(void);
+extern void gdt_tss_load(void);
 extern void gdt_init(void);
 
 #endif

@@ -12,11 +12,11 @@ extern irqs_handler
 global _irq_common
 _irq_common:
     ; The processor has already pushed SS, RSP, RFLAGS, CS, and RIP to the stack.
-    ; Push general registers (RAX, RCX, RDX, RBX, RBP, RSI, and RDI) to stack.
+    ; Push general registers (RAX, RBX, RCX, RDX, RBP, RSI, and RDI) to stack.
     push rax
+    push rbx
     push rcx
     push rdx
-    push rbx
     push rbp
     push rsi
     push rdi
@@ -72,13 +72,13 @@ _irq_exit:
     pop r14
     pop r15
 
-    ; Restore general registers (RDI, RSI, RBP, RBX, RDX, RCX, and RAX).
+    ; Restore general registers (RDI, RSI, RBP, RDX, RCX, RBX, and RAX).
     pop rdi
     pop rsi
     pop rbp
-    pop rbx
     pop rdx
     pop rcx
+    pop rbx
     pop rax
 
     ; Continue execution.

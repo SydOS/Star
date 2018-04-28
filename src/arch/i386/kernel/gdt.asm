@@ -1,28 +1,31 @@
 [bits 32]
-extern gdt32Ptr
 section .text
 
 ; Sets up the new GDT into the processor while flushing out the old one.
 global _gdt_load
 _gdt_load:
+	; Get GDT pointer into EAX, and desired segment offset into EBX.
+	mov eax, [esp+4]
+	mov ebx, [esp+8]
+
 	; Load the GDT.
-	mov eax, gdt32Ptr
 	lgdt [eax]
 
-	mov ax, 0x10
-	mov ds, ax
-	mov es, ax
-	mov fs, ax
-	mov gs, ax
-	mov ss, ax
+	; Load segments.
+	mov ds, bx
+	mov es, bx
+	mov fs, bx
+	mov gs, bx
+	mov ss, bx
 	
 	jmp 0x08:.flush2
 .flush2:
 	ret
 
-global _gdt_flush_tss
-_gdt_flush_tss:
-	; Load TSS segment into the processor.
-	mov ax, 0x2B
+; Loads the TSS into the processor.
+global _gdt_tss_load
+_gdt_tss_load:
+	; Load specified TSS segment into the processor.
+	mov eax, [esp+4]
 	ltr ax
 	ret
