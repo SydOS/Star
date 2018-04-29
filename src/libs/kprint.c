@@ -134,6 +134,15 @@ void kprint_hex(uint64_t num, bool capital, uint8_t width) {
     }
 }
 
+void kprintf_nolock(const char* format, ...) {
+    // Get args.
+    va_list args;
+    va_start(args, format);
+
+    // Call va_list kprintf.
+    kprintf_va(format, args);
+}
+
 void kprintf(const char* format, ...) {
     // Lock.
     spinlock_lock(&kprintf_mutex);

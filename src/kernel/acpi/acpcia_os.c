@@ -107,32 +107,19 @@ ACPI_THREAD_ID AcpiOsGetThreadId() {
     return 1;
 }
 
-//ACPI_OSD_EXEC_CALLBACK functionA;
-//void *ContextA;
-void acpica_thread(void) {
-    // Function is in ECX/RCX, and the context in EDX/RDX.
-    uintptr_t Function = 0;
-    uintptr_t Context = 0;
+void acpica_thread(ACPI_OSD_EXEC_CALLBACK functionPtr, void *contextPtr) {
+    // Execute ACPICA function.
+    // = (ACPI_OSD_EXEC_CALLBACK)arg1;
+  //   = (void*)arg2;
 
-#ifdef X86_64
-    asm volatile ("movq %%rcx, %0" : "=r"(Function));
-    asm volatile ("movq %%rdx, %0" : "=r"(Context));
-#else
-    asm volatile ("movl %%ecx, %0" : "=r"(Function));
-    asm volatile ("movl %%edx, %0" : "=r"(Context));
-#endif
-
-    ACPI_OSD_EXEC_CALLBACK FunctionPtr = (ACPI_OSD_EXEC_CALLBACK)Function;
-    void *ContextPtr = (void*)Context;
-
-    FunctionPtr(Context);
-    _kill();
-    while(true);
+    //kprintf("function 0x%p, context 0x%p\n", arg1, arg2);
+    functionPtr(contextPtr);
+    kprintf("done acpcia handler.\n");
 }
 
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
-    tasking_add_process(tasking_create_process("acpica", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context));
-    kprintf("in interrupt? %s\n", irqs_irq_executing() ? "yes" : "no");
+    // Schedule execution by adding a thread.
+    tasking_thread_add_kernel(tasking_thread_create("acpica_worker", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context, 0));
     return (AE_OK);
 }
 

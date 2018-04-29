@@ -36,9 +36,9 @@ void panic(const char *format, ...) {
 	va_start(args, format);
 
 	// Show panic.
-	kprintf("\nPANIC:\n");
+	kprintf_nolock("\nPANIC:\n");
 	kprintf_va(format, args);
-	kprintf("\n\nHalted.");
+	kprintf_nolock("\n\nHalted.");
 
 	// Halt other processors.
 	//lapic_send_nmi_all();
@@ -95,11 +95,22 @@ void kernel_main() {
 	// We should never get here.
 	panic("Tasking failed to start!\n");
 }
-
-void hmmm_thread(void) {
+extern void vga_writes(const char* data);
+void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
 	while (1) { 
-		//kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
+		kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
 		sleep(2000);
+	 }
+}
+
+void secondprocess_thread(void) {
+	while (1) { 
+		vga_writes("I'm a ring 3 thread!\n");
+		//char *out;
+		//utoa(pit_ticks() / 1000, out, 10);
+		//vga_writes(out);
+		//vga_writes("s\n");
+		sleep(4000);
 	 }
 }
 
@@ -125,15 +136,16 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 }
 
 void kernel_late() {
-	kprintf("Adding second task...\n");
-	tasking_add_process(tasking_create_process("hmmm", (uintptr_t)hmmm_thread, 0, 0));
-	kprintf("Starting tasking...\n");
+	kprintf("MAIN: Adding second kernel thread...\n");
+	tasking_thread_add_kernel(tasking_thread_create("hmm", (uintptr_t)hmmm_thread, 12, 3, 4));
 
-		acpi_late_init();
+	kprintf("MAIN: Adding second process...\n"); 
+	tasking_process_add(tasking_process_create("another one", tasking_thread_create("ring3", (uintptr_t)secondprocess_thread, 0, 0, 0), false));
+
+	acpi_late_init();
 
 	// Initialize PS/2.
 	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	
-
 	
 	// Initialize floppy.
 	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
