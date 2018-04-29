@@ -94,7 +94,8 @@ thread_t *tasking_thread_create(char* name, uintptr_t addr, uintptr_t arg1, uint
     thread->StackPointer = stackTop - sizeof(irq_regs_t);
     thread->Regs = (irq_regs_t*)thread->StackPointer;
     thread->Regs->SP = thread->Regs->BP = stackTop;
-    thread->Regs->FLAGS = 0x202;
+    thread->Regs->FLAGS.AlwaysTrue = true;
+    thread->Regs->FLAGS.InterruptsEnabled = true;
 
     // AX contains the address of thread's main function.
     thread->Regs->IP = _tasking_thread_exec;
