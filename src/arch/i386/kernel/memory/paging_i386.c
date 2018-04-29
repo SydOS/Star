@@ -72,7 +72,7 @@ static void paging_map_std(uintptr_t virtual, uint32_t physical, bool unmap) {
     // Pages will never be located at 0x0, so its safe to assume a value of 0 = no table defined.
     uint32_t *table = (uint32_t*)(PAGE_TABLES_ADDRESS + (tableIndex * PAGE_SIZE_4K));
     if (MASK_PAGE_4K(directory[tableIndex]) == 0) {
-        directory[tableIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        directory[tableIndex] = pmm_pop_frame() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
         paging_flush_tlb();
 
         // Zero out new table.
@@ -231,7 +231,7 @@ void paging_late_std() {
 
     // Pop a new page frame for the page directory, and map it to 0x0 in the current virtual space.
     memInfo.kernelPageDirectory = pmm_pop_frame();
-    earlyPageTableLow[0] = memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    earlyPageTableLow[0] = memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
 
     // Get pointer to the page directory.
     uint32_t *pageDirectory = (uint32_t*)0x0;
@@ -239,7 +239,7 @@ void paging_late_std() {
 
     // Create the first page table for the kernel, and map it to 0x1000 in the current virtual space.
     uint32_t pageKernelTableAddr = pmm_pop_frame();
-    earlyPageTableLow[1] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    earlyPageTableLow[1] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
     paging_flush_tlb();
 
     // Get pointer to page table.
@@ -247,7 +247,7 @@ void paging_late_std() {
     memset(pageKernelTable, 0, PAGE_SIZE_4K);
 
     // Add the table to the new directory.
-    pageDirectory[paging_calculate_table(memInfo.kernelVirtualOffset)] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    pageDirectory[paging_calculate_table(memInfo.kernelVirtualOffset)] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
 
     // Map low memory and kernel to higher-half virtual space.
     uint32_t offset = 0;
@@ -256,7 +256,7 @@ void paging_late_std() {
         if (page > 0 && page % PAGE_SIZE_4M == 0) { 
             // Create another table and map to 0x1000 in the current virtual space.
             pageKernelTableAddr = pmm_pop_frame();
-            earlyPageTableLow[1] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+            earlyPageTableLow[1] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
             paging_flush_tlb();
 
             // Zero out new page table.
@@ -264,15 +264,15 @@ void paging_late_std() {
 
             // Increase offset and add the table to our new directory.
             offset++;
-            pageDirectory[paging_calculate_table(memInfo.kernelVirtualOffset) + offset] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+            pageDirectory[paging_calculate_table(memInfo.kernelVirtualOffset) + offset] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
         }
 
         // Add page to table.
-        pageKernelTable[(page / PAGE_SIZE_4K) - (offset * PAGE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+        pageKernelTable[(page / PAGE_SIZE_4K) - (offset * PAGE_DIRECTORY_SIZE)] = page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
     }
 
     // Recursively map page directory to last entry.
-    pageDirectory[PAGE_DIRECTORY_SIZE - 1] = memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+    pageDirectory[PAGE_DIRECTORY_SIZE - 1] = memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
 }
 
 void paging_late_pae() {

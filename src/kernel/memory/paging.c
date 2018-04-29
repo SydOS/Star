@@ -179,7 +179,7 @@ void paging_device_free(uintptr_t startAddress, uintptr_t endAddress) {
 }
 
 static void paging_pagefault_handler(ExceptionRegisters_t *regs) {
-    page_t addr;
+    uintptr_t addr;
     asm volatile ("mov %%cr2, %0" : "=r"(addr));
 /*#ifdef X86_64
     kprintf("RAX: 0x%p, RBX: 0x%p, RCX: 0x%p, RDX: 0x%p\n", regs->rax, regs->rbx, regs->rcx, regs->rdx);
@@ -193,7 +193,7 @@ static void paging_pagefault_handler(ExceptionRegisters_t *regs) {
     kprintf("EAX: 0x%p, EBX: 0x%p, ECX: 0x%p, EDX: 0x%p\n", regs->ax, regs->bx, regs->cx, regs->dx);
     kprintf("ESI: 0x%p, EDI: 0x%p, EBP: 0x%p, ESP: 0x%p\n", regs->si, regs->di, regs->bp, regs->sp);
     kprintf("EIP: 0x%p, EFLAGS: 0x%p\n", regs->ip, regs->flags);
-    panic("PAGING: Page fault at 0x%X (0x%X)!\n", addr, regs->errorCode);
+    panic("PAGING: Page fault at 0x%p (0x%X)!\n", addr, regs->errorCode);
 }
 
 /**
