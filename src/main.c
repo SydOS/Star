@@ -88,6 +88,9 @@ void kernel_main() {
 	// Initialize SMP.
 	smp_init();
 
+	// Print CPUID info.
+	cpuid_print_capabilities();
+
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");
 	tasking_init();
@@ -103,9 +106,13 @@ void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
 	 }
 }
 
+extern void _syscalls_syscall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
 void secondprocess_thread(void) {
+	
+	
 	while (1) { 
-		vga_writes("I'm a ring 3 thread!\n");
+		_syscalls_syscall(30, 0xFF, 0x4E, 0, 0, 0);
+		//vga_writes("I'm a ring 3 thread!\n");
 		//char *out;
 		//utoa(pit_ticks() / 1000, out, 10);
 		//vga_writes(out);
@@ -155,8 +162,7 @@ void kernel_late() {
 
 	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
 
-	// Print CPUID info.
-	cpuid_print_capabilities();
+
 
 	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 

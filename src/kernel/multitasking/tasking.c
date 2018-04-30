@@ -211,6 +211,9 @@ static void kernel_main_thread(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {
 }
 
 void tasking_init(void) {
+    // Initialize syscalls.
+    syscalls_init();
+
     // Disable interrupts, we don't want to screw the following code up.
     interrupts_disable();
 

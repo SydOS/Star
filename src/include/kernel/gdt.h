@@ -59,15 +59,16 @@ typedef struct {
 #define GDT_NULL_INDEX          0
 #define GDT_KERNEL_CODE_INDEX   1
 #define GDT_KERNEL_DATA_INDEX   2
-#define GDT_USER_CODE_INDEX     3
-#define GDT_USER_DATA_INDEX     4
+#define GDT_USER_DATA_INDEX     3
+#define GDT_USER_CODE_INDEX     4
 #define GDT_TSS_INDEX           5
 
+// GDT offsets. SYSCALL requires user code to be after user data for some reason.
 #define GDT_NULL_OFFSET         (uint8_t)(GDT_NULL_INDEX * sizeof(gdt_entry_t))
 #define GDT_KERNEL_CODE_OFFSET  (uint8_t)(GDT_KERNEL_CODE_INDEX * sizeof(gdt_entry_t))
 #define GDT_KERNEL_DATA_OFFSET  (uint8_t)(GDT_KERNEL_DATA_INDEX * sizeof(gdt_entry_t))
-#define GDT_USER_CODE_OFFSET    (uint8_t)(GDT_USER_CODE_INDEX * sizeof(gdt_entry_t))
 #define GDT_USER_DATA_OFFSET    (uint8_t)(GDT_USER_DATA_INDEX * sizeof(gdt_entry_t))
+#define GDT_USER_CODE_OFFSET    (uint8_t)(GDT_USER_CODE_INDEX * sizeof(gdt_entry_t))
 #define GDT_TSS_OFFSET          (uint8_t)(GDT_TSS_INDEX * sizeof(gdt_entry_t))
 
 #define GDT_SELECTOR_RPL_RING3  0x3

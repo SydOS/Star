@@ -152,9 +152,9 @@ void gdt_init(void) {
     gdt_set_descriptor(gdt32, GDT_KERNEL_CODE_INDEX, true, false, false);
     gdt_set_descriptor(gdt32, GDT_KERNEL_DATA_INDEX, false, false, false);
 
-    // Set code and data segement for ring 3 (user mode) for 32-bit GDT.
-    gdt_set_descriptor(gdt32, GDT_USER_CODE_INDEX, true, true, false);
+    // Set data and code segement for ring 3 (user mode) for 32-bit GDT.
     gdt_set_descriptor(gdt32, GDT_USER_DATA_INDEX, false, true, false);
+    gdt_set_descriptor(gdt32, GDT_USER_CODE_INDEX, true, true, false);
 
 #ifdef X86_64
     // Set up the 64-bit GDT pointer and limit.
@@ -169,12 +169,9 @@ void gdt_init(void) {
     gdt_set_descriptor(gdt64, GDT_KERNEL_CODE_INDEX, true, false, true);
     gdt_set_descriptor(gdt64, GDT_KERNEL_DATA_INDEX, false, false, false);
 
-    // Set code and data segement for ring 3 (user mode) for 64-bit GDT.
-    gdt_set_descriptor(gdt64, GDT_USER_CODE_INDEX, true, true, true);
+    // Set data and code segement for ring 3 (user mode) for 64-bit GDT.
     gdt_set_descriptor(gdt64, GDT_USER_DATA_INDEX, false, true, false);
-
-    //gdt_set_descriptor(5, 0x80000, 0x67, 0xE9, 0x00); // User mode data segment.
-    //gdt_set_descriptor(6, 0, 0x80, 0x00, 0x00); // User mode data segment.);
+    gdt_set_descriptor(gdt64, GDT_USER_CODE_INDEX, true, true, true);
 #endif
 
     // Zero out TSS.
