@@ -4,8 +4,12 @@ section .text
 extern SyscallStack
 extern SyscallTemp
 
-global _syscalls_syscall
-_syscalls_syscall:
+global syscalls_syscall
+syscalls_syscall:
+    ; Move last arg (call index) into RAX.
+    mov rax, [rsp+8]
+
+    ; Execute SYSCALL.
     syscall
     ret
 
@@ -40,9 +44,11 @@ _syscalls_handler:
     mov rax, [qword SyscallTemp]
     mov rcx, r10
 
-    ; Call C handler.
+    ; Push call index to stack as last arg, call C handler, and discard call index.
+    push rax
     extern syscalls_handler
     call syscalls_handler
+    pop rdx
 
     ; Restore other registers.
     pop rbx

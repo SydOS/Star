@@ -20,9 +20,9 @@ typedef struct thread_t {
 	uint32_t ThreadId;
 	char *Name;
 
-	uint8_t Stack[THREAD_STACK_SIZE];
+	//uint8_t Stack[THREAD_STACK_SIZE];
+	uint64_t StackPage;
 	uintptr_t StackPointer;
-	irq_regs_t *Regs;
 } thread_t;
 
 typedef struct process_t {
@@ -31,7 +31,7 @@ typedef struct process_t {
 
 	char* Name;
 	uint32_t ProcessId;
-	bool KernelMode;
+	uintptr_t PagingTablePhys;
 
 	struct thread_t *MainThread;
 	struct thread_t *CurrentThread;

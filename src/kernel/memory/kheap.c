@@ -178,7 +178,7 @@ static bool kheap_expand(size_t size) {
 
     for (page_t page = currentKernelHeapSize; page < ALIGN_4K(newSize) - PAGE_SIZE_4K; page += PAGE_SIZE_4K) {
         // Pop another page and increase size of heap.
-        paging_map(KHEAP_START + page, pmm_pop_frame(), false, true);
+        paging_map(KHEAP_START + page, pmm_pop_frame(), true, true);
 
         // Increase wilderness size.
         kheap_node_t *wildNode = kheap_get_wilderness();
@@ -363,7 +363,7 @@ void kheap_init(void) {
 
     // Start with 4MB heap.
     currentKernelHeapSize = KHEAP_INITIAL_SIZE;
-    paging_map_region(KHEAP_START, KHEAP_START + currentKernelHeapSize, false, true);
+    paging_map_region(KHEAP_START, KHEAP_START + currentKernelHeapSize, true, true);
 
     // Test heap area.
     kprintf("KHEAP: Testing %uKB of heap memory...\n", currentKernelHeapSize / 1024);

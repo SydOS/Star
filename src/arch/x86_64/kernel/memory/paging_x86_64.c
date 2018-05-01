@@ -106,7 +106,7 @@ void paging_map(uintptr_t virtual, uint64_t physical, bool kernel, bool writeabl
         flags |= PAGING_PAGE_USER;
     if (writeable)
         flags |= PAGING_PAGE_READWRITE;
-    flags |= PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
+    flags |= PAGING_PAGE_PRESENT;
 
     // Map address.
     paging_map_long(virtual, physical | flags, false);
@@ -165,6 +165,27 @@ bool paging_get_phys(uintptr_t virtual, uint64_t *physOut) {
     // Get address from table.
     *physOut = MASK_PAGE_4K(table[entryIndex]);
     return true;
+}
+
+uintptr_t paging_create_app_copy(void) {
+    // Create a new PML4 table.
+    uint64_t appPml4Page = pmm_pop_frame();
+    uint64_t *appPml4Table = (uint64_t*)paging_device_alloc(appPml4Page, appPml4Page);
+    memset(appPml4Table, 0, PAGE_SIZE_4K);
+
+    // Get current PML4 table.
+    uint64_t *pml4Table = (uint64_t*)PAGE_LONG_PML4_ADDRESS;
+
+    // Copy higher half of PML4 table into the new one. We can safely assume the current one's higher-half is accurate.
+    for (uint16_t i = (PAGE_LONG_STRUCT_SIZE / 2); i < PAGE_LONG_STRUCT_SIZE; i++)
+        appPml4Table[i] = pml4Table[i];
+
+    // Recursively map PML4 table.
+    appPml4Table[PAGE_LONG_STRUCT_SIZE - 1] = appPml4Page | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
+
+    // Unmap table.
+    paging_device_free((uintptr_t)appPml4Table, (uintptr_t)appPml4Table);
+    return appPml4Page;
 }
 
 /**

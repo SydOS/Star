@@ -19,12 +19,22 @@ extern void paging_late_pae();
 #endif
 
 /**
+ * Gets the current paging structure.
+ */
+uintptr_t paging_get_current_directory(void) {
+    // Tell CPU the directory and enable paging.
+    uintptr_t directoryPhysicalAddr;
+    asm volatile ("mov %%cr3, %%eax" : "=a"(directoryPhysicalAddr));
+    return directoryPhysicalAddr;
+}
+
+/**
  * Changes the current paging structure.
  * @param directoryPhysicalAddr The physical address of the root paging structure.
  */
 void paging_change_directory(uintptr_t directoryPhysicalAddr) {
     // Tell CPU the directory and enable paging.
-    asm volatile ("mov %%eax, %%cr3": :"a"(directoryPhysicalAddr)); 
+    asm volatile ("mov %%eax, %%cr3" : : "a"(directoryPhysicalAddr)); 
     asm volatile ("mov %cr0, %eax");
     asm volatile ("orl $0x80000000, %eax");
     asm volatile ("mov %eax, %cr0");
@@ -151,7 +161,7 @@ void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
         panic("PAGING: Out of device virtual addresses!\n");
 
     // Map range.
-    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), startPhys, true, true);
+    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), startPhys, false, true); // TODO change back to kernel only.
 
     // Return address.
     return (void*)(page);

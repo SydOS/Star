@@ -21,6 +21,7 @@
 #include <driver/ps2/ps2.h>
 #include <libs/keyboard.h>
 #include <driver/rtc.h>
+#include <kernel/multitasking/syscalls.h>
 
 #include <driver/usb/devices/usb_device.h>
 
@@ -106,17 +107,11 @@ void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
 	 }
 }
 
-extern void _syscalls_syscall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
 void secondprocess_thread(void) {
-	
-	
 	while (1) { 
-		_syscalls_syscall(30, 0xFF, 0x4E, 0, 0, 0);
-		//vga_writes("I'm a ring 3 thread!\n");
-		//char *out;
-		//utoa(pit_ticks() / 1000, out, 10);
-		//vga_writes(out);
-		//vga_writes("s\n");
+		uint64_t uptime = 0;
+		syscalls_syscall(&uptime, 0, 0, 0, 0, 0, SYSCALL_UPTIME);
+		syscalls_kprintf("Hi from ring 3, via syscall! Uptime: %u\n", uptime);
 		sleep(4000);
 	 }
 }
@@ -143,11 +138,11 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 }
 
 void kernel_late() {
-	kprintf("MAIN: Adding second kernel thread...\n");
-	tasking_thread_add_kernel(tasking_thread_create("hmm", (uintptr_t)hmmm_thread, 12, 3, 4));
+	//kprintf("MAIN: Adding second kernel thread...\n");
+	//tasking_thread_add_kernel(tasking_thread_create("hmm", (uintptr_t)hmmm_thread, 12, 3, 4));
 
 	kprintf("MAIN: Adding second process...\n"); 
-	tasking_process_add(tasking_process_create("another one", tasking_thread_create("ring3", (uintptr_t)secondprocess_thread, 0, 0, 0), false));
+	//tasking_process_add(tasking_process_create("another one", tasking_thread_create("ring3", (uintptr_t)secondprocess_thread, 0, 0, 0), false));
 
 	acpi_late_init();
 

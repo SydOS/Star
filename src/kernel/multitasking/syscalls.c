@@ -3,7 +3,9 @@
 #include <string.h>
 #include <io.h>
 
+#include <kernel/multitasking/syscalls.h>
 #include <kernel/gdt.h>
+#include <kernel/pit.h>
 #include <kernel/cpuid.h>
 #include <kernel/memory/kheap.h>
 extern void _syscalls_handler(void);
@@ -11,11 +13,41 @@ extern void _syscalls_handler(void);
 uint8_t *SyscallStack;
 uintptr_t SyscallTemp;
 
-void syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {
-  //  char *dd = (char*)syscallParams;
-   // kprintf(dd);
-   kprintf("test");
-    //speaker_play_tone(2000, 30);
+void syscalls_kprintf(const char *format, ...) {
+    // Get args.
+    va_list args;
+	va_start(args, format);
+
+	// Invoke kprintf_va via system call.
+    syscalls_syscall(format, args, 0, 0, 0, 0, 0xAB);
+}
+
+static uintptr_t syscalls_uptime_handler(uintptr_t ptrAddr) {
+    uint64_t *uptimePtr = (uint64_t)ptrAddr;
+    if (uptimePtr != NULL) {
+        *uptimePtr = pit_ticks() / 1000;
+        return 0;
+    }
+    return -1;
+}
+
+uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5, uintptr_t index) {
+    if (index == 0xAB) {
+        //va_list args = (va_list[])arg1;
+        //uintptr_t *ar = &arg1;
+       // kprintf_va((const char*)arg0, (va_list)ar);
+       kprintf_va(arg0, arg1);
+    }
+    
+    switch (index) {
+        case SYSCALL_UPTIME:
+            return syscalls_uptime_handler(arg0);
+
+        default:
+            return -1;
+    }
+
+    return 0xFE;
 }
 
 void syscalls_init(void) {
