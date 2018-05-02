@@ -210,7 +210,7 @@ static void paging_pagefault_handler(ExceptionRegisters_t *regs) {
  * Initializes paging.
  */
 void paging_init() {
-    kprintf("PAGING: Initializing...\n");
+    kprintf("\e[95mPAGING: Initializing...\n");
 
     // Wire up page fault handler.
     exceptions_install_handler(EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
@@ -253,5 +253,5 @@ void paging_init() {
     kprintf("PAGING: Unmapping test region...\n");
     paging_unmap_region(0x1000, 0x5000);
 
-    kprintf("PAGING: Initialized!\n");
+    kprintf("PAGING: Initialized!\e[0m\n");
 }

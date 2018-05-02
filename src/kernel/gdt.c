@@ -141,7 +141,7 @@ void gdt_tss_load(void) {
  */
 void gdt_init(void) {
     // Set up the 32-bit GDT pointer and limit.
-    kprintf("GDT: Initializing 32-bit GDT at 0x%p...\n", &gdt32);
+    kprintf("\e[31mGDT: Initializing 32-bit GDT at 0x%p...\n", &gdt32);
     gdt32Ptr.Limit = (sizeof(gdt_entry_t) * GDT32_ENTRIES) - 1;
     gdt32Ptr.Base = (uintptr_t)&gdt32;
 
@@ -196,5 +196,5 @@ void gdt_init(void) {
     // Load the GDT.
     gdt_load();
     gdt_tss_load();
-    kprintf("GDT: Initialized!\n");
+    kprintf("GDT: Initialized!\e[0m\n");
 }

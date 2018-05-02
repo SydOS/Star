@@ -463,7 +463,7 @@ static void pmm_build_stacks() {
  * Initializes the physical memory manager.
  */
 void pmm_init() {
-    kprintf("PMM: Initializing physical memory manager...\n");
+    kprintf("\e[35mPMM: Initializing physical memory manager...\n");
 
     // Store away Multiboot info.
     memInfo.mbootInfo = (multiboot_info_t*)(MULTIBOOT_INFO + (uintptr_t)&KERNEL_VIRTUAL_OFFSET);
@@ -498,5 +498,5 @@ void pmm_init() {
 
     // Build stacks.
     pmm_build_stacks();
-    kprintf("PMM: Initialized!\n");
+    kprintf("PMM: Initialized!\e[0m\n");
 }

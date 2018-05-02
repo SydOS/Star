@@ -60,28 +60,20 @@ void kernel_main() {
 
 	vga_initialize();
 
+	// Initialize the GDT.
 	gdt_init();
 
-	// -------------------------------------------------------------------------
-	// MEMORY RELATED STUFF
-	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
-	
-	// Initialize memory.
+	// Initialize memory system.
 	pmm_init();
     paging_init();
 	kheap_init();
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	// Initialize ACPI and interrupts.
 	acpi_init();
 	interrupts_init();
 
-
-	kprintf("Setting up PIT...\n");
+	// Initialize PIT.
     pit_init();
-
-
 
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
@@ -99,7 +91,7 @@ void kernel_main() {
 	// We should never get here.
 	panic("Tasking failed to start!\n");
 }
-extern void vga_writes(const char* data);
+
 void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
 	while (1) { 
 		kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
@@ -145,71 +137,45 @@ void kernel_late() {
 	//tasking_process_add(tasking_process_create("another one", tasking_thread_create("ring3", (uintptr_t)secondprocess_thread, 0, 0, 0), false));
 
 	acpi_late_init();
-
-	// Initialize PS/2.
-	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	
 	
 	// Initialize floppy.
-	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
 	floppy_init();
 
     vga_enable_cursor();
 
-	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-
-
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
 	pci_init();
 
-	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
-	
-	vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-	kprintf("Kernel is located at 0x%p!\n", memInfo.kernelStart);
+	// Print info.
+	kprintf("\e[92mKernel is located at 0x%p!\n", memInfo.kernelStart);
 	kprintf("Detected usable RAM: %uMB\n", memInfo.memoryKb / 1024);
 	if (memInfo.paeEnabled)
 		kprintf("PAE enabled!\n");
 	if (memInfo.nxEnabled)
 		kprintf("NX enabled!\n");
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	kprintf("\e[0m");
+	
 	//rtc_init();
 	//kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 	//kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
+	// Print logo.
+	kprintf("\n\e[94m");
+	kprintf("   _____           _  ____   _____ \n");
+	kprintf("  / ____|         | |/ __ \\ / ____|\n");
+	kprintf(" | (___  _   _  __| | |  | | (___  \n");
+	kprintf("  \\___ \\| | | |/ _` | |  | |\\___ \\ \n");
+	kprintf("  ____) | |_| | (_| | |__| |____) |\n");
+	kprintf(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
+	kprintf("          __/ |                    \n");
+	kprintf("         |___/                     \n");
+	kprintf("\e[36mCopyright (c) Sydney Erickson 2017 - 2018\e[0m\n\n");
 
-
-	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-	vga_writes("   _____           _  ____   _____ \n");
-	vga_writes("  / ____|         | |/ __ \\ / ____|\n");
-	vga_writes(" | (___  _   _  __| | |  | | (___  \n");
-	vga_writes("  \\___ \\| | | |/ _` | |  | |\\___ \\ \n");
-	vga_writes("  ____) | |_| | (_| | |__| |____) |\n");
-	vga_writes(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
-	vga_writes("          __/ |                    \n");
-	vga_writes("         |___/                     \n");
-	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
-
-
-    
-
-    // Ring serial and VGA terminals.
-	serial_write('\a');
-	//vga_putchar('\a');
-  
-	// If serial isn't present, just loop.
-	//if (!serial_present()) {
-		//kprintf("No serial port present for logging, waiting here.");
-	//	while (true);
-	//}
+    // Ring serial terminals.
+	kprintf("\a");
 
 	char buffer[100];
-
 	while (true) {
-		vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-		kprintf("root@sydos ~: ");
-		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+		kprintf("\e[96mroot@sydos ~:\e[0m ");
 
 		uint16_t i = 0;
 		while (i < 98) {
@@ -300,19 +266,5 @@ void kernel_late() {
 				usbDevice = usbDevice->Next;
 			}
 		}
-
-
-		/*char c = serial_read();
-
-		if (c == '\r' || c == '\n') {
-			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-			kprintf("\nroot@sydos ~: ");
-			serial_writes("\nroot@sydos ~: ");
-			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-		} else {
-			vga_putchar(c);
-			serial_write(c);
-			vga_trigger_cursor_update();
-		}*/
 	}
 }

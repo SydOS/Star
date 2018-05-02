@@ -15,18 +15,16 @@ static bool interruptsEnabled = false;
 void interrupts_enable(void) {
     asm volatile ("sti");
     interruptsEnabled = true;
+    kprintf("\e[97;44mINTERRUPTS ARE ENABLED\n\e[0m");
 }
 
 void interrupts_disable(void) {
     asm volatile ("cli");
     interruptsEnabled = false;
+    kprintf("\e[97;44mINTERRUPTS ARE DISABLED\n\e[0m");
 }
 
 bool interrupts_enabled(void) {
-    // Get FLAGS.
-    uintptr_t flags = 0;
-  //  asm volatile ("movl ")
-
     return interruptsEnabled;
 }
 
@@ -48,7 +46,7 @@ void interrupts_nmi_disable(void) {
 
 // Initializes interrupts.
 void interrupts_init(void) {
-    kprintf("INTERRUPTS: Initializing...\n");
+    kprintf("\e[33mINTERRUPTS: Initializing...\n");
 
     // Initialize IDT.
     idt_init();
@@ -60,9 +58,5 @@ void interrupts_init(void) {
 
     // Enable interrupts.
 	interrupts_enable();
-    vga_setcolor(VGA_COLOR_WHITE, VGA_COLOR_BLUE);
-    kprintf("INTERRUPTS ARE ENABLED\n");
-    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
-    kprintf("INTERRUPTS: Initialized!\n");
+    kprintf("\e[33mINTERRUPTS: Initialized!\e[0m\n");
 }

@@ -251,7 +251,7 @@ static bool floppy_recalibrate(uint8_t drive) {
  * Initializes the floppy driver.
  */
 void floppy_init() {
-	kprintf("FLOPPY: Initializing...\n");
+	kprintf("\e[93mFLOPPY: Initializing...\n");
 
 	// Detect drives.
 	if (!floppy_detect()) {
@@ -309,5 +309,5 @@ void floppy_init() {
 
 	// Print volume name.
 	kprintf("FAT12 volume string: %s\n", volumeName);
-	kprintf("FLOPPY: Initialized!\n");
+	kprintf("FLOPPY: Initialized!\e[0m\n");
 }

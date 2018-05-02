@@ -123,7 +123,7 @@ void vga_putchar(char c) {
 		terminal_column = 0;
 		return;
 	} else if(c == '\a') {
-		speaker_play_tone(2000, 50);
+		//speaker_play_tone(1000, 10);
 		return;
 	} else {
 		vga_putentryat(c, terminal_color, terminal_column, terminal_row);
@@ -163,6 +163,18 @@ void vga_writes(const char* data) {
  */
 void vga_setcolor(enum vga_color fg, enum vga_color bg) {
 	terminal_color = vga_entry_color(fg, bg);
+}
+
+void vga_setcolor_fg(enum vga_color fg) {
+	// Clear current foreground and set.
+	terminal_color &= 0xF0;
+	terminal_color |= fg;
+}
+
+void vga_setcolor_bg(enum vga_color bg) {
+	// Clear current background and set.
+	terminal_color &= 0x0F;
+	terminal_color |= bg << 4;
 }
 
 // -----------------------------------------------------------------------------

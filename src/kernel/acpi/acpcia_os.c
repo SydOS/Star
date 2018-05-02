@@ -118,8 +118,8 @@ void acpica_thread(ACPI_OSD_EXEC_CALLBACK functionPtr, void *contextPtr) {
 }
 
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
-    // Schedule execution by adding a thread.
-    tasking_thread_add_kernel(tasking_thread_create("acpica_worker", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context, 0));
+    // Schedule execution by adding a thread. BROKEN
+    //tasking_thread_add_kernel(tasking_thread_create("acpica_worker", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context, 0));
     return (AE_OK);
 }
 

@@ -359,7 +359,7 @@ void *kheap_realloc(void *oldPtr, size_t newSize) {
 }
 
 void kheap_init(void) {
-    kprintf("KHEAP: Initializing at 0x%p...\n", KHEAP_START);
+    kprintf("\e[91mKHEAP: Initializing at 0x%p...\n", KHEAP_START);
 
     // Start with 4MB heap.
     currentKernelHeapSize = KHEAP_INITIAL_SIZE;
@@ -430,5 +430,5 @@ void kheap_init(void) {
     kheap_free(big);
     kheap_free(test2);
     kheap_free(test4);
-    kprintf("KHEAP: Initialized!\n");
+    kprintf("KHEAP: Initialized!\e[0m\n");
 }

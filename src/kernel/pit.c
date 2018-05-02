@@ -62,6 +62,8 @@ static bool pit_callback(irq_regs_t *regs, uint8_t irqNum) {
 
 // Initialize the PIT.
 void pit_init(void) {
+	kprintf("PIT: Initializing...\n");
+
 	// Start main timer at 1 tick = 2 ms.
 	pit_startcounter(1000, PIT_CMD_COUNTER0, PIT_CMD_MODE_SQUAREWAVEGEN);
 
@@ -69,8 +71,8 @@ void pit_init(void) {
     irqs_install_handler(IRQ_PIT, pit_callback);
 
     // Wait for a tick to happen
-    kprintf("Waiting for PIT test...\n");
+    kprintf("PIT: Waiting for response...\n");
 	while (ticks == 0);
 
-	kprintf("PIT initialized!\n");
+	kprintf("PIT: Initialized!\n");
 }
