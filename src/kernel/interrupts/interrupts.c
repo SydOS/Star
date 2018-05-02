@@ -10,18 +10,18 @@
 
 static bool interruptsEnabled = false;
 
-#define FLAGS_IF 0x200
+#define NMI_PORT 0x70
 
 void interrupts_enable(void) {
     asm volatile ("sti");
     interruptsEnabled = true;
-    kprintf("\e[97;44mINTERRUPTS ARE ENABLED\n\e[0m");
+    kprintf("\e[97;44m   INTERRUPTS ARE ENABLED   \e[0m\n");
 }
 
 void interrupts_disable(void) {
     asm volatile ("cli");
     interruptsEnabled = false;
-    kprintf("\e[97;44mINTERRUPTS ARE DISABLED\n\e[0m");
+    kprintf("\e[97;44m   INTERRUPTS ARE DISABLED   \e[0m\n");
 }
 
 bool interrupts_enabled(void) {
@@ -32,7 +32,7 @@ bool interrupts_enabled(void) {
  * Enable non-maskable interrupts
  */
 void interrupts_nmi_enable(void) {
-	outb(0x70, inb(0x70)&0x7F);
+	outb(NMI_PORT, inb(NMI_PORT) & 0x7F);
 	kprintf("INTERRUPTS: NMI enabled!\n");
 }
 
@@ -40,7 +40,7 @@ void interrupts_nmi_enable(void) {
  * Disable non-maskable interrupts
  */
 void interrupts_nmi_disable(void) {
-	outb(0x70, inb(0x70)|0x80);
+	outb(NMI_PORT, inb(NMI_PORT) | 0x80);
 	kprintf("INTERRUPTS: NMI disabled!\n");
 }
 
