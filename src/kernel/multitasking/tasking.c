@@ -86,6 +86,10 @@ void __notified(int sig) {
     }
 }
 
+void tasking_fork(void) {
+
+}
+
 thread_t *tasking_thread_create(char* name, uintptr_t addr, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {
     // Allocate memory for thread.
     thread_t *thread = (thread_t*)kheap_alloc(sizeof(thread_t));
@@ -233,17 +237,23 @@ void tasking_tick(irq_regs_t *regs) {
 }
 
 static void kernel_main_thread(void) {
+    // Start up tasking and enter into the late kernel.
     tasking_unfreeze();
     kernel_late();
 }
 
+static void kernel_init_thread(void) {
+    while(true);
+}
+
 static void tasking_create_kernel_process(void) {
-    // Allocate memory for process.
-    process_t* kernelProcess = (process_t*)kheap_alloc(sizeof(process_t));
+    // Allocate memory for kernel process.
+    kernelProcess = (process_t*)kheap_alloc(sizeof(process_t));
     memset(kernelProcess, 0, sizeof(process_t));
 
     // Set up process fields.
     kernelProcess->Name = "kernel";
+    kernelProcess->ProcessId = 0;
     kernelProcess->PagingTablePhys = paging_get_current_directory();
     kernelProcess->Next = kernelProcess;
     kernelProcess->Prev = kernelProcess;
@@ -255,6 +265,7 @@ static void tasking_create_kernel_process(void) {
 
     // Set thread fields.
     kernelThread->Name = "kernel_main";
+    kernelThread->ThreadId = 0;
     kernelThread->Next = kernelThread;
     kernelThread->Prev = kernelThread;
 
@@ -276,30 +287,83 @@ static void tasking_create_kernel_process(void) {
     regs->AX = kernel_main_thread;
 
     // Map stack to 0x0 for now.
-    paging_map(0x0, kernelThread->StackPage, false, true);
-    kernelThread->StackPointer = PAGE_SIZE_4K - sizeof(irq_regs_t);
-    regs->SP = regs->BP = PAGE_SIZE_4K;
-    paging_device_free(stackBottom, stackBottom);
+    //paging_map(0x0, kernelThread->StackPage, false, true);
+    kernelThread->StackPointer = stackTop - sizeof(irq_regs_t);
+    regs->SP = regs->BP = stackTop;
+    //paging_device_free(stackBottom, stackBottom);
 
     // Thread is the only one in process.
     kernelProcess->MainThread = kernelThread;
     kernelProcess->CurrentThread = kernelProcess->MainThread;
 }
 
-void tasking_init(void) {
-    // Initialize systme calls.
-    syscalls_init();
+static void tasking_create_init_process(void) {
+    // Allocate memory for kernel process.
+    process_t *initProcess = (process_t*)kheap_alloc(sizeof(process_t));
+    memset(initProcess, 0, sizeof(process_t));
 
+    // Set up process fields.
+    initProcess->Name = "init";
+    initProcess->ProcessId = 1;
+    initProcess->Next = currentProcess->Next;
+    initProcess->Next->Prev = initProcess;
+    initProcess->Prev = currentProcess;
+    currentProcess->Next = initProcess;
+
+    // Allocate memory for thread.
+    thread_t *initThread = (thread_t*)kheap_alloc(sizeof(thread_t));
+    memset(initThread, 0, sizeof(thread_t));
+
+    // Set thread fields.
+    initThread->Name = "init_main";
+    initThread->ThreadId = 1;
+    initThread->Next = initThread;
+    initThread->Prev = initThread;
+
+    // Pop new page for stack and map to temp address.
+    initThread->StackPage = pmm_pop_frame();
+    uintptr_t stackBottom = (uintptr_t)paging_device_alloc(initThread->StackPage, initThread->StackPage);
+    uintptr_t stackTop = stackBottom + PAGE_SIZE_4K;
+    memset((void*)stackBottom, 0, PAGE_SIZE_4K);
+
+    // Set up registers.
+    irq_regs_t *regs = (irq_regs_t*)(stackTop - sizeof(irq_regs_t));
+    regs->FLAGS.AlwaysTrue = true;
+    regs->FLAGS.InterruptsEnabled = true;
+    regs->CS = GDT_USER_CODE_OFFSET | GDT_SELECTOR_RPL_RING3;
+    regs->DS = regs->ES = regs->FS = regs->GS = regs->SS = (GDT_USER_DATA_OFFSET | GDT_SELECTOR_RPL_RING3);
+
+    // AX contains the address of thread's main function.
+    regs->IP = _tasking_thread_exec;
+    regs->AX = kernel_init_thread;
+
+    // Create a new root paging structure, with the higher half of the kernel copied in.
+    initProcess->PagingTablePhys = paging_create_app_copy();
+
+    // Change to new paging structure.
+    uintptr_t oldPagingTablePhys = paging_get_current_directory();
+    paging_change_directory(initProcess->PagingTablePhys);
+
+    // Map stack of main thread in.
+    paging_map(0x0, initThread->StackPage, false, true);
+    initThread->StackPointer = PAGE_SIZE_4K - sizeof(irq_regs_t);
+    regs->SP = regs->BP = PAGE_SIZE_4K;
+
+    // Change back.
+    paging_change_directory(oldPagingTablePhys);
+    paging_device_free(stackBottom, stackBottom);
+
+    // Thread is the only one in process.
+    initProcess->MainThread = initThread;
+    initProcess->CurrentThread = initProcess->MainThread;
+}
+
+void tasking_init(void) {
     // Disable interrupts, we don't want to screw the following code up.
     interrupts_disable();
 
-    // Create the main kernel process 0.
-
-
-
- //   thread_t *kernelThread = tasking_thread_create("kernel_main", (uintptr_t)kernel_main_thread, 10, 20, 30);
- //   kernelProcess = tasking_process_create("kernel", kernelThread, true);
-    
+    // Initialize system calls.
+    syscalls_init();
 
     // Set kernel stack pointer. This is used for interrupts when switching from ring 3 tasks.
     uintptr_t kernelStack;
@@ -310,9 +374,12 @@ void tasking_init(void) {
 #endif
     gdt_tss_set_kernel_stack(kernelStack);
 
-    // Create kernel thread and process.
+    // Create kernel thread 0 and process 0.
     kprintf("Creating kernel process...\n");
     tasking_create_kernel_process();
+
+    // Create main user process 1.
+    tasking_create_init_process();
 
     // Start tasking!
     interrupts_enable();

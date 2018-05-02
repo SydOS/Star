@@ -17,10 +17,9 @@ typedef struct thread_t {
 	struct thread_t *Next;
 	struct thread_t *Prev;
 
-	uint32_t ThreadId;
 	char *Name;
+	uint32_t ThreadId;
 
-	//uint8_t Stack[THREAD_STACK_SIZE];
 	uint64_t StackPage;
 	uintptr_t StackPointer;
 } thread_t;
@@ -28,6 +27,7 @@ typedef struct thread_t {
 typedef struct process_t {
 	struct process_t *Next;
 	struct process_t *Prev;
+	struct process_t *Parent;
 
 	char* Name;
 	uint32_t ProcessId;
