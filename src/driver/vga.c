@@ -107,10 +107,10 @@ void vga_scroll() {
  */
 void vga_putchar(char c) {
 	if (c == '\n') {
-		for (size_t i = terminal_column; i < VGA_WIDTH; i++) {
+		/*for (size_t i = terminal_column; i < VGA_WIDTH; i++) {
 			vga_putentryat(' ', terminal_color, terminal_column, terminal_row);
 			terminal_column++;
-		}
+		}*/
 		terminal_column = 0;
 		if (++terminal_row == VGA_HEIGHT) {
 			vga_scroll();
