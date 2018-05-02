@@ -53,12 +53,11 @@ void panic(const char *format, ...) {
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main() {
-	vga_disable_cursor();
-	
 	// Initialize serial for logging.
 	serial_init();
 
-	vga_initialize();
+	// Initialize VGA.
+	vga_init();
 
 	// Initialize the GDT.
 	gdt_init();
@@ -140,8 +139,6 @@ void kernel_late() {
 	
 	// Initialize floppy.
 	floppy_init();
-
-    vga_enable_cursor();
 
 	pci_init();
 
