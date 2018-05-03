@@ -13,9 +13,15 @@
 
 #define THREAD_STACK_SIZE	4096
 
+// Used for circular dependencies.
+struct thread_t;
+struct process_t;
+
 typedef struct thread_t {
 	struct thread_t *Next;
 	struct thread_t *Prev;
+
+	struct process_t *Parent;
 
 	char *Name;
 	uint32_t ThreadId;
@@ -33,8 +39,8 @@ typedef struct process_t {
 	uint32_t ProcessId;
 	uintptr_t PagingTablePhys;
 
-	struct thread_t *MainThread;
-	struct thread_t *CurrentThread;
+	thread_t *MainThread;
+	thread_t *CurrentThread;
 } process_t;
 
 extern void tasking_kill_thread(void);

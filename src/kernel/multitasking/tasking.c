@@ -8,12 +8,17 @@
 #include <kernel/main.h>
 #include <kernel/interrupts/interrupts.h>
 #include <kernel/interrupts/irqs.h>
+#include <kernel/interrupts/smp.h>
 
 #include <kernel/memory/paging.h>
 #include <kernel/memory/pmm.h>
 
 extern void _isr_exit(void);
 extern void _tasking_thread_exec(void);
+
+// Thread lists.
+static thread_t **threadLists;
+
 
 // Current process.
 //Process* currentProcess = 0;
@@ -375,7 +380,11 @@ void tasking_init(void) {
 #else
     asm volatile ("mov %%esp, %0" : "=r"(kernelStack));
 #endif
-    gdt_tss_set_kernel_stack(kernelStack);
+    gdt_tss_set_kernel_stack(NULL, kernelStack);
+
+    // Create thread lists for processors.
+    threadLists = (thread_t**)kheap_alloc(sizeof(thread_t) * smp_get_proc_count());
+    memset(threadLists, 0, sizeof(thread_t) * smp_get_proc_count());
 
     // Create kernel thread 0 and process 0.
     kprintf("Creating kernel process...\n");
@@ -385,6 +394,7 @@ void tasking_init(void) {
     tasking_create_init_process();
 
     // Start tasking!
+    while(true);
     interrupts_enable();
     tasking_exec();
 }

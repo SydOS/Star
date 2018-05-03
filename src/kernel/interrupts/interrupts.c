@@ -8,24 +8,16 @@
 #include <kernel/interrupts/irqs.h>
 #include <driver/vga.h>
 
-static bool interruptsEnabled = false;
-
 #define NMI_PORT 0x70
 
 void interrupts_enable(void) {
     asm volatile ("sti");
-    interruptsEnabled = true;
     kprintf("\e[97;44m   INTERRUPTS ARE ENABLED   \e[0m\n");
 }
 
 void interrupts_disable(void) {
     asm volatile ("cli");
-    interruptsEnabled = false;
     kprintf("\e[97;44m   INTERRUPTS ARE DISABLED   \e[0m\n");
-}
-
-bool interrupts_enabled(void) {
-    return interruptsEnabled;
 }
 
 /**

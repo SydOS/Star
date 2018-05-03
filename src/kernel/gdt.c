@@ -7,24 +7,24 @@
 extern void _gdt_load(gdt_ptr_t *gdtPtr, uintptr_t offsets);
 extern void _gdt_tss_load(uintptr_t offset);
 
-// Represents the 32-bit GDT and pointer to it. This is used as
+// Represents the 32-bit GDT for the BSP and pointer to it. This is used as
 // the system GDT on 32-bit systems and when starting up other processors,
-gdt_entry_t gdt32[GDT32_ENTRIES];
-gdt_ptr_t gdt32Ptr;
+gdt_entry_t bspGdt32[GDT32_ENTRIES];
+gdt_ptr_t bspGdt32Ptr;
 
 #ifdef X86_64
-// Represents the 64-bit GDT and pointer to it. Only used in 64-bit mode.
-gdt_entry_t gdt64[GDT64_ENTRIES];
-gdt_ptr_t gdt64Ptr;
+// Represents the 64-bit GDT for the BSP and pointer to it. Only used in 64-bit mode.
+gdt_entry_t bspGdt64[GDT64_ENTRIES];
+gdt_ptr_t bspGdt64Ptr;
 #endif
 
 // Task state segment. Used for switching from ring 3 tasks.
-static tss_t tss;
+static tss_t bspTss;
 
 /**
  * Creates an entry in the GDT.
  */
-static void gdt_set_descriptor(gdt_entry_t gdt[], uint8_t num, bool code, bool userMode, bool Is64Bits) {
+static void gdt_set_descriptor(gdt_entry_t gdt[], uint8_t num, bool code, bool userMode, bool is64Bits) {
     // Set up the descriptor base address.
     gdt[num].BaseLow = 0;
     gdt[num].BaseHigh = 0;
@@ -43,8 +43,8 @@ static void gdt_set_descriptor(gdt_entry_t gdt[], uint8_t num, bool code, bool u
 
     // Set flags.
     gdt[num].ReservedZero = 0;
-    gdt[num].Is64Bits = Is64Bits;
-    gdt[num].Is32Bits = !Is64Bits;
+    gdt[num].Is64Bits = is64Bits;
+    gdt[num].Is32Bits = !is64Bits;
     gdt[num].IsLimit4K = true;
 }
 
@@ -104,97 +104,101 @@ static void gdt_set_tss(gdt_entry_t gdt[], uint8_t num, uintptr_t base, uint32_t
 /**
  * Sets the kernel ESP in the TSS.
  */
-void gdt_tss_set_kernel_stack(uintptr_t stack) {
+void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack) {
+    // If TSS specified is nothing, use the BSP TSS.
+    if (tss == NULL)
+        tss = &bspTss;
+
 #ifdef X86_64
     // 64-bit code here.
-    tss.RSP0 = stack;
+    tss->RSP0 = stack;
 #else
-    tss.ESP0 = stack;
+    tss->ESP0 = stack;
 #endif
 }
 
 /**
- * Loads the GDT.
+ * Loads a GDT.
  */
-void gdt_load(void) {
+void gdt_load(gdt_ptr_t *gdtPtr) {
     // Load the GDT into the processor.
-#ifdef X86_64
-    _gdt_load(&gdt64Ptr, GDT_KERNEL_DATA_OFFSET);
-    kprintf("GDT: Loaded 64-bit GDT at 0x%p.\n", &gdt64);
-#else
-    _gdt_load(&gdt32Ptr, GDT_KERNEL_DATA_OFFSET);
-    kprintf("GDT: Loaded 32-bit GDT at 0x%p.\n", &gdt32);
-#endif
+    _gdt_load(gdtPtr, GDT_KERNEL_DATA_OFFSET);
+    kprintf("\e[31mGDT: Loaded GDT at 0x%p.\e[0m\n", gdtPtr);
 }
 
 /**
  * Loads the TSS.
  */
-void gdt_tss_load(void) {
+void gdt_tss_load(tss_t *tss) {
     // Load the TSS into the processor.
     _gdt_tss_load(GDT_TSS_OFFSET);
-    kprintf("GDT: Loaded TSS at 0x%p.\n", &tss);
+    kprintf("\e[31mGDT: Loaded TSS at 0x%p.\e[0m\n", tss);
+}
+
+/**
+ * Fills the specified GDT.
+ * @param gdt       The pointer to the GDT.
+ * @param is64Bits  Whether or not the GDT is 64-bit.
+ * @param tss       The pointer to a TSS, if any.
+ */
+void gdt_fill(gdt_entry_t *gdt, bool is64Bits, tss_t *tss) {
+    // Set null segment.
+    gdt[GDT_NULL_INDEX] = (gdt_entry_t) { };
+
+    // Set code and data segment for kernel.
+    gdt_set_descriptor(gdt, GDT_KERNEL_CODE_INDEX, true, false, is64Bits);
+    gdt_set_descriptor(gdt, GDT_KERNEL_DATA_INDEX, false, false, false);
+
+    // Set code and data segment for ring 3 (user mode).
+    gdt_set_descriptor(gdt, GDT_USER_CODE_INDEX, true, true, is64Bits);
+    gdt_set_descriptor(gdt, GDT_USER_DATA_INDEX, false, true, false);
+
+    // If a TSS was specified, add it too.
+    if (tss != NULL)
+        gdt_set_tss(gdt, GDT_TSS_INDEX, (uintptr_t)tss, sizeof(tss_t));
 }
 
 /**
  * Initializes the GDT and TSS
  */
 void gdt_init(void) {
-    // Set up the 32-bit GDT pointer and limit.
-    kprintf("\e[31mGDT: Initializing 32-bit GDT at 0x%p...\n", &gdt32);
-    gdt32Ptr.Limit = (sizeof(gdt_entry_t) * GDT32_ENTRIES) - 1;
-    gdt32Ptr.Base = (uintptr_t)&gdt32;
-
-    // Set null segment for 32-bit GDT.
-    gdt32[GDT_NULL_INDEX] = (gdt_entry_t) { };
-
-    // Set code and data segment for kernel for 32-bit GDT.
-    gdt_set_descriptor(gdt32, GDT_KERNEL_CODE_INDEX, true, false, false);
-    gdt_set_descriptor(gdt32, GDT_KERNEL_DATA_INDEX, false, false, false);
-
-    // Set code and data segement for ring 3 (user mode) for 32-bit GDT.
-    gdt_set_descriptor(gdt32, GDT_USER_CODE_INDEX, true, true, false);
-    gdt_set_descriptor(gdt32, GDT_USER_DATA_INDEX, false, true, false);
-
-#ifdef X86_64
-    // Set up the 64-bit GDT pointer and limit.
-    kprintf("GDT: Initializing 64-bit GDT at 0x%p...\n", &gdt64);
-    gdt64Ptr.Limit = (sizeof(gdt_entry_t) * GDT64_ENTRIES) - 1;
-    gdt64Ptr.Base = (uintptr_t)&gdt64;
-
-    // Set null segment for 64-bit GDT.
-    gdt64[GDT_NULL_INDEX] = (gdt_entry_t) { };
-
-    // Set code and data segment for kernel for 64-bit GDT.
-    gdt_set_descriptor(gdt64, GDT_KERNEL_CODE_INDEX, true, false, true);
-    gdt_set_descriptor(gdt64, GDT_KERNEL_DATA_INDEX, false, false, false);
-
-    // Set data and code segement for ring 3 (user mode) for 64-bit GDT.
-    gdt_set_descriptor(gdt64, GDT_USER_DATA_INDEX, false, true, false);
-    gdt_set_descriptor(gdt64, GDT_USER_CODE_INDEX, true, true, true);
-#endif
-
     // Zero out TSS.
-    kprintf("GDT: Initializing TSS at 0x%p...\n", &tss);
-    memset(&tss, 0, sizeof(tss_t));
+    kprintf("\e[31mGDT: Initializing TSS at 0x%p...\n", &bspTss);
+    memset(&bspTss, 0, sizeof(tss_t));
 
 #ifdef X86_64
     // Set initial kernel (ring 0) stack pointer.
-    tss.RSP0 = 0;
-
-    // Add TSS to GDT.
-    gdt_set_tss(gdt64, GDT_TSS_INDEX, (uintptr_t)&tss, sizeof(tss_t));
+    bspTss.RSP0 = 0;
 #else
     // Set initial kernel (ring 0) info.
-    tss.SS0 = GDT_KERNEL_DATA_OFFSET;
-    tss.ESP0 = 0;
-
-    // Add TSS to GDT.
-    gdt_set_tss(gdt32, GDT_TSS_INDEX, (uintptr_t)&tss, sizeof(tss_t));
+    bspTss.SS0 = GDT_KERNEL_DATA_OFFSET;
+    bspTss.ESP0 = 0;
 #endif
 
-    // Load the GDT.
-    gdt_load();
-    gdt_tss_load();
-    kprintf("GDT: Initialized!\e[0m\n");
+    // Set up the 32-bit GDT pointer and limit.
+    kprintf("GDT: Initializing 32-bit GDT at 0x%p...\n", &bspGdt32);
+    bspGdt32Ptr.Limit = (sizeof(gdt_entry_t) * GDT32_ENTRIES) - 1;
+    bspGdt32Ptr.Base = (uintptr_t)&bspGdt32;
+
+#ifdef X86_64
+    gdt_fill(bspGdt32, false, NULL);
+
+    // Set up the 64-bit GDT pointer and limit.
+    kprintf("GDT: Initializing 64-bit GDT at 0x%p...\n", &bspGdt64);   
+    bspGdt64Ptr.Limit = (sizeof(gdt_entry_t) * GDT64_ENTRIES) - 1;
+    bspGdt64Ptr.Base = (uintptr_t)&bspGdt64;
+    gdt_fill(bspGdt64, true, &bspTss);
+
+    // Load 64-bit GDT.
+    gdt_load(&bspGdt64Ptr);
+#else
+    gdt_fill(bspGdt32, false, &bspTss);
+
+    // Load 32-bit GDT.
+    gdt_load(&bspGdt32Ptr);
+#endif
+    
+    // Load TSS.
+    gdt_tss_load(&bspTss);
+    kprintf("\e[31mGDT: Initialized!\e[0m\n");
 }

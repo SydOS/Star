@@ -2,6 +2,7 @@
 #define GDT_H
 
 #include <main.h>
+#include <kernel/tss.h>
 
 #ifdef X86_64
 #define GDT32_ENTRIES 5
@@ -81,9 +82,10 @@ typedef struct {
 
 #define GDT_SELECTOR_RPL_RING3  0x3
 
-extern void gdt_tss_set_kernel_stack(uintptr_t stack);
-extern void gdt_load(void);
-extern void gdt_tss_load(void);
+extern void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack);
+extern void gdt_load(gdt_ptr_t *gdtPtr);
+extern void gdt_tss_load(tss_t *tss);
+extern void gdt_fill(gdt_entry_t *gdt, bool is64Bits, tss_t *tss);
 extern void gdt_init(void);
 
 #endif
