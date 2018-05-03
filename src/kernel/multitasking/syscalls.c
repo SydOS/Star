@@ -51,20 +51,35 @@ uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
 }
 
 void syscalls_init(void) {
-     // Detect and enable SYSCALL.
+#ifdef X86_64
+    // Detect and enable SYSCALL.
     uint32_t result, unused;
     if (cpuid_query(CPUID_INTELFEATURES, &unused, &unused, &unused, &result) && (result & CPUID_FEAT_EDX_SYSCALL)) {
-        
+        kprintf("SYSCALLS: SYSCALL instruction supported!\n");
         SyscallStack = kheap_alloc(4096);
         memset(SyscallStack, 0, 4096);
 
-        cpu_msr_write(0xC0000081, (((uint64_t)(GDT_KERNEL_DATA_OFFSET | GDT_SELECTOR_RPL_RING3)) << 48) | ((uint64_t)GDT_KERNEL_CODE_OFFSET << 32));
-uint64_t msr = cpu_msr_read(0xC0000081);
-        cpu_msr_write(0xC0000082, (uint64_t)_syscalls_handler);
+        cpu_msr_write(SYSCALL_MSR_STAR, (((uint64_t)(GDT_KERNEL_DATA_OFFSET | GDT_SELECTOR_RPL_RING3)) << 48) | ((uint64_t)GDT_KERNEL_CODE_OFFSET << 32));
+        cpu_msr_write(SYSCALL_MSR_LSTAR, (uint64_t)_syscalls_handler);
 
         // Enable SYSCALL instructions.
-        msr = cpu_msr_read(0xC0000080);
-        cpu_msr_write(0xC0000080, msr | 0x1);
+        cpu_msr_write(SYSCALL_MSR_EFER, cpu_msr_read(SYSCALL_MSR_EFER) | 0x1);
         kprintf("SYSCALLS: SYSCALL instruction enabled!\n");
     }
+#else
+    // Determine if SYSENTER is supported (only on PII or higher).
+    uint32_t resultEax, resultEdx, unused;
+    if (cpuid_query(CPUID_GETFEATURES, &resultEax, &unused, &unused, &resultEdx) && (!(CPUID_FAMILY(resultEax) == 6 &&
+        CPUID_MODEL(resultEax) < 3 && CPUID_STEPPING(resultEax) < 3)) && (resultEdx & CPUID_FEAT_EDX_SEP)) {
+        kprintf("SYSCALLS: SYSENTER instruction supported!\n");
+        SyscallStack = kheap_alloc(4096);
+        memset(SyscallStack, 0, 4096);
+
+        // Set ring 0 CS, ESP, and EIP.
+        cpu_msr_write(SYSCALL_MSR_SYSENTER_CS, GDT_KERNEL_CODE_OFFSET);
+        cpu_msr_write(SYSCALL_MSR_SYSENTER_ESP, (uintptr_t)SyscallStack + 4096);
+        cpu_msr_write(SYSCALL_MSR_SYSENTER_EIP, (uint32_t)_syscalls_handler);
+        kprintf("SYSCALLS: SYSENTER instruction enabled!\n");
+    }
+#endif
 }

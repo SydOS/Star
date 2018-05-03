@@ -230,7 +230,7 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + ((memory / PAGE_SIZE_4K) * sizeof(uint32_t)); // Space for 32-bit addresses.
 
     // Force PAE off for now.
-    PAE_ENABLED = false;
+    //PAE_ENABLED = false;
 
     // Is PAE enabled?
     if (PAE_ENABLED)

@@ -171,7 +171,7 @@ process_t* tasking_process_create(char* name, thread_t *mainThread, bool kernel)
     
     interrupts_disable();
     // Create a new root paging structure, with the higher half of the kernel copied in.
-    process->PagingTablePhys = paging_create_app_copy();
+    //process->PagingTablePhys = paging_create_app_copy();
 
     // Change to new paging structure.
     uintptr_t oldPagingTablePhys = paging_get_current_directory();
@@ -243,7 +243,10 @@ static void kernel_main_thread(void) {
 }
 
 static void kernel_init_thread(void) {
-    while(true);
+    while(true) {
+        //syscalls_kprintf("Test\n");
+        sleep(2000);
+    }
 }
 
 static void tasking_create_kernel_process(void) {

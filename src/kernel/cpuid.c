@@ -52,8 +52,7 @@ void cpuid_print_capabilities() {
     // Print processor info and feature bits.
     if (cpuid_query(CPUID_GETFEATURES, &eax, &ebx, &ecx, &edx)) {
         // Get the processor signature.
-        kprintf("Family %u, model %u, stepping %u\n", (eax & 0x00000F00) >> 8,
-            (eax & 0x000000F0) >> 4, eax & 0x0000000F);
+        kprintf("Family %u, model %u, stepping %u\n", CPUID_FAMILY(eax), CPUID_MODEL(eax), CPUID_STEPPING(eax));
         kprintf("Features: ");
 
         // EDX features.

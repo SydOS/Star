@@ -1,6 +1,10 @@
 #ifndef CPUID_H
 #define CPUID_H
 
+#define CPUID_STEPPING(value) (value & 0xF)
+#define CPUID_MODEL(value)    ((value & 0xF0) >> 4)
+#define CPUID_FAMILY(value)   ((value & 0xF00) >> 8)
+
 enum cpuid_requests {
   CPUID_GETVENDORSTRING,
   CPUID_GETFEATURES,
