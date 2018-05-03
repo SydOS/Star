@@ -244,7 +244,7 @@ static void kernel_main_thread(void) {
 
 static void kernel_init_thread(void) {
     while(true) {
-        //syscalls_kprintf("Test\n");
+        syscalls_kprintf("Test\n");
         sleep(2000);
     }
 }

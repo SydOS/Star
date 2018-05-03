@@ -1,70 +1,169 @@
 ; 32-bit code.
 [bits 32]
 section .text
-extern SyscallStack
-extern SyscallTemp
 
+extern syscalls_handler
 
-global syscalls_syscall
-syscalls_syscall:
-    ; Move last arg (call index) into RAX.
-    ;mov rax, [rsp+8]
+global _syscalls_sysenter
+_syscalls_sysenter:
+    ; Save ECX, EDX.
+    push ecx
+    push edx
 
-    ; Execute SYSCALL.
+    ; Save segments.
+    push ds
+    push es
+    push fs
+    push gs
+   
+    ; Save ESP to ECX.
+    mov ecx, esp
+
+    ; Execute SYSENTER.
     sysenter
+
+    ; We jump here when SYSENTER is done.
+_syscalls_sysenter_done:
+    ; Restore segments.
+    pop gs
+    pop fs
+    pop es
+    pop ds
+
+    ; Restore EDX and ECX.
+    pop edx
+    pop ecx
     ret
 
-global _syscalls_handler
-_syscalls_handler:
+global _syscalls_sysenter_handler
+_syscalls_sysenter_handler:
+    ; At this point, the stack specified for SYSENTER has been changed to.
     ; Disable interrupts.
     cli
 
-    ; Save RAX to temp location so we can store RSP there.
-  ;  mov [qword SyscallTemp], rax
-  ;  mov rax, rsp
+    ; Set up kernel segments.
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
 
-    ; Load up SYSCALL handler stack.
-  ;  mov rsp, SyscallStack
-  ;  add rsp, 4096
+    ; Push caller's ESP (in ECX), EBP, EAX, EBX, ESI, and EDI to stack.
+    push ecx
+    push ebp
+    push eax
+    push ebx
+    push esi
+    push edi
+    
+    ; Get caller's stack.
+    mov eax, ecx
+    mov ecx, 7
+    add eax, 24 ; Move past stuff pushed before the SYSENTER.
+    add eax, (4*8) ; 7 arguments, each 4 bytes.
 
-    ; Push caller's RSP, RBP, RIP, and RFLAGS in R11 to stack.
-  ;  push rax
-  ;  push rbp
-   ; push rcx
-   ; push r11
-  ;  xor rbp, rbp
+    ; Copy args to stack.
+.loop_syse_args:
+    sub eax, 4
+    mov ebx, [eax]
+    push ebx 
+    dec ecx
+    jnz .loop_syse_args
 
-    ; Save other registers.
-    ;push r12
-   ; push r13
-   ; push r14
-   ; push r15
-   ; push rbx
-
-    ; Restore RAX.
-  ;  mov rax, [qword SyscallTemp]
-  ;  mov rcx, r10
-
-    ; Push call index to stack as last arg, call C handler, and discard call index.
-   ; push rax
-    extern syscalls_handler
+    ; Call C handler.
     call syscalls_handler
-   ; pop rdx
 
-    ; Restore other registers.
-  ;  pop rbx
-  ;  pop r15
- ;   pop r14
-  ;  pop r13
-   ; pop r12
+    ; Pop off args and discard.
+    mov ecx, 7
+.loop_syse_args_del:
+    pop ebx
+    dec ecx
+    jnz .loop_syse_args_del
 
-    ; Restore caller's RFLAGS, RIP, RBP, and RSP.
-   ; pop r11
-  ;  pop rcx
-   ; pop rbp
-   ; pop rsp
+    ; Restore caller's EDI, ESI, EBX, EAX, and EBP.
+    pop edi
+    pop esi
+    pop ebx
+    pop eax
+    pop ebp
 
-    ; Restore control back to the calling code.
-  ;  o64 sysret
+    ; Restore caller's ESP into ECX and EIP into EDX for SYSEXIT to use.
+    pop ecx
+    mov edx, _syscalls_sysenter_done
+
+    ; Re-enable interrupts and return to caller.
+    sti
     sysexit
 
+global _syscalls_interrupt
+_syscalls_interrupt:
+    ; Raise syscall interrupt. Passed args should be on stack already.
+    ; Return value from handler will be in EAX.
+    int 0x80
+    ret
+
+global _syscalls_interrupt_handler
+_syscalls_interrupt_handler:
+    ; The processor has already pushed SS, ESP, EFLAGS, CS, and EIP to the stack.
+    ; Push general registers (EBX, ECX, EDX, EBP, ESI, and EDI) to stack.
+    push ebx
+    push ecx
+    push edx
+    push ebp
+    push esi
+    push edi
+
+    ; Push segments to stack.
+    push ds
+    push es
+    push fs
+    push gs
+
+    ; Set up kernel segments.
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    ; Get caller's ESP from our stack.
+    ; 52 = number of bytes to go up stack until we get the ESP that was pushed prior.
+    mov eax, [esp+52]
+    mov ecx, 7      ; 7 arguments.
+    add eax, (4*8)  ; 7 arguments, each 4 bytes.
+
+    ; Copy args to stack.
+.loop_int_args:
+    sub eax, 4
+    mov ebx, [eax]
+    push ebx 
+    dec ecx
+    jnz .loop_int_args
+
+    ; Call C handler.
+    call syscalls_handler
+
+    ; Pop off args and discard.
+    mov ecx, 7
+.loop_int_args_del:
+    pop ebx
+    dec ecx
+    jnz .loop_int_args_del
+
+    ; Restore segments.
+    pop gs
+    pop fs
+    pop es
+    pop ds
+
+    ; Restore general registers (EDI, ESI, EBP, EDX, ECX, and EBX).
+    pop edi
+    pop esi
+    pop ebp
+    pop edx
+    pop ecx
+    pop ebx
+
+    ; Continue execution. This restores EIP, CS, EFLAGS, ESP, and SS, and re-enables interrupts.
+    ; Return value from handler is in EAX.
+    iretd

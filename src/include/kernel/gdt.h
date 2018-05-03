@@ -59,8 +59,16 @@ typedef struct {
 #define GDT_NULL_INDEX          0
 #define GDT_KERNEL_CODE_INDEX   1
 #define GDT_KERNEL_DATA_INDEX   2
+
+// User-mode code and data segments have to be flipped in x64.
+#ifdef X86_64
 #define GDT_USER_DATA_INDEX     3
 #define GDT_USER_CODE_INDEX     4
+#else
+#define GDT_USER_CODE_INDEX     3
+#define GDT_USER_DATA_INDEX     4
+#endif
+
 #define GDT_TSS_INDEX           5
 
 // GDT offsets. SYSCALL requires user code to be after user data for some reason.

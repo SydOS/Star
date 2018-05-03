@@ -3,6 +3,8 @@
 
 #include <main.h>
 
+#define SYSCALL_INTERRUPT   0x80
+
 #define SYSCALL_MSR_EFER    0xC0000080
 #define SYSCALL_MSR_STAR    0xC0000081
 #define SYSCALL_MSR_LSTAR   0xC0000082

@@ -2,22 +2,27 @@
 #include <kprint.h>
 #include <string.h>
 #include <kernel/interrupts/idt.h>
+#include <kernel/gdt.h>
 
 // Create an IDT.
 static idt_entry_t idt[IDT_ENTRIES];
 static idt_ptr_t idtPtr;
 
 // Sets an entry in the IDT.
-void idt_set_gate(uint8_t gate, uintptr_t base, uint16_t selector, uint8_t flags) {
-    // The base address of the interrupt routine.
+void idt_set_gate(uint8_t gate, uintptr_t base, uint16_t selector, uint8_t type, uint8_t privilege, bool present) {
+    // Set low 16 bits of function address.
     idt[gate].BaseLow = base & 0xFFFF;
 
-    // The segment of the IDT entry.
+    // Set options.
     idt[gate].Selector = selector;
     idt[gate].Unused = 0;
-    idt[gate].Flags = flags;
+    idt[gate].GateType = type;
+    idt[gate].StorageSegement = false;
+    idt[gate].PrivilegeLevel = privilege;
+    idt[gate].Present = present;
 
 #ifdef X86_64
+    idt[gate].StackTableOffset = 0;
     idt[gate].BaseMiddle = (base >> 16) & 0xFFFF;
     idt[gate].BaseHigh = (base >> 32) & 0xFFFFFFFF;
     idt[gate].Unused2 = 0;
@@ -28,12 +33,12 @@ void idt_set_gate(uint8_t gate, uintptr_t base, uint16_t selector, uint8_t flags
 
 void idt_open_interrupt_gate(uint8_t gate, uintptr_t base) {
     // Open an interrupt gate.
-    idt_set_gate(gate, base, 0x08, 0x8E);
+    idt_set_gate(gate, base, GDT_KERNEL_CODE_OFFSET, IDT_GATE_INTERRUPT_32, GDT_PRIVILEGE_KERNEL, true);
 }
 
 void idt_close_interrupt_gate(uint8_t gate) {
     // Close an interrupt gate.
-    idt_set_gate(gate, 0, 0, 0);
+    idt_set_gate(gate, 0, 0, 0, 0, false);
 }
 
 void idt_load() {
