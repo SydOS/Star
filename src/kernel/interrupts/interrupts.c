@@ -36,16 +36,31 @@ void interrupts_nmi_disable(void) {
 	kprintf("INTERRUPTS: NMI disabled!\n");
 }
 
+void interrupts_init_ap(idt_entry_t *idt) {
+    kprintf("INTERRUPTS: Initializing for AP...\n");
+
+    // Initialize IDT.
+    idt_init(idt);
+
+    // Initialize exceptions.
+    exceptions_init(idt);
+
+    // Enable interrupts.
+	interrupts_enable();
+    kprintf("\e[33mINTERRUPTS: Initialized!\e[0m\n");
+}
+
 // Initializes interrupts.
-void interrupts_init(void) {
+void interrupts_init_bsp(void) {
     kprintf("\e[33mINTERRUPTS: Initializing...\n");
 
     // Initialize IDT.
-    idt_init();
+    idt_init_bsp();
+    idt_entry_t *bspIdt = idt_get_bsp();
 
     // Initialize exceptions and IRQs.
-    exceptions_init();
-    irqs_init();
+    exceptions_init(bspIdt);
+    irqs_init(bspIdt);
     interrupts_nmi_enable();
 
     // Enable interrupts.

@@ -6,6 +6,7 @@
 // 256 interrupt entries in IDT.
 #define IDT_ENTRIES 256
 
+// Gate types.
 #define IDT_GATE_TASK_32        0x5
 #define IDT_GATE_INTERRUPT_16   0x6
 #define IDT_GATE_TRAP_16        0x7
@@ -61,14 +62,23 @@ typedef struct {
 // A struct describing a pointer to an array of interrupt handlers.
 // This is in a format suitable for giving to 'lidt'.
 typedef struct {
+    // Length of IDT in bytes - 1.
     uint16_t Limit;
-    uintptr_t Base;                // The address of the first element in our idt_entry_t array.
+
+    // Pointer to IDT.
+    idt_entry_t *Table;
 } __attribute__((packed)) idt_ptr_t;
 
-extern void idt_set_gate(uint8_t gate, uintptr_t base, uint16_t selector, uint8_t type, uint8_t privilege, bool present);
-extern void idt_open_interrupt_gate(uint8_t gate, uintptr_t base);
-extern void idt_close_interrupt_gate(uint8_t gate);
-extern void idt_load();
-extern void idt_init();
+#define IDT_SIZE    (sizeof(idt_entry_t) * IDT_ENTRIES)
+
+extern idt_entry_t *idt_get_bsp(void);
+
+extern void idt_set_gate(idt_entry_t idt[], uint8_t gate, uintptr_t base, uint16_t selector, uint8_t type, uint8_t privilege, bool present);
+extern void idt_open_interrupt_gate(idt_entry_t idt[], uint8_t gate, uintptr_t base);
+extern void idt_close_interrupt_gate(idt_entry_t idt[], uint8_t gate);
+
+extern void idt_load(idt_entry_t idt[]);
+extern void idt_init(idt_entry_t idt[]);
+extern void idt_init_bsp(void);
 
 #endif

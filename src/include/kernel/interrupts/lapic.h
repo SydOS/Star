@@ -156,13 +156,17 @@ typedef struct {
     // Specifies the target processor or processors. This field is only used when the destination
     // shorthand field is set to 00B.
     uint8_t Destination             : 8;
-} lapic_icr_t __attribute__((packed));
+} __attribute__((packed)) lapic_icr_t;
 
 extern bool lapic_supported(void);
 extern bool lapic_x2apic(void);
 extern bool lapic_enabled(void);
 extern void lapic_send_init(uint8_t apic);
 extern void lapic_send_startup(uint8_t apic, uint8_t vector);
+
+extern uint32_t lapic_timer_get_rate(void);
+extern void lapic_timer_start(uint32_t rate);
+
 extern uint32_t lapic_id(void);
 extern uint8_t lapic_version(void);
 extern uint8_t lapic_max_lvt(void);

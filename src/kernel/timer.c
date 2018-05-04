@@ -1,5 +1,4 @@
 #include <main.h>
-#include <io.h>
 #include <tools.h>
 #include <kprint.h>
 #include <kernel/timer.h>
@@ -43,8 +42,12 @@ void timer_init(void) {
 
     // Are APICs supported?
     if (ioapic_supported()) {
-        // Initialize LAPIC timer.
-        lapic_timer_init();
+        // Get LAPIC timer rate.
+        uint32_t rate = lapic_timer_get_rate();
+
+        // Disconnect PIT interrupt from I/O APIC and start timer.
+        ioapic_disable_interrupt(ioapic_remap_interrupt(IRQ_TIMER), IRQ_OFFSET + IRQ_TIMER);
+        lapic_timer_start(rate);
 
         // Test LAPIC timer.
         kprintf("TIMER: Waiting for response from LAPIC.\nTIMER: If the system hangs here, IRQs or the LAPIC are not working.\n");

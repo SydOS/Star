@@ -2,6 +2,7 @@
 #define EXCEPTIONS_H
 
 #include <main.h>
+#include <kernel/interrupts/idt.h>
 
 #define EXCEPTION_COUNT     32
 
@@ -74,6 +75,6 @@ typedef void (*exception_handler)(ExceptionRegisters_t *regs);
 
 extern void exceptions_install_handler(uint8_t exception, exception_handler handler);
 extern void exceptions_remove_handler(uint8_t exception);
-extern void exceptions_init(void);
+extern void exceptions_init(idt_ptr_t *idtPtr);
 
 #endif

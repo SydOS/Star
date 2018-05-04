@@ -125,7 +125,7 @@ void irqs_handler(irq_regs_t *regs) {
     irqExecuting = false;
 }
 
-void irqs_init(void) {
+void irqs_init(idt_ptr_t *idtPtr) {
     kprintf("IRQS: Intializing...\n");
 
     // Initialize PIC and I/O APIC.
@@ -168,6 +168,6 @@ void irqs_init(void) {
 
     // Open gates in IDT.
     for (uint8_t irq = 0; irq < irqCount; irq++)
-        idt_open_interrupt_gate(irq + IRQ_OFFSET, (uintptr_t)_irq_common);
+        idt_open_interrupt_gate(idtPtr, irq + IRQ_OFFSET, (uintptr_t)_irq_common);
     kprintf("IRQS: Initialized!\n");
 }

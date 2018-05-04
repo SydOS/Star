@@ -368,6 +368,7 @@ static void tasking_create_init_process(void) {
 }
 
 void tasking_init(void) {
+        while(true);
     // Disable interrupts, we don't want to screw the following code up.
     interrupts_disable();
 
@@ -395,7 +396,7 @@ void tasking_init(void) {
     tasking_create_init_process();
 
     // Start tasking!
-    while(true);
+
     interrupts_enable();
     tasking_exec();
 }

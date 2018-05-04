@@ -1,5 +1,6 @@
 #include <main.h>
 #include <kprint.h>
+#include <string.h>
 #include <kernel/gdt.h>
 #include <kernel/tss.h>
 
@@ -9,17 +10,31 @@ extern void _gdt_tss_load(uintptr_t offset);
 
 // Represents the 32-bit GDT for the BSP and pointer to it. This is used as
 // the system GDT on 32-bit systems and when starting up other processors,
-gdt_entry_t bspGdt32[GDT32_ENTRIES];
-gdt_ptr_t bspGdt32Ptr;
+static gdt_entry_t bspGdt32[GDT32_ENTRIES];
 
 #ifdef X86_64
 // Represents the 64-bit GDT for the BSP and pointer to it. Only used in 64-bit mode.
-gdt_entry_t bspGdt64[GDT64_ENTRIES];
-gdt_ptr_t bspGdt64Ptr;
+static gdt_entry_t bspGdt64[GDT64_ENTRIES];
 #endif
 
 // Task state segment. Used for switching from ring 3 tasks.
 static tss_t bspTss;
+
+/**
+ * Gets the BSP's 32-bit GDT.
+ */
+gdt_entry_t *gdt_get_bsp32(void) {
+    return bspGdt32;
+}
+
+#ifdef X86_64
+/**
+ * Gets the BSP's 64-bit GDT.
+ */
+gdt_entry_t *gdt_get_bsp64(void) {
+    return bspGdt64;
+}
+#endif
 
 /**
  * Creates an entry in the GDT.
@@ -118,12 +133,24 @@ void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack) {
 }
 
 /**
- * Loads a GDT.
+ * Creates a GDT pointer.
+ * @param gdt       The GDT.
+ * @param entries   The number of entries in the GDT.
  */
-void gdt_load(gdt_ptr_t *gdtPtr) {
+gdt_ptr_t gdt_create_ptr(gdt_entry_t gdt[], uint8_t entries) {
+    return (gdt_ptr_t) { (sizeof(gdt_entry_t) * entries) - 1, gdt };
+}
+
+/**
+ * Loads a GDT.
+ * @param gdt       The GDT.
+ * @param entries   The number of entries in the GDT.
+ */
+void gdt_load(gdt_entry_t gdt[], uint8_t entries) {
     // Load the GDT into the processor.
-    _gdt_load(gdtPtr, GDT_KERNEL_DATA_OFFSET);
-    kprintf("\e[31mGDT: Loaded GDT at 0x%p.\e[0m\n", gdtPtr);
+    gdt_ptr_t gdtPtr = gdt_create_ptr(gdt, entries);
+    _gdt_load(&gdtPtr, GDT_KERNEL_DATA_OFFSET);
+    kprintf("\e[31mGDT: Loaded GDT at 0x%p.\e[0m\n", gdt);
 }
 
 /**
@@ -141,7 +168,7 @@ void gdt_tss_load(tss_t *tss) {
  * @param is64Bits  Whether or not the GDT is 64-bit.
  * @param tss       The pointer to a TSS, if any.
  */
-void gdt_fill(gdt_entry_t *gdt, bool is64Bits, tss_t *tss) {
+void gdt_fill(gdt_entry_t gdt[], bool is64Bits, tss_t *tss) {
     // Set null segment.
     gdt[GDT_NULL_INDEX] = (gdt_entry_t) { };
 
@@ -159,9 +186,9 @@ void gdt_fill(gdt_entry_t *gdt, bool is64Bits, tss_t *tss) {
 }
 
 /**
- * Initializes the GDT and TSS
+ * Initializes the BSP GDT and TSS.
  */
-void gdt_init(void) {
+void gdt_init_bsp(void) {
     // Zero out TSS.
     kprintf("\e[31mGDT: Initializing TSS at 0x%p...\n", &bspTss);
     memset(&bspTss, 0, sizeof(tss_t));
@@ -175,27 +202,22 @@ void gdt_init(void) {
     bspTss.ESP0 = 0;
 #endif
 
-    // Set up the 32-bit GDT pointer and limit.
-    kprintf("GDT: Initializing 32-bit GDT at 0x%p...\n", &bspGdt32);
-    bspGdt32Ptr.Limit = (sizeof(gdt_entry_t) * GDT32_ENTRIES) - 1;
-    bspGdt32Ptr.Base = (uintptr_t)&bspGdt32;
-
+    // Set up the 32-bit GDT.
+    kprintf("GDT: Initializing 32-bit GDT at 0x%p...\n", bspGdt32);
 #ifdef X86_64
     gdt_fill(bspGdt32, false, NULL);
 
-    // Set up the 64-bit GDT pointer and limit.
-    kprintf("GDT: Initializing 64-bit GDT at 0x%p...\n", &bspGdt64);   
-    bspGdt64Ptr.Limit = (sizeof(gdt_entry_t) * GDT64_ENTRIES) - 1;
-    bspGdt64Ptr.Base = (uintptr_t)&bspGdt64;
+    // Set up the 64-bit GDT.
+    kprintf("GDT: Initializing 64-bit GDT at 0x%p...\n", bspGdt64);   
     gdt_fill(bspGdt64, true, &bspTss);
 
     // Load 64-bit GDT.
-    gdt_load(&bspGdt64Ptr);
+    gdt_load(bspGdt64, GDT64_ENTRIES);
 #else
     gdt_fill(bspGdt32, false, &bspTss);
 
     // Load 32-bit GDT.
-    gdt_load(&bspGdt32Ptr);
+    gdt_load(bspGdt32, GDT32_ENTRIES);
 #endif
     
     // Load TSS.

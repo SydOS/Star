@@ -53,9 +53,16 @@ typedef struct {
     // The upper 16 bits of all selector limits.
     uint16_t Limit;
 
-    // The address of the first GDT entry.               
-    uintptr_t Base;
+    // The address of the first GDT entry.     
+    gdt_entry_t *Table;          
+    //uintptr_t Base;
 } __attribute__((packed)) gdt_ptr_t;
+
+#define GDT32_SIZE (sizeof(gdt_entry_t) * GDT32_ENTRIES)
+
+#ifdef X86_64
+#define GDT64_SIZE (sizeof(gdt_entry_t) * GDT64_ENTRIES)
+#endif
 
 #define GDT_NULL_INDEX          0
 #define GDT_KERNEL_CODE_INDEX   1
@@ -82,10 +89,17 @@ typedef struct {
 
 #define GDT_SELECTOR_RPL_RING3  0x3
 
+extern gdt_entry_t *gdt_get_bsp32(void);
+#ifdef X86_64
+extern gdt_entry_t *gdt_get_bsp64(void);
+#endif
+
 extern void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack);
-extern void gdt_load(gdt_ptr_t *gdtPtr);
+
+extern gdt_ptr_t gdt_create_ptr(gdt_entry_t gdt[], uint8_t entries);
+extern void gdt_load(gdt_entry_t gdt[], uint8_t entries);
 extern void gdt_tss_load(tss_t *tss);
-extern void gdt_fill(gdt_entry_t *gdt, bool is64Bits, tss_t *tss);
-extern void gdt_init(void);
+extern void gdt_fill(gdt_entry_t gdt[], bool is64Bits, tss_t *tss);
+extern void gdt_init_bsp(void);
 
 #endif

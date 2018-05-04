@@ -111,7 +111,7 @@ void syscalls_init(void) {
 #endif
 
     // Add interrupt option for syscalls.
-    idt_set_gate(SYSCALL_INTERRUPT, (uintptr_t)_syscalls_interrupt_handler, GDT_KERNEL_CODE_OFFSET, IDT_GATE_INTERRUPT_32, GDT_PRIVILEGE_USER, true);
+    //idt_set_gate(SYSCALL_INTERRUPT, (uintptr_t)_syscalls_interrupt_handler, GDT_KERNEL_CODE_OFFSET, IDT_GATE_INTERRUPT_32, GDT_PRIVILEGE_USER, true);
     kprintf("SYSCALLS: Added handler for interrupt 0x%X at 0x%p\n", SYSCALL_INTERRUPT, _syscalls_interrupt_handler);
     kprintf("SYSCALLS: Initialized!\n");
 }

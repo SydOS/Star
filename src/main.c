@@ -60,7 +60,7 @@ void kernel_main() {
 	vga_init();
 
 	// Initialize the GDT.
-	gdt_init();
+	gdt_init_bsp();
 
 	// Initialize memory system.
 	pmm_init();
@@ -69,7 +69,7 @@ void kernel_main() {
 
 	// Initialize ACPI and interrupts.
 	acpi_init();
-	interrupts_init();
+	interrupts_init_bsp();
 
 	// Initialize timer.
     timer_init();

@@ -2,6 +2,7 @@
 #define IRQS_H
 
 #include <main.h>
+#include <kernel/interrupts/idt.h>
 
 #define IRQ_OFFSET      32
 #define IRQ_ISA_COUNT       16
@@ -97,6 +98,6 @@ extern void irqs_eoi(uint8_t irq);
 extern void irqs_install_handler(uint8_t irq, irq_handler_func_t handlerFunc);
 extern void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc);
 extern bool irqs_handler_mapped(uint8_t irq, irq_handler_func_t handlerFunc);
-extern void irqs_init(void);
+extern void irqs_init(idt_ptr_t *idtPtr);
 
 #endif

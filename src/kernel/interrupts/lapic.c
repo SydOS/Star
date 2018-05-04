@@ -5,7 +5,6 @@
 
 #include <kernel/cpuid.h>
 #include <kernel/interrupts/idt.h>
-#include <kernel/interrupts/ioapic.h>
 #include <kernel/interrupts/irqs.h>
 #include <kernel/memory/paging.h>
 
@@ -98,9 +97,9 @@ void lapic_send_nmi_all(void) {
     lapic_send_icr(icr);
 }
 
-void lapic_timer_init(void) {
+uint32_t lapic_timer_get_rate(void) {
     // Set divider to 16.
-    kprintf("LAPIC: Initializing timer...\n");
+    kprintf("LAPIC: Calculating tick rate for timer...\n");
     lapic_write(LAPIC_REG_TIMER_DIVIDE, LAPIC_TIMER_DIVIDE16);
 
     uint32_t averageCount = 0;
@@ -111,23 +110,21 @@ void lapic_timer_init(void) {
 
         // Wait for 100 ms and get current count.
         sleep(100);
-        uint32_t count = 0xFFFFFFFF - lapic_read(LAPIC_REG_TIMER_CURRENT);
+        averageCount += 0xFFFFFFFF - lapic_read(LAPIC_REG_TIMER_CURRENT);
         lapic_write(LAPIC_REG_TIMER_INITIAL, 0);
         lapic_write(LAPIC_REG_TIMER_CURRENT, 0);
-        averageCount += count;
-        kprintf("LAPIC: Timer ticked %u times in 100ms.\n", count);
     }  
 
     averageCount = averageCount / 20;
     kprintf("LAPIC: Timer ticked %u times on average in 100ms.\n", averageCount);
+    return averageCount / 100;
+}
 
-    // Disconnect PIT interrupt from I/O APIC.
-    ioapic_disable_interrupt(ioapic_remap_interrupt(IRQ_TIMER), IRQ_OFFSET + IRQ_TIMER);
-
+void lapic_timer_start(uint32_t rate) {
     // Start up timer using calculated amount.
     lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_TIMER_MODE_PERIODIC | (IRQ_OFFSET + IRQ_TIMER));
     lapic_write(LAPIC_REG_TIMER_DIVIDE, LAPIC_TIMER_DIVIDE16);
-    lapic_write(LAPIC_REG_TIMER_INITIAL, averageCount / 100);
+    lapic_write(LAPIC_REG_TIMER_INITIAL, rate);
 }
 
 uint32_t lapic_id(void) {
@@ -185,7 +182,7 @@ void lapic_init(void) {
     lapicPointer = paging_device_alloc(base, base);
     
     kprintf("LAPIC: Mapped LAPIC at 0x%X to 0x%p...\n", base, lapicPointer);
-    idt_open_interrupt_gate(LAPIC_SPURIOUS_INT, (uintptr_t)_irq_empty);
+    //idt_open_interrupt_gate(LAPIC_SPURIOUS_INT, (uintptr_t)_irq_empty);
 
     lapic_setup();
     kprintf("LAPIC: Initialized!\n");

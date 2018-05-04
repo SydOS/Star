@@ -11,6 +11,7 @@
 #include <kernel/interrupts/idt.h>
 #include <kernel/interrupts/ioapic.h>
 #include <kernel/interrupts/lapic.h>
+#include <kernel/interrupts/irqs.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
@@ -20,11 +21,6 @@
 
 extern uintptr_t _ap_bootstrap_init;
 extern uintptr_t _ap_bootstrap_end;
-extern gdt_ptr_t bspGdt32Ptr;
-
-#ifdef X86_64
-extern gdt_ptr_t bspGdt64Ptr;
-#endif
 
 static bool smpInitialized;
 
@@ -60,6 +56,10 @@ uint32_t smp_ap_get_stack(uint32_t apicId) {
     return apStacks[proc->Index];
 }
 
+static void test(void) {
+    kprintf("dd");
+}
+
 void smp_ap_main(void) {
     // Reload paging directory.
     paging_change_directory(memInfo.kernelPageDirectory);
@@ -75,26 +75,25 @@ void smp_ap_main(void) {
     tss_t *tss = (tss_t*)kheap_alloc(sizeof(tss_t));
     memset(tss, 0, sizeof(tss_t));
 
-    // Create a brand new GDT for this processor.
-    gdt_entry_t *gdt = (gdt_entry_t*)kheap_alloc(sizeof(gdt_entry_t) * GDT64_ENTRIES);
+    // Create new GDT.
+    gdt_entry_t *gdt = (gdt_entry_t*)kheap_alloc(GDT64_SIZE);
     gdt_fill(gdt, true, tss);
 
-    // Create GDT pointer.
-    gdt_ptr_t *gdtPtr = (gdt_ptr_t*)kheap_alloc(sizeof(gdt_ptr_t));
-    gdtPtr->Limit = (sizeof(gdt_entry_t) * GDT64_ENTRIES) - 1;
-    gdtPtr->Base = (uintptr_t)gdt;
-
     // Load new GDT and TSS.
-    gdt_load(gdtPtr);
+    gdt_load(gdt, GDT64_ENTRIES);
     gdt_tss_load(tss);
 
-    // Load existing IDT.
-    idt_load();
+    // Initialize interrupts.
+    idt_entry_t *idt = (idt_entry_t*)kheap_alloc(IDT_SIZE);
+    interrupts_init_ap(idt);
+    //idt_load();
     lapic_setup();
 
-    // Enable interrupts.
-    kprintf("CPU%u: Enabling interrupts...\n", proc->Index);
-    interrupts_enable();
+    idt_open_interrupt_gate(idt, IRQ_OFFSET + IRQ_TIMER, (uintptr_t)test);
+
+    // Start LAPIC timer.
+    lapic_timer_start(lapic_timer_get_rate());
+
     while (true) {
         sleep(2000);
        // kprintf("Tick tock, I'm CPU %d!\n", cpu);
@@ -139,13 +138,15 @@ static void smp_setup_apboot(void) {
     // Identity map low memory and kernel.
     paging_map_region_phys(0x0, ALIGN_4K_64BIT(memInfo.kernelEnd - memInfo.kernelVirtualOffset), 0x0, true, true);
     
-    // Copy 32-bit GDT into low memory.
-    memcpy((void*)((uintptr_t)(memInfo.kernelVirtualOffset + SMP_GDT32_ADDRESS)), (void*)&bspGdt32Ptr, sizeof(gdt_ptr_t));
+    // Copy BSP's 32-bit GDT pointer into low memory.
+    gdt_ptr_t gdtPtr32 = gdt_create_ptr(gdt_get_bsp32(), GDT32_ENTRIES);
+    memcpy((void*)((uintptr_t)(memInfo.kernelVirtualOffset + SMP_GDT32_ADDRESS)), (void*)&gdtPtr32, sizeof(gdt_ptr_t));
 
 #ifdef X86_64
-    // Copy 64-bit GDT and PML4 table into low memory.
+    // Copy BSP's 64-bit GDT pointer and PML4 table into low memory.
+    gdt_ptr_t gdtPtr64 = gdt_create_ptr(gdt_get_bsp64(), GDT64_ENTRIES);
     memcpy((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_PML4), (void*)PAGE_LONG_PML4_ADDRESS, PAGE_SIZE_4K);
-    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT64_ADDRESS), (void*)&bspGdt64Ptr, sizeof(gdt_ptr_t));
+    memcpy((void*)(memInfo.kernelVirtualOffset + SMP_GDT64_ADDRESS), (void*)&gdtPtr64, sizeof(gdt_ptr_t));
 #else
     // Copy root paging structure address into low memory.
     memcpy((void*)(memInfo.kernelVirtualOffset + SMP_PAGING_ADDRESS), (void*)&memInfo.kernelPageDirectory, sizeof(memInfo.kernelPageDirectory));
