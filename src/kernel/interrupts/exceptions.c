@@ -101,28 +101,28 @@ void exceptions_handler(ExceptionRegisters_t *regs) {
         panic("CPU%d: Exception: %s (error code: %p)\n", lapic_id(), exception_messages[regs->intNum], regs->errorCode);
 }
 
-void exceptions_init(idt_ptr_t *idtPtr) {
+void exceptions_init(idt_entry_t *idt) {
     // Add exceptions to the IDT.
     kprintf("EXCEPTIONS: Initializing exceptions...\n");
-    idt_open_interrupt_gate(idtPtr, 0, (uintptr_t)_exception0);
-    idt_open_interrupt_gate(idtPtr, 1, (uintptr_t)_exception1);
-    idt_open_interrupt_gate(idtPtr, 2, (uintptr_t)_exception2);
-    idt_open_interrupt_gate(idtPtr, 3, (uintptr_t)_exception3);
-    idt_open_interrupt_gate(idtPtr, 4, (uintptr_t)_exception4);
-    idt_open_interrupt_gate(idtPtr, 5, (uintptr_t)_exception5);
-    idt_open_interrupt_gate(idtPtr, 6, (uintptr_t)_exception6);
-    idt_open_interrupt_gate(idtPtr, 7, (uintptr_t)_exception7);
-    idt_open_interrupt_gate(idtPtr, 8, (uintptr_t)_exception8);
-    idt_open_interrupt_gate(idtPtr, 9, (uintptr_t)_exception9);
-    idt_open_interrupt_gate(idtPtr, 10, (uintptr_t)_exception10);
-    idt_open_interrupt_gate(idtPtr, 11, (uintptr_t)_exception11);
-    idt_open_interrupt_gate(idtPtr, 12, (uintptr_t)_exception12);
-    idt_open_interrupt_gate(idtPtr, 13, (uintptr_t)_exception13);
-    idt_open_interrupt_gate(idtPtr, 14, (uintptr_t)_exception14);
-    idt_open_interrupt_gate(idtPtr, 16, (uintptr_t)_exception16);
-    idt_open_interrupt_gate(idtPtr, 17, (uintptr_t)_exception17);
-    idt_open_interrupt_gate(idtPtr, 18, (uintptr_t)_exception18);
-    idt_open_interrupt_gate(idtPtr, 19, (uintptr_t)_exception19);
-    idt_open_interrupt_gate(idtPtr, 20, (uintptr_t)_exception20);
+    idt_open_interrupt_gate(idt, 0, (uintptr_t)_exception0);
+    idt_open_interrupt_gate(idt, 1, (uintptr_t)_exception1);
+    idt_open_interrupt_gate(idt, 2, (uintptr_t)_exception2);
+    idt_open_interrupt_gate(idt, 3, (uintptr_t)_exception3);
+    idt_open_interrupt_gate(idt, 4, (uintptr_t)_exception4);
+    idt_open_interrupt_gate(idt, 5, (uintptr_t)_exception5);
+    idt_open_interrupt_gate(idt, 6, (uintptr_t)_exception6);
+    idt_open_interrupt_gate(idt, 7, (uintptr_t)_exception7);
+    idt_open_interrupt_gate(idt, 8, (uintptr_t)_exception8);
+    idt_open_interrupt_gate(idt, 9, (uintptr_t)_exception9);
+    idt_open_interrupt_gate(idt, 10, (uintptr_t)_exception10);
+    idt_open_interrupt_gate(idt, 11, (uintptr_t)_exception11);
+    idt_open_interrupt_gate(idt, 12, (uintptr_t)_exception12);
+    idt_open_interrupt_gate(idt, 13, (uintptr_t)_exception13);
+    idt_open_interrupt_gate(idt, 14, (uintptr_t)_exception14);
+    idt_open_interrupt_gate(idt, 16, (uintptr_t)_exception16);
+    idt_open_interrupt_gate(idt, 17, (uintptr_t)_exception17);
+    idt_open_interrupt_gate(idt, 18, (uintptr_t)_exception18);
+    idt_open_interrupt_gate(idt, 19, (uintptr_t)_exception19);
+    idt_open_interrupt_gate(idt, 20, (uintptr_t)_exception20);
     kprintf("EXCEPTIONS: Initialized!\n");
 }

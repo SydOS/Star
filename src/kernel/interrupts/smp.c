@@ -25,8 +25,8 @@ extern uintptr_t _ap_bootstrap_end;
 static bool smpInitialized;
 
 // List of processors.
-static uint32_t procCount;
-static smp_proc_t *processors;
+static uint32_t procCount = 0;
+static smp_proc_t *processors = NULL;
 
 // Array holding the address of stack for each AP.
 uintptr_t *apStacks;
@@ -57,7 +57,8 @@ uint32_t smp_ap_get_stack(uint32_t apicId) {
 }
 
 static void test(void) {
-    kprintf("dd");
+    if (timer_ticks() % 1000 == 0)
+        kprintf("dd");
 }
 
 void smp_ap_main(void) {
@@ -84,12 +85,11 @@ void smp_ap_main(void) {
     gdt_tss_load(tss);
 
     // Initialize interrupts.
-    idt_entry_t *idt = (idt_entry_t*)kheap_alloc(IDT_SIZE);
-    interrupts_init_ap(idt);
-    //idt_load();
+    interrupts_init_ap();
     lapic_setup();
 
-    idt_open_interrupt_gate(idt, IRQ_OFFSET + IRQ_TIMER, (uintptr_t)test);
+    // idt_open_interrupt_gate(idt, IRQ_OFFSET + IRQ_TIMER, (uintptr_t)test);
+    irqs_install_handler(IRQ_TIMER, test);
 
     // Start LAPIC timer.
     lapic_timer_start(lapic_timer_get_rate());
@@ -198,6 +198,7 @@ void smp_init(void) {
     // Search for processors again, this time saving the APIC IDs.
     acpiCpu = (ACPI_MADT_LOCAL_APIC*)acpi_search_madt(ACPI_MADT_TYPE_LOCAL_APIC, 8, 0);
     uint32_t currentCpu = 0;
+    smp_proc_t *lastProc = NULL;
     while (acpiCpu != NULL && currentCpu < procCount) {
         if (acpiCpu->LapicFlags & ACPI_MADT_ENABLED) {
             // Create processor object.
@@ -209,9 +210,11 @@ void smp_init(void) {
             proc->Index = currentCpu;
 
             // Add to processor list.
-            if (processors != NULL)
-                proc->Next = processors;
-            processors = proc;
+            if (lastProc != NULL)
+                lastProc->Next = proc;
+            else
+                processors = lastProc = proc;
+            lastProc = proc;
             currentCpu++;
         }
 

@@ -73,12 +73,12 @@ typedef struct {
 
 extern idt_entry_t *idt_get_bsp(void);
 
-extern void idt_set_gate(idt_entry_t idt[], uint8_t gate, uintptr_t base, uint16_t selector, uint8_t type, uint8_t privilege, bool present);
-extern void idt_open_interrupt_gate(idt_entry_t idt[], uint8_t gate, uintptr_t base);
-extern void idt_close_interrupt_gate(idt_entry_t idt[], uint8_t gate);
+extern void idt_set_gate(idt_entry_t *idt, uint8_t gate, uintptr_t base, uint16_t selector, uint8_t type, uint8_t privilege, bool present);
+extern void idt_open_interrupt_gate(idt_entry_t *idt, uint8_t gate, uintptr_t base);
+extern void idt_close_interrupt_gate(idt_entry_t *idt, uint8_t gate);
 
-extern void idt_load(idt_entry_t idt[]);
-extern void idt_init(idt_entry_t idt[]);
+extern void idt_load(idt_entry_t *idt);
+extern void idt_init(idt_entry_t *idt);
 extern void idt_init_bsp(void);
 
 #endif

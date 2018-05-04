@@ -88,16 +88,27 @@ typedef struct {
 typedef bool (*irq_handler_func_t)(irq_regs_t *regs, uint8_t irqNum);
 
 typedef struct irq_handler_t {
+    // Pointer to next handler.
     struct irq_handler_t *Next;
+
+    // Handler function.
     irq_handler_func_t HandlerFunc;
+
+    // Processor index the handler belongs to.
+    uint32_t ProcessorIndex;
 } irq_handler_t;
 
 extern uint8_t irqs_get_count(void);
 extern bool irqs_irq_executing(void);
 extern void irqs_eoi(uint8_t irq);
+
+extern void irqs_install_handler_proc(uint8_t irq, irq_handler_func_t handlerFunc, uint32_t procIndex);
 extern void irqs_install_handler(uint8_t irq, irq_handler_func_t handlerFunc);
+extern void irqs_remove_handler_proc(uint8_t irq, irq_handler_func_t handlerFunc, uint32_t procIndex);
 extern void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc);
+extern bool irqs_handler_mapped_proc(uint8_t irq, irq_handler_func_t handlerFunc, uint32_t procIndex);
 extern bool irqs_handler_mapped(uint8_t irq, irq_handler_func_t handlerFunc);
-extern void irqs_init(idt_ptr_t *idtPtr);
+
+extern void irqs_init(idt_entry_t *idt);
 
 #endif
