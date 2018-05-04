@@ -6,6 +6,7 @@
 #include <kernel/gdt.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/main.h>
+#include <kernel/timer.h>
 #include <kernel/interrupts/interrupts.h>
 #include <kernel/interrupts/irqs.h>
 #include <kernel/interrupts/smp.h>
@@ -231,7 +232,7 @@ void tasking_tick(irq_regs_t *regs) {
     currentProcess->CurrentThread = currentProcess->CurrentThread->Next;
 
     // Every other tick, change to next process.
-    if (pit_ticks() % 2) {
+    if (timer_ticks() % 2) {
         currentProcess = currentProcess->Next;
         if (currentProcess->PagingTablePhys != 0)
             paging_change_directory(currentProcess->PagingTablePhys);

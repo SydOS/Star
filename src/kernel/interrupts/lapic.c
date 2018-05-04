@@ -5,6 +5,7 @@
 
 #include <kernel/cpuid.h>
 #include <kernel/interrupts/idt.h>
+#include <kernel/interrupts/ioapic.h>
 #include <kernel/interrupts/irqs.h>
 #include <kernel/memory/paging.h>
 
@@ -61,11 +62,11 @@ static void lapic_send_icr(lapic_icr_t icr) {
 void lapic_send_init(uint8_t apic) {
     // Send INIT to specified APIC.
     lapic_icr_t icr = {};
-    icr.deliveryMode = LAPIC_DELIVERY_INIT;
-    icr.destinationMode = LAPIC_DEST_MODE_PHYSICAL;
-    icr.triggerMode = LAPIC_TRIGGER_EDGE;
-    icr.level = LAPIC_LEVEL_ASSERT;
-    icr.destination = apic;
+    icr.DeliveryMode = LAPIC_DELIVERY_INIT;
+    icr.DestinationMode = LAPIC_DEST_MODE_PHYSICAL;
+    icr.TriggerMode = LAPIC_TRIGGER_EDGE;
+    icr.Level = LAPIC_LEVEL_ASSERT;
+    icr.Destination = apic;
 
     // Send ICR.
     lapic_send_icr(icr);;
@@ -74,12 +75,12 @@ void lapic_send_init(uint8_t apic) {
 void lapic_send_startup(uint8_t apic, uint8_t vector) {
     // Send startup to specified APIC.
     lapic_icr_t icr = {};
-    icr.vector = vector;
-    icr.deliveryMode = LAPIC_DELIVERY_STARTUP;
-    icr.destinationMode = LAPIC_DEST_MODE_PHYSICAL;
-    icr.triggerMode = LAPIC_TRIGGER_EDGE;
-    icr.level = LAPIC_LEVEL_ASSERT;
-    icr.destination = apic;
+    icr.Vector = vector;
+    icr.DeliveryMode = LAPIC_DELIVERY_STARTUP;
+    icr.DestinationMode = LAPIC_DEST_MODE_PHYSICAL;
+    icr.TriggerMode = LAPIC_TRIGGER_EDGE;
+    icr.Level = LAPIC_LEVEL_ASSERT;
+    icr.Destination = apic;
 
     // Send ICR.
     lapic_send_icr(icr);
@@ -88,13 +89,45 @@ void lapic_send_startup(uint8_t apic, uint8_t vector) {
 void lapic_send_nmi_all(void) {
     // Send NMI to all LAPICs but ourself.
     lapic_icr_t icr = {};
-    icr.deliveryMode = LAPIC_DELIVERY_NMI;
-    icr.triggerMode = LAPIC_TRIGGER_EDGE;
-    icr.destinationShorthand = LAPIC_DEST_SHORTHAND_ALL_BUT_SELF;
-    icr.level = LAPIC_LEVEL_ASSERT;
+    icr.DeliveryMode = LAPIC_DELIVERY_NMI;
+    icr.TriggerMode = LAPIC_TRIGGER_EDGE;
+    icr.DestinationShorthand = LAPIC_DEST_SHORTHAND_ALL_BUT_SELF;
+    icr.Level = LAPIC_LEVEL_ASSERT;
 
     // Send ICR.
     lapic_send_icr(icr);
+}
+
+void lapic_timer_init(void) {
+    // Set divider to 16.
+    kprintf("LAPIC: Initializing timer...\n");
+    lapic_write(LAPIC_REG_TIMER_DIVIDE, LAPIC_TIMER_DIVIDE16);
+
+    uint32_t averageCount = 0;
+    for (uint8_t i = 0; i < 20; i++) {
+        // Reset initial count to 0xFFFFFFFF.
+        lapic_write(LAPIC_REG_TIMER_INITIAL, 0xFFFFFFFF);
+        lapic_write(LAPIC_REG_TIMER_CURRENT, 0xFFFFFFFF);
+
+        // Wait for 100 ms and get current count.
+        sleep(100);
+        uint32_t count = 0xFFFFFFFF - lapic_read(LAPIC_REG_TIMER_CURRENT);
+        lapic_write(LAPIC_REG_TIMER_INITIAL, 0);
+        lapic_write(LAPIC_REG_TIMER_CURRENT, 0);
+        averageCount += count;
+        kprintf("LAPIC: Timer ticked %u times in 100ms.\n", count);
+    }  
+
+    averageCount = averageCount / 20;
+    kprintf("LAPIC: Timer ticked %u times on average in 100ms.\n", averageCount);
+
+    // Disconnect PIT interrupt from I/O APIC.
+    ioapic_disable_interrupt(ioapic_remap_interrupt(IRQ_TIMER), IRQ_OFFSET + IRQ_TIMER);
+
+    // Start up timer using calculated amount.
+    lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_TIMER_MODE_PERIODIC | (IRQ_OFFSET + IRQ_TIMER));
+    lapic_write(LAPIC_REG_TIMER_DIVIDE, LAPIC_TIMER_DIVIDE16);
+    lapic_write(LAPIC_REG_TIMER_INITIAL, averageCount / 100);
 }
 
 uint32_t lapic_id(void) {

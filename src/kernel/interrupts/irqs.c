@@ -134,8 +134,8 @@ void irqs_init(void) {
     useLapic = false;
     irqCount = IRQ_ISA_COUNT;
 
-    // If ACPI and the I/O APIC are supported, changeover to that.
-    if (acpi_supported() && ioapic_supported()) {
+    // If the I/O APIC is supported, changeover to that.
+    if (ioapic_supported()) {
         kprintf("IRQS: Using APICs for IRQs.\n");
 
         // Disable PIC and initialize LAPIC.

@@ -6,7 +6,7 @@
 #include <kernel/multitasking/syscalls.h>
 #include <kernel/gdt.h>
 #include <kernel/interrupts/idt.h>
-#include <kernel/pit.h>
+#include <kernel/timer.h>
 #include <kernel/cpuid.h>
 #include <kernel/memory/kheap.h>
 
@@ -51,7 +51,7 @@ void syscalls_kprintf(const char *format, ...) {
 static uintptr_t syscalls_uptime_handler(uintptr_t ptrAddr) {
     uint64_t *uptimePtr = (uint64_t)ptrAddr;
     if (uptimePtr != NULL) {
-        *uptimePtr = pit_ticks() / 1000;
+        *uptimePtr = timer_ticks() / 1000;
         return 0;
     }
     return -1;

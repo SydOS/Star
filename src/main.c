@@ -6,11 +6,11 @@
 #include <kernel/gdt.h>
 #include <kernel/interrupts/interrupts.h>
 #include <kernel/acpi/acpi.h>
-#include <kernel/pit.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
+#include <kernel/timer.h>
 #include <kernel/interrupts/smp.h>
 #include <kernel/cpuid.h>
 #include <driver/vga.h>
@@ -71,8 +71,8 @@ void kernel_main() {
 	acpi_init();
 	interrupts_init();
 
-	// Initialize PIT.
-    pit_init();
+	// Initialize timer.
+    timer_init();
 
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
@@ -93,7 +93,7 @@ void kernel_main() {
 
 void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
 	while (1) { 
-		kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
+		kprintf("hmm(): %u seconds\n", timer_ticks() / 1000);
 		sleep(2000);
 	 }
 }
@@ -223,7 +223,7 @@ void kernel_late() {
 			ps2_reset_system();
 
 		else if (strcmp(buffer, "uptime") == 0)
-			kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
+			kprintf("Current uptime: %i milliseconds.\n", timer_ticks());
 
 		else if (strcmp(buffer, "corp") == 0)
 			kprintf("Hacking CorpNewt's computer and installing SydOS.....\n");

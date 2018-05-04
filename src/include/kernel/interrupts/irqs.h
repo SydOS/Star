@@ -9,7 +9,7 @@
 // Common IRQs.
 // https://wiki.osdev.org/Interrupts#General_IBM-PC_Compatible_Interrupt_Information
 enum {
-    IRQ_PIT         = 0,
+    IRQ_TIMER       = 0,
     IRQ_KEYBOARD    = 1,
     IRQ_COM2        = 3,
     IRQ_COM1        = 4,

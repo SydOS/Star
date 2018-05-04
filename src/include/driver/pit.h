@@ -1,6 +1,8 @@
 #ifndef PIT_H
 #define PIT_H
 
+#include <main.h>
+
 // PIT I/O ports.
 enum {
     PIT_PORT_CHANNEL0               = 0x40, // Channel 0 port (read/write). Tied to IRQ0.
@@ -50,8 +52,7 @@ enum {
 
 #define PIT_BASE_FREQ 1193182
 
-extern uint64_t pit_ticks(void);
-extern void pit_init(void);
 extern void pit_startcounter(uint32_t freq, uint8_t counter, uint8_t mode);
+extern void pit_init(void);
 
 #endif

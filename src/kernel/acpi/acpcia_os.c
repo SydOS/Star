@@ -10,6 +10,7 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
 #include <driver/pci.h>
+#include <kernel/timer.h>
 
 #include <kernel/interrupts/irqs.h>
 
@@ -299,7 +300,7 @@ void AcpiOsVprintf ( const char *Format, va_list Args) {
 }
 
 UINT64 AcpiOsGetTimer ( void) {
-    return pit_ticks() * 10;
+    return timer_ticks() * 10;
 }
 
 ACPI_STATUS AcpiOsSignal ( UINT32 Function,  void *Info) {
