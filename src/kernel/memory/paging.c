@@ -3,6 +3,7 @@
 #include <kprint.h>
 #include <string.h>
 #include <kernel/memory/paging.h>
+#include <kernel/lock.h>
 
 #include <kernel/interrupts/exceptions.h>
 #include <kernel/memory/pmm.h>
@@ -128,6 +129,8 @@ void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress) {
     }
 }
 
+static lock_t paging_device_alloc_lock = { };
+
 void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
     // Ensure addresses are on 4KB boundaries.
     if (MASK_PAGEFLAGS_4K_64BIT(startPhys) || MASK_PAGEFLAGS_4K_64BIT(endPhys))
@@ -135,6 +138,8 @@ void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
     if (startPhys > endPhys)
         panic("PAGING: Start address (0x%llX) is after end address (0x%llX)!\n", startPhys, endPhys);
 
+    // Lock.
+    spinlock_lock(&paging_device_alloc_lock);
     uint32_t pageCount = ((endPhys - startPhys) / PAGE_SIZE_4K) + 1;// DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K(PhysicalAddress) + Length, PAGE_SIZE_4K);
 
     // Get next available virtual range.
@@ -162,6 +167,9 @@ void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
 
     // Map range.
     paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), startPhys, false, true); // TODO change back to kernel only.
+
+    // unlock.
+    spinlock_release(&paging_device_alloc_lock);
 
     // Return address.
     return (void*)(page);

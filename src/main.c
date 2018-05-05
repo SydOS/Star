@@ -88,7 +88,7 @@ void kernel_main() {
 	tasking_init();
 
 	// We should never get here.
-	panic("Tasking failed to start!\n");
+	panic("MAIN: Tasking failed to start!\n");
 }
 
 void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {

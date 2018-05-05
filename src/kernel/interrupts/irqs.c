@@ -146,15 +146,15 @@ void irqs_handler(irq_regs_t *regs) {
 
     // Get processor we are running on.
     smp_proc_t *proc = smp_get_proc(lapic_id());
-    uint32_t index = (proc != NULL) ? proc->Index : 0;
+    uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
 
     // Ensure IRQ is within range.
     if (irq < irqCount) {
         // Invoke registered handlers.
         irq_handler_t *handler = irqHandlers[irq];
         while (handler != NULL) {
-            if (handler->HandlerFunc != NULL && handler->ProcessorIndex == index) {
-                if (handler->HandlerFunc(regs, irq))
+            if (handler->HandlerFunc != NULL && handler->ProcessorIndex == procIndex) {
+                if (handler->HandlerFunc(regs, irq, procIndex))
                     break;
             }
             handler = handler->Next;

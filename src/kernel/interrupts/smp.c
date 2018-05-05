@@ -57,10 +57,10 @@ uint32_t smp_ap_get_stack(uint32_t apicId) {
     return apStacks[proc->Index];
 }
 
-static bool test(irq_regs_t *regs, uint8_t irqNum) {
+static bool test(irq_regs_t *regs, uint8_t irqNum, uint32_t procIndex) {
     // Change tasks every 5ms.
 	if (timer_ticks() % 5 == 0)
-		tasking_tick(regs);
+		tasking_tick(regs, procIndex);
 	return true;
 }
 
@@ -70,7 +70,7 @@ void smp_ap_main(void) {
 
     // Get processor.
     smp_proc_t *proc = smp_get_proc(lapic_id());
-    kprintf("Hi from core #%u (APIC %u)!\n", proc->Index, proc->ApicId);
+    kprintf("Hi from core %u (APIC %u)!\n", proc->Index, proc->ApicId);
 
     // Processor is initialized, so mark it as such which signals the BSP to continue.
     proc->Started = true;
@@ -91,30 +91,17 @@ void smp_ap_main(void) {
     interrupts_init_ap();
     lapic_setup();
 
-    // idt_open_interrupt_gate(idt, IRQ_OFFSET + IRQ_TIMER, (uintptr_t)test);
-
-
     // Start LAPIC timer.
     lapic_timer_start(lapic_timer_get_rate());
 
-    // Initialize fast syscalls for this processor.
-    syscalls_init_ap();
-
-    
-
-    // Set kernel stack pointer. This is used for interrupts when switching from ring 3 tasks.
-    uintptr_t kernelStack;
-#ifdef X86_64
-    asm volatile ("mov %%rsp, %0" : "=r"(kernelStack));
-#else
-    asm volatile ("mov %%esp, %0" : "=r"(kernelStack));
-#endif
-    gdt_tss_set_kernel_stack(tss, kernelStack);
-
+    // Install handler for IRQ0 to handle task switching.
     irqs_install_handler(IRQ_TIMER, test);
+    
+    // Initialize and start tasking.
+    tasking_init_ap();
 
-    // Do nothing.
-    while (true);
+    // We should never get here.
+	panic("SMP: Tasking failed to start on core %u!\n", proc->Index);
 }
 
 static void smp_setup_stacks(void) {

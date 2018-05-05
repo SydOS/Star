@@ -16,13 +16,13 @@ uint64_t timer_ticks(void) {
 }
 
 // Callback for timer on IRQ0.
-static bool timer_callback(irq_regs_t *regs, uint8_t irqNum) {	
+static bool timer_callback(irq_regs_t *regs, uint8_t irqNum, uint32_t procIndex) {	
 	// Increment the number of ticks.
 	ticks++;
 
 	// Change tasks every 5ms.
 	if (ticks % 5 == 0)
-		tasking_tick(regs);
+		tasking_tick(regs, procIndex);
 	return true;
 }
 

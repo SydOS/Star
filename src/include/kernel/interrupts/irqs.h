@@ -85,7 +85,7 @@ typedef struct {
     uintptr_t SS;   
 } __attribute__((packed)) irq_regs_t;
 
-typedef bool (*irq_handler_func_t)(irq_regs_t *regs, uint8_t irqNum);
+typedef bool (*irq_handler_func_t)(irq_regs_t *regs, uint8_t irqNum, uint32_t procIndex);
 
 typedef struct irq_handler_t {
     // Pointer to next handler.

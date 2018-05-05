@@ -92,7 +92,8 @@ void syscalls_init_ap(void) {
         // Enable SYSCALL instructions.
         cpu_msr_write(SYSCALL_MSR_EFER, cpu_msr_read(SYSCALL_MSR_EFER) | 0x1);
         kprintf("SYSCALLS: SYSCALL instruction enabled!\n");
-        syscallInterruptOnly = false;
+        if (syscallInterruptOnly)
+            syscallInterruptOnly = false;
     }
 #else
     // Determine if SYSENTER is supported (only on PII or higher).
@@ -111,7 +112,8 @@ void syscalls_init_ap(void) {
         uint64_t stackPage = pmm_pop_frame();
         SyscallStack[index] = (uint8_t*)paging_device_alloc(stackPage, stackPage);
         memset(SyscallStack[index], 0, PAGE_SIZE_4K);
-        syscallInterruptOnly = false;
+        if (syscallInterruptOnly)
+            syscallInterruptOnly = false;
         kprintf("SYSCALLS: SYSENTER instruction enabled!\n");
     }
 #endif
