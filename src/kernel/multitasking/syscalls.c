@@ -13,6 +13,8 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/smp.h>
 
+#include <kernel/lock.h>
+
 
 #ifdef X86_64
 extern uintptr_t _syscalls_syscall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5, uintptr_t index);
@@ -40,13 +42,16 @@ uintptr_t syscalls_syscall(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
 #endif
 }
 
+extern lock_t kprintf_mutex;
 void syscalls_kprintf(const char *format, ...) {
     // Get args.
     va_list args;
 	va_start(args, format);
 
 	// Invoke kprintf_va via system call.
+   // spinlock_lock(&kprintf_mutex);
     syscalls_syscall(format, args, 0, 0, 0, 0, 0xAB);
+    //spinlock_release(&kprintf_mutex);
 }
 
 static uintptr_t syscalls_uptime_handler(uintptr_t ptrAddr) {
@@ -60,7 +65,7 @@ static uintptr_t syscalls_uptime_handler(uintptr_t ptrAddr) {
 
 uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5, uintptr_t index) {
     if (index == 0xAB) {
-       kprintf_va(true, arg0, arg1);
+       kprintf_va(false, arg0, arg1);
        return 0xFE;
     }
     
@@ -86,7 +91,7 @@ void syscalls_init_ap(void) {
     if (cpuid_query(CPUID_INTELFEATURES, &unused, &unused, &unused, &result) && (result & CPUID_FEAT_EDX_SYSCALL)) {
         // Set GDT offsets and handler address.
         kprintf("SYSCALLS: SYSCALL instruction supported!\n");
-        cpu_msr_write(SYSCALL_MSR_STAR, (((uint64_t)(GDT_KERNEL_DATA_OFFSET | GDT_SELECTOR_RPL_RING3)) << 48) | ((uint64_t)GDT_KERNEL_CODE_OFFSET << 32));
+        cpu_msr_write(SYSCALL_MSR_STAR, (((uint64_t)(GDT_KERNEL_DATA_OFFSET | GDT_PRIVILEGE_USER)) << 48) | ((uint64_t)GDT_KERNEL_CODE_OFFSET << 32));
         cpu_msr_write(SYSCALL_MSR_LSTAR, (uintptr_t)_syscalls_syscall_handler);
 
         // Enable SYSCALL instructions.
@@ -102,16 +107,12 @@ void syscalls_init_ap(void) {
         CPUID_MODEL(resultEax) < 3 && CPUID_STEPPING(resultEax) < 3)) && (resultEdx & CPUID_FEAT_EDX_SEP)) {
         // We can use the SYSENTER instruction for better performance.
         kprintf("SYSCALLS: SYSENTER instruction supported!\n");
-
-        // Set ring 0 CS, ESP, and EIP.
         cpu_msr_write(SYSCALL_MSR_SYSENTER_CS, GDT_KERNEL_CODE_OFFSET);
-        cpu_msr_write(SYSCALL_MSR_SYSENTER_ESP, (uintptr_t)SyscallStack[index] + 4096);
         cpu_msr_write(SYSCALL_MSR_SYSENTER_EIP, (uint32_t)_syscalls_sysenter_handler);
 
-        // Create stack.
-        uint64_t stackPage = pmm_pop_frame();
-        SyscallStack[index] = (uint8_t*)paging_device_alloc(stackPage, stackPage);
-        memset(SyscallStack[index], 0, PAGE_SIZE_4K);
+        // Set ESP.
+        cpu_msr_write(SYSCALL_MSR_SYSENTER_ESP, gdt_tss_get_kernel_stack(gdt_tss_get()));
+        
         if (syscallInterruptOnly)
             syscallInterruptOnly = false;
         kprintf("SYSCALLS: SYSENTER instruction enabled!\n");

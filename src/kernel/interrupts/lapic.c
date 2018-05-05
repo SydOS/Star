@@ -128,8 +128,8 @@ void lapic_timer_start(uint32_t rate) {
 }
 
 uint32_t lapic_id(void) {
-    // Get ID.
-    return lapic_read(LAPIC_REG_ID) >> 24;
+    // Get ID if LAPIC is configured, otherwise return 0.
+    return lapicPointer != NULL ? lapic_read(LAPIC_REG_ID) >> 24 : 0;
 }
 
 uint8_t lapic_version(void) {

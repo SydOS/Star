@@ -58,10 +58,10 @@ typedef struct {
     //uintptr_t Base;
 } __attribute__((packed)) gdt_ptr_t;
 
-#define GDT32_SIZE (sizeof(gdt_entry_t) * GDT32_ENTRIES)
+#define GDT32_SIZE  (sizeof(gdt_entry_t) * GDT32_ENTRIES)
 
 #ifdef X86_64
-#define GDT64_SIZE (sizeof(gdt_entry_t) * GDT64_ENTRIES)
+#define GDT64_SIZE  (sizeof(gdt_entry_t) * GDT64_ENTRIES)
 #endif
 
 #define GDT_NULL_INDEX          0
@@ -86,8 +86,6 @@ typedef struct {
 #define GDT_USER_DATA_OFFSET    (uint8_t)(GDT_USER_DATA_INDEX * sizeof(gdt_entry_t))
 #define GDT_USER_CODE_OFFSET    (uint8_t)(GDT_USER_CODE_INDEX * sizeof(gdt_entry_t))
 #define GDT_TSS_OFFSET          (uint8_t)(GDT_TSS_INDEX * sizeof(gdt_entry_t))
-
-#define GDT_SELECTOR_RPL_RING3  0x3
 
 extern gdt_entry_t *gdt_get_bsp32(void);
 #ifdef X86_64

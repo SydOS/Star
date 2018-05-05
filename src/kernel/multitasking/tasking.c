@@ -269,7 +269,7 @@ void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex) {
 
 static void kernel_init_thread(void) {
     while(true) {
-        syscalls_kprintf("Test LAPIC #%u: %u ticks\n", lapic_id(), timer_ticks());
+        syscalls_kprintf("Test %u ticks\n", timer_ticks());
         sleep(1000);
     }
 }
@@ -296,8 +296,8 @@ static void kernel_main_thread(void) {
     // Create userspace process.
     kprintf("Creating userspace process...\n");
     process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
-    tasking_thread_schedule_proc(initProcess->MainThread, 1);
-
+    tasking_thread_schedule_proc(initProcess->MainThread, 0);
+    
     kernel_late();
 }
 
@@ -345,9 +345,6 @@ void tasking_init_ap(void) {
     // Get processor.
     smp_proc_t *proc = smp_get_proc(lapic_id());
 
-    // Initialize fast syscalls for this processor.
-    syscalls_init_ap();
-
     // Set kernel stack pointer. This is used for interrupts when switching from ring 3 tasks.
     uintptr_t kernelStack;
 #ifdef X86_64
@@ -356,6 +353,9 @@ void tasking_init_ap(void) {
     asm volatile ("mov %%esp, %0" : "=r"(kernelStack));
 #endif
     gdt_tss_set_kernel_stack(gdt_tss_get(), kernelStack);
+
+    // Initialize fast syscalls for this processor.
+    syscalls_init_ap();
 
     // Create idle kernel thread.
     thread_t *idleThread = tasking_thread_create_kernel("core_idle", kernel_idle_thread, proc->Index, 0, 0);
@@ -372,9 +372,6 @@ void tasking_init(void) {
     // Disable interrupts, we don't want to screw the following code up.
     interrupts_disable();
 
-    // Initialize system calls.
-    syscalls_init();
-
     // Set kernel stack pointer. This is used for interrupts when switching from ring 3 tasks.
     uintptr_t kernelStack;
 #ifdef X86_64
@@ -383,6 +380,9 @@ void tasking_init(void) {
     asm volatile ("mov %%esp, %0" : "=r"(kernelStack));
 #endif
     gdt_tss_set_kernel_stack(NULL, kernelStack);
+
+    // Initialize system calls.
+    syscalls_init();
 
     // Create thread lists for processors.
     threadLists = (tasking_proc_t*)kheap_alloc(sizeof(tasking_proc_t) * smp_get_proc_count());

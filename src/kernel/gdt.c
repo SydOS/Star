@@ -128,6 +128,7 @@ void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack) {
 #ifdef X86_64
     tss->RSP0 = stack;
 #else
+    tss->SS0 = GDT_KERNEL_DATA_OFFSET;
     tss->ESP0 = stack;
 #endif
 }

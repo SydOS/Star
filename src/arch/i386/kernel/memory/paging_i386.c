@@ -224,7 +224,7 @@ bool paging_get_phys(uintptr_t virtual, uint64_t *physOut) {
 }
 
 uintptr_t paging_create_app_copy(void) {
-    uint64_t appDirPage = pmm_pop_frame();
+    uint64_t appDirPage = pmm_pop_frame_nonpae();
 
     // Are we in PAE mode?
     if (memInfo.paeEnabled) {
@@ -267,10 +267,8 @@ uintptr_t paging_create_app_copy(void) {
         uint32_t *directory = (uint32_t*)(PAGE_DIR_ADDRESS);
 
         // Copy higher half of page directory into the new one. We can safely assume the current one's higher-half is accurate.
-        for (uint16_t i = paging_calculate_table(memInfo.kernelVirtualOffset); i < PAGE_DIRECTORY_SIZE; i++) {
+        for (uint16_t i = paging_calculate_table(memInfo.kernelVirtualOffset); i < PAGE_DIRECTORY_SIZE; i++)
             appPageDir[i] = directory[i];
-            kprintf("copied 0x%X to 0x%X\n", appPageDir[i], directory[i]);
-        }
 
         // Recursively map page directory to last entry.
         appPageDir[PAGE_DIRECTORY_SIZE - 1] = (uint32_t)appDirPage | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;

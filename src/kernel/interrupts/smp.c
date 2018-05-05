@@ -79,6 +79,7 @@ void smp_ap_main(void) {
     tss_t *tss = (tss_t*)kheap_alloc(sizeof(tss_t));
     memset(tss, 0, sizeof(tss_t));
 
+#ifdef X86_64
     // Create new GDT.
     gdt_entry_t *gdt = (gdt_entry_t*)kheap_alloc(GDT64_SIZE);
     gdt_fill(gdt, true, tss);
@@ -86,6 +87,15 @@ void smp_ap_main(void) {
     // Load new GDT and TSS.
     gdt_load(gdt, GDT64_ENTRIES);
     gdt_tss_load(tss);
+#else
+    // Create new GDT.
+    gdt_entry_t *gdt = (gdt_entry_t*)kheap_alloc(GDT32_SIZE);
+    gdt_fill(gdt, false, tss);
+
+    // Load new GDT and TSS.
+    gdt_load(gdt, GDT32_ENTRIES);
+    gdt_tss_load(tss);
+#endif
 
     // Initialize interrupts.
     interrupts_init_ap();
