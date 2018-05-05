@@ -15,6 +15,7 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
+#include <kernel/tasking.h>
 
 // https://wiki.osdev.org/SMP
 // http://ethv.net/workshops/osdev/notes/notes-5
@@ -25,7 +26,7 @@ extern uintptr_t _ap_bootstrap_end;
 static bool smpInitialized;
 
 // List of processors.
-static uint32_t procCount = 0;
+static uint32_t procCount = 1;
 static smp_proc_t *processors = NULL;
 
 // Array holding the address of stack for each AP.
@@ -56,9 +57,11 @@ uint32_t smp_ap_get_stack(uint32_t apicId) {
     return apStacks[proc->Index];
 }
 
-static void test(void) {
-    if (timer_ticks() % 1000 == 0)
-        kprintf("dd");
+static bool test(irq_regs_t *regs, uint8_t irqNum) {
+    // Change tasks every 5ms.
+	if (timer_ticks() % 5 == 0)
+		tasking_tick(regs);
+	return true;
 }
 
 void smp_ap_main(void) {
@@ -89,15 +92,29 @@ void smp_ap_main(void) {
     lapic_setup();
 
     // idt_open_interrupt_gate(idt, IRQ_OFFSET + IRQ_TIMER, (uintptr_t)test);
-    irqs_install_handler(IRQ_TIMER, test);
+
 
     // Start LAPIC timer.
     lapic_timer_start(lapic_timer_get_rate());
 
-    while (true) {
-        sleep(2000);
-       // kprintf("Tick tock, I'm CPU %d!\n", cpu);
-    }
+    // Initialize fast syscalls for this processor.
+    syscalls_init_ap();
+
+    
+
+    // Set kernel stack pointer. This is used for interrupts when switching from ring 3 tasks.
+    uintptr_t kernelStack;
+#ifdef X86_64
+    asm volatile ("mov %%rsp, %0" : "=r"(kernelStack));
+#else
+    asm volatile ("mov %%esp, %0" : "=r"(kernelStack));
+#endif
+    gdt_tss_set_kernel_stack(tss, kernelStack);
+
+    irqs_install_handler(IRQ_TIMER, test);
+
+    // Do nothing.
+    while (true);
 }
 
 static void smp_setup_stacks(void) {

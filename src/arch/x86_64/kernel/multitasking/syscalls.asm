@@ -4,12 +4,50 @@ section .text
 extern SyscallStack
 
 extern syscalls_handler
+extern gdt_tss_get
+extern gdt_tss_get_kernel_stack
 
 global _syscalls_syscall
 _syscalls_syscall:
+    ; Push non-arg registers to stack.
+    push rbx
+    push rbp
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+
+    ; Push args to stack.
+    push rdi
+    push rsi
+    push rdx
+    push rcx
+    push r8
+    push r9
+
     ; Execute SYSCALL. Passed args should be in proper registers already.
     ; Return value from handler will be in RAX.
     syscall
+
+    ; Pop args from stack.
+    pop r9
+    pop r8
+    pop rcx
+    pop rdx
+    pop rsi
+    pop rdi
+
+    ; Restore non-arg registers.
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop rbp
+    pop rbx
     ret
 
 global _syscalls_syscall_handler
@@ -17,45 +55,52 @@ _syscalls_syscall_handler:
     ; Disable interrupts.
     cli
 
-    ; Save caller's RSP to RAX.
-    mov rax, rsp
-
-    ; Load up SYSCALL handler stack.
-    mov rsp, SyscallStack
-    add rsp, 4096
-
-    ; Push caller's RSP (in RAX), RBP, RIP (in RCX), and RFLAGS (in R11) to stack.
-    push rax
-    push rbp
+    ; Push caller's RIP (in RCX) and RFLAGS (in R11) to caller's stack.
     push rcx
     push r11
 
-    ; Save unused registers.
-    push r12
-    push r13
-    push r14
-    push r15
+    ; Get current TSS and ring 0 stack.
+    call gdt_tss_get
+    mov rdi, rax
+    call gdt_tss_get_kernel_stack
+
+    ; Restore caller's RFLAGS into R11 and RIP into R10.
+    pop r11
+    pop r10
+    
+    ; Save caller's RSP to RBX.
+    mov rbx, rsp
+
+    ; Restore args into proper registers.
+    mov r9, [rsp]
+    mov r8, [rsp+8]
+    mov rcx, [rsp+16]
+    mov rdx, [rsp+24]
+    mov rsi, [rsp+32]
+    mov rdi, [rsp+40]
+    
+    ; Load up SYSCALL handler stack and push caller's RSP (in RBX) to our stack.
+    mov rsp, [rax]
     push rbx
 
+    ; Push caller's RIP (in R10) and RFLAGS (in R11) to our stack.
+    push r10
+    push r11
+
     ; Get index argument and push to our stack.
-    mov rbx, [rax+8]
+    ; 72 = 14 registers plus 8 bytes, location of index.
+    mov rbx, [rbx+120]
     push rbx
 
     ; Call C handler. Afterwards, discard the index argument from stack.
     call syscalls_handler
     pop rbx
 
-    ; Restore unused registers.
-    pop rbx
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-
-    ; Restore caller's RFLAGS, RIP, RBP, and RSP.
+    ; Restore caller's RFLAGS to R11 and RIP to RCX.
     pop r11
     pop rcx
-    pop rbp
+
+    ; Restore caller's RSP.
     pop rsp
 
     ; Restore control back to the calling code.

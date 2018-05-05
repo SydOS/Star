@@ -43,6 +43,13 @@ typedef struct process_t {
 	thread_t *CurrentThread;
 } process_t;
 
+typedef struct {
+	thread_t *Threads;
+	thread_t *CurrentThread;
+
+	bool Started;
+} tasking_proc_t;
+
 extern void tasking_kill_thread(void);
 extern thread_t *tasking_thread_create(char* name, uintptr_t addr, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
 extern uint32_t tasking_thread_add(thread_t *thread, process_t *process);

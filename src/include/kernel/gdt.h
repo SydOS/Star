@@ -95,10 +95,15 @@ extern gdt_entry_t *gdt_get_bsp64(void);
 #endif
 
 extern void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack);
+extern uintptr_t gdt_tss_get_kernel_stack(tss_t *tss);
 
 extern gdt_ptr_t gdt_create_ptr(gdt_entry_t gdt[], uint8_t entries);
 extern void gdt_load(gdt_entry_t gdt[], uint8_t entries);
 extern void gdt_tss_load(tss_t *tss);
+
+extern gdt_entry_t *gdt_get(void);
+extern tss_t *gdt_tss_get(void);
+
 extern void gdt_fill(gdt_entry_t gdt[], bool is64Bits, tss_t *tss);
 extern void gdt_init_bsp(void);
 

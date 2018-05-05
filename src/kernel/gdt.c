@@ -39,7 +39,7 @@ gdt_entry_t *gdt_get_bsp64(void) {
 /**
  * Creates an entry in the GDT.
  */
-static void gdt_set_descriptor(gdt_entry_t gdt[], uint8_t num, bool code, bool userMode, bool is64Bits) {
+static void gdt_set_descriptor(gdt_entry_t *gdt, uint8_t num, bool code, bool userMode, bool is64Bits) {
     // Set up the descriptor base address.
     gdt[num].BaseLow = 0;
     gdt[num].BaseHigh = 0;
@@ -66,7 +66,7 @@ static void gdt_set_descriptor(gdt_entry_t gdt[], uint8_t num, bool code, bool u
 /**
  * Creates the TSS entry in the GDT.
  */
-static void gdt_set_tss(gdt_entry_t gdt[], uint8_t num, uintptr_t base, uint32_t size) {
+static void gdt_set_tss(gdt_entry_t *gdt, uint8_t num, uintptr_t base, uint32_t size) {
     // Set TSS base address.
     gdt[num].BaseLow = (base & 0xFFFFFF);
     gdt[num].BaseHigh = (base >> 24) & 0xFF;
@@ -124,11 +124,28 @@ void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack) {
     if (tss == NULL)
         tss = &bspTss;
 
+    // Set stack.
 #ifdef X86_64
-    // 64-bit code here.
     tss->RSP0 = stack;
 #else
     tss->ESP0 = stack;
+#endif
+}
+
+/**
+ * Gets the kernel ESP in the TSS.
+ */
+uintptr_t gdt_tss_get_kernel_stack(tss_t *tss) {
+    // If TSS specified is nothing, use the BSP TSS.
+    if (tss == NULL)
+        tss = &bspTss;
+
+    // Return stack.
+#ifdef X86_64
+    // 64-bit code here.
+    return tss->RSP0;
+#else
+    return tss->ESP0;
 #endif
 }
 
@@ -137,7 +154,7 @@ void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack) {
  * @param gdt       The GDT.
  * @param entries   The number of entries in the GDT.
  */
-gdt_ptr_t gdt_create_ptr(gdt_entry_t gdt[], uint8_t entries) {
+gdt_ptr_t gdt_create_ptr(gdt_entry_t *gdt, uint8_t entries) {
     return (gdt_ptr_t) { (sizeof(gdt_entry_t) * entries) - 1, gdt };
 }
 
@@ -146,7 +163,7 @@ gdt_ptr_t gdt_create_ptr(gdt_entry_t gdt[], uint8_t entries) {
  * @param gdt       The GDT.
  * @param entries   The number of entries in the GDT.
  */
-void gdt_load(gdt_entry_t gdt[], uint8_t entries) {
+void gdt_load(gdt_entry_t *gdt, uint8_t entries) {
     // Load the GDT into the processor.
     gdt_ptr_t gdtPtr = gdt_create_ptr(gdt, entries);
     _gdt_load(&gdtPtr, GDT_KERNEL_DATA_OFFSET);
@@ -163,12 +180,47 @@ void gdt_tss_load(tss_t *tss) {
 }
 
 /**
+ * Gets the GDT for the currently executing processor.
+ */
+gdt_entry_t *gdt_get(void) {
+    // Get GDT pointer.
+    gdt_ptr_t gdtPtr = { };
+    asm volatile ("sgdt %0" : "=g"(gdtPtr));
+
+    // Return GDT.
+    return gdtPtr.Table;
+}
+
+/**
+ * Gets the TSS for the currently executing processor.
+ */
+tss_t *gdt_tss_get(void) {
+    // Get current GDT.
+    gdt_entry_t *gdt = gdt_get();
+
+    // Get TSS offset.
+    uint16_t tssOffset = 0;
+    asm volatile ("str %%ax" : "=a"(tssOffset));
+    uint8_t tssIndex = tssOffset / sizeof(gdt_entry_t);
+
+    // Get TSS address.
+    uintptr_t tssAddress = ((uint32_t)(gdt[tssIndex].BaseLow)) | ((uint32_t)(gdt[tssIndex].BaseHigh) << 24);
+
+#ifdef X86_64
+    tssAddress |= ((uint64_t)(gdt[tssIndex+1].LimitLow) << 32) | ((uint64_t)(gdt[tssIndex+1].BaseLow) << 48);
+#endif
+
+    // Return TSS pointer.
+    return (tss_t*)tssAddress;
+}
+
+/**
  * Fills the specified GDT.
  * @param gdt       The pointer to the GDT.
  * @param is64Bits  Whether or not the GDT is 64-bit.
  * @param tss       The pointer to a TSS, if any.
  */
-void gdt_fill(gdt_entry_t gdt[], bool is64Bits, tss_t *tss) {
+void gdt_fill(gdt_entry_t *gdt, bool is64Bits, tss_t *tss) {
     // Set null segment.
     gdt[GDT_NULL_INDEX] = (gdt_entry_t) { };
 
