@@ -80,7 +80,7 @@ _syscalls_syscall_handler:
     mov rdi, [rsp+40]
     
     ; Load up SYSCALL handler stack and push caller's RSP (in RBX) to our stack.
-    mov rsp, [rax]
+    mov rsp, rax
     push rbx
 
     ; Push caller's RIP (in R10) and RFLAGS (in R11) to our stack.

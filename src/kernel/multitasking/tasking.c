@@ -253,36 +253,22 @@ void tasking_tick(irq_regs_t *regs, uint32_t procIndex) {
     if (!taskingEnabled || !threadLists[procIndex].TaskingEnabled)
         return;
 
+
+
     // Save stack pointer and move to next thread in schedule.
     threadLists[procIndex].CurrentThread->StackPointer = (uintptr_t)regs;
     threadLists[procIndex].CurrentThread = threadLists[procIndex].CurrentThread->SchedNext;
+    thread_t *dddd = threadLists[procIndex].CurrentThread;
+    if (procIndex == 2 && strcmp(dddd->Name, "init_main") == 0) {
+        int dd = 0;
+        tasking_freeze();
+    }
 
     // Jump to next task.
     tasking_exec(procIndex);
 }
 
-static void kernel_main_thread(void) {
-    // Start up tasking and enter into the late kernel.
-    tasking_unfreeze();
-    kernel_late();
-}
 
-static void kernel_idle_thread(uintptr_t procIndex) {
-    threadLists[procIndex].TaskingEnabled = true;
-
-    // Do nothing.
-    while (true) {
-        sleep(1000);
-        kprintf("hi %u\n", lapic_id());
-    }
-}
-
-static void kernel_init_thread(void) {
-    while(true) {
-        syscalls_kprintf("Test LAPIC #%u: %u ticks\n", lapic_id(), timer_ticks());
-        sleep(1000);
-    }
-}
 lock_t threadLock = { };
 
 static thread_t *tasking_t_create(process_t *process, char *name, void *func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2) {
@@ -305,8 +291,8 @@ static thread_t *tasking_t_create(process_t *process, char *name, void *func, ui
     irq_regs_t *regs = (irq_regs_t*)(stackTop - sizeof(irq_regs_t));
     regs->FLAGS.AlwaysTrue = true;
     regs->FLAGS.InterruptsEnabled = true;
-    regs->CS = process->UserMode ? GDT_USER_CODE_OFFSET : GDT_KERNEL_CODE_OFFSET;
-    regs->DS = regs->ES = regs->FS = regs->GS = regs->SS = process->UserMode ? GDT_USER_DATA_OFFSET : GDT_KERNEL_DATA_OFFSET;
+    regs->CS = process->UserMode ? (GDT_USER_CODE_OFFSET | GDT_PRIVILEGE_USER) : GDT_KERNEL_CODE_OFFSET;
+    regs->DS = regs->ES = regs->FS = regs->GS = regs->SS = process->UserMode ? (GDT_USER_DATA_OFFSET | GDT_PRIVILEGE_USER) : GDT_KERNEL_DATA_OFFSET;
 
     // AX contains the address of thread's main function. BX, CX, and DX contain args.
     regs->IP = (uintptr_t)_tasking_thread_exec;
@@ -317,7 +303,22 @@ static thread_t *tasking_t_create(process_t *process, char *name, void *func, ui
 
     // Map stack to lower half if its a user process.
     if (process->UserMode) {
+        tasking_freeze();
 
+        // Change to new paging structure.
+        uintptr_t oldPagingTablePhys = paging_get_current_directory();
+        paging_change_directory(process->PagingTablePhys);
+
+        // Map stack of main thread in.
+        paging_map(0x0, thread->StackPage, false, true);
+        thread->StackPointer = PAGE_SIZE_4K - sizeof(irq_regs_t);
+        regs->SP = regs->BP = PAGE_SIZE_4K;
+
+        // Change back.
+        paging_change_directory(oldPagingTablePhys);
+        paging_device_free(stackBottom, stackBottom);
+
+        tasking_unfreeze();
     }
     else {
         thread->StackPointer = stackTop - sizeof(irq_regs_t);
@@ -329,7 +330,7 @@ static thread_t *tasking_t_create(process_t *process, char *name, void *func, ui
     if (process->MainThread != NULL) {
         thread->Next = process->MainThread;
         process->MainThread->Prev->Next = thread;
-        process->Prev = process->MainThread->Prev;
+        thread->Prev = process->MainThread->Prev;
         process->MainThread->Prev = thread;
     }
     else {
@@ -394,6 +395,52 @@ void tasking_t_schedule(thread_t *thread, uint32_t procIndex) {
     threadLists[procIndex].TaskingEnabled = true;
 }
 
+static void kernel_init_thread(void) {
+    while(true) {
+        syscalls_kprintf("Test LAPIC #%u: %u ticks\n", lapic_id(), timer_ticks());
+        sleep(1000);
+    }
+}
+
+static void kernel_main_thread(void) {
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
+
+    // Enable tasking on current processor.
+    threadLists[procIndex].TaskingEnabled = true;
+    kprintf("TASKING: Waiting for all %u processors to come up...\n", smp_get_proc_count());
+
+    // Wait for all processors.
+    for (uint32_t i = 0; i < smp_get_proc_count(); i++) {
+        // Wait for processor.
+        while (!threadLists[i].TaskingEnabled);
+    }
+
+    // Start up global tasking and enter into the late kernel.
+    kprintf("TASKING: All processors started, enabling multitasking!\n");
+    tasking_unfreeze();
+
+    // Create userspace process.
+    kprintf("Creating userspace process...\n");
+    process_t *initProcess = tasking_p_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
+    tasking_t_schedule(initProcess->MainThread, 2);
+    
+    kernel_late();
+}
+
+static void kernel_idle_thread(uintptr_t procIndex) {
+    threadLists[procIndex].TaskingEnabled = true;
+
+    // Do nothing.
+    while (true) {
+        sleep(1000);
+        kprintf("hi %u\n", lapic_id());
+    }
+}
+
+
+
 void tasking_init_ap(void) {
     // Disable interrupts, we don't want to screw the following code up.
     interrupts_disable();
@@ -451,12 +498,7 @@ void tasking_init(void) {
     kernelProcess->MainThread->SchedNext = kernelProcess->MainThread;
     kernelProcess->MainThread->SchedPrev = kernelProcess->MainThread;
 
-    // Create userspace process.
-    kprintf("Creating userspace process...\n");
-    process_t *initProcess = tasking_p_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
-
     // Start tasking on BSP!
     interrupts_enable();
-    threadLists[0].TaskingEnabled = true;
     tasking_exec(0);
 }
