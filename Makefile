@@ -68,8 +68,10 @@ endif
 
 ifeq ($(ARCH), x86_64)
 	cp Star-x86_64.kernel isofiles/
-	grub-mkrescue -o os.iso isofiles -d /usr/lib/grub/i386-pc
+else
+	cp Star-i686.kernel isofiles/
 endif
+	grub-mkrescue -o os.iso isofiles -d /usr/lib/grub/i386-pc
 
 # Compile assembly source files.
 $(ASM_OBJECTS):
