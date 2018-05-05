@@ -253,21 +253,13 @@ void tasking_tick(irq_regs_t *regs, uint32_t procIndex) {
     if (!taskingEnabled || !threadLists[procIndex].TaskingEnabled)
         return;
 
-
-
     // Save stack pointer and move to next thread in schedule.
     threadLists[procIndex].CurrentThread->StackPointer = (uintptr_t)regs;
     threadLists[procIndex].CurrentThread = threadLists[procIndex].CurrentThread->SchedNext;
-    thread_t *dddd = threadLists[procIndex].CurrentThread;
-    if (procIndex == 2 && strcmp(dddd->Name, "init_main") == 0) {
-        int dd = 0;
-        tasking_freeze();
-    }
 
     // Jump to next task.
     tasking_exec(procIndex);
 }
-
 
 lock_t threadLock = { };
 
@@ -425,7 +417,7 @@ static void kernel_main_thread(void) {
     kprintf("Creating userspace process...\n");
     process_t *initProcess = tasking_p_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
     tasking_t_schedule(initProcess->MainThread, 2);
-    
+
     kernel_late();
 }
 
