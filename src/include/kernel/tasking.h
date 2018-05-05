@@ -13,6 +13,9 @@
 
 #define THREAD_STACK_SIZE	4096
 
+// Thread entry function.
+typedef void (*thread_entry_func_t)(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2);
+
 // Used for circular dependencies.
 struct thread_t;
 struct process_t;
@@ -26,6 +29,7 @@ typedef struct thread_t {
 	// Thread ID info.
 	char *Name;
 	uint32_t ThreadId;
+	thread_entry_func_t EntryFunc;
 
 	// Stack.
 	uint64_t StackPage;
@@ -48,10 +52,6 @@ typedef struct process_t {
 	bool UserMode;
 
 	thread_t *MainThread;
-
-
-
-	thread_t *CurrentThread;
 } process_t;
 
 typedef struct {
@@ -61,12 +61,15 @@ typedef struct {
 } tasking_proc_t;
 
 extern void tasking_kill_thread(void);
-extern thread_t *tasking_thread_create(char* name, uintptr_t addr, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
-extern uint32_t tasking_thread_add(thread_t *thread, process_t *process);
-extern uint32_t tasking_thread_add_kernel(thread_t *thread);
 
-extern process_t* tasking_process_create(char* name, thread_t *mainThread, bool kernel);
-extern uint32_t tasking_process_add(process_t *process);
+extern thread_t *tasking_thread_create(process_t *process, char *name, thread_entry_func_t func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2);
+extern process_t *tasking_process_create(process_t *parent, char *name, bool userMode, char *mainThreadName, thread_entry_func_t mainThreadFunc,
+	uintptr_t mainThreadArg0, uintptr_t mainThreadArg1, uintptr_t mainThreadArg2);
+
+
+extern thread_t *tasking_thread_create_kernel(char *name, thread_entry_func_t func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2);
+
+extern void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex);
 
 extern void tasking_tick(irq_regs_t* regs, uint32_t procIndex);
 extern void tasking_init(void);

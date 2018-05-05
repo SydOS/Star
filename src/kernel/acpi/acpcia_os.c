@@ -121,6 +121,7 @@ void acpica_thread(ACPI_OSD_EXEC_CALLBACK functionPtr, void *contextPtr) {
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
     // Schedule execution by adding a thread. BROKEN
     //tasking_thread_add_kernel(tasking_thread_create("acpica_worker", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context, 0));
+    tasking_thread_schedule_proc(tasking_thread_create_kernel("acpica_worker", acpica_thread, (uintptr_t)Function, (uintptr_t)Context, 0), 0);
     return (AE_OK);
 }
 
@@ -292,11 +293,11 @@ void ACPI_INTERNAL_VAR_XFACE AcpiOsPrintf ( const char *Format, ...) {
     // Get args.
     va_list args;
 	va_start(args, Format);
-    kprintf_va(Format, args);
+    kprintf_va(true, Format, args);
 }
 
 void AcpiOsVprintf ( const char *Format, va_list Args) {
-    kprintf_va(Format, Args);
+    kprintf_va(true, Format, Args);
 }
 
 UINT64 AcpiOsGetTimer ( void) {

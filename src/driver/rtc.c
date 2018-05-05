@@ -68,6 +68,7 @@ void rtc_thread() {
 	while(true) {
 		rtc_get_time();
 		sleep(500);
+		kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 	}
 }
 
@@ -80,5 +81,6 @@ void rtc_init() {
 	rtc_settings = rtc_get_settings();
 	rtc_get_time();
 
-	tasking_thread_add_kernel(tasking_thread_create("rtc_worker", (uintptr_t)rtc_thread, 0, 0, 0));
+	// Add poll thread.
+	tasking_thread_schedule_proc(tasking_thread_create_kernel("rtc_worker", rtc_thread, 0, 0, 0), 0);
 }

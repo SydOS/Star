@@ -38,7 +38,7 @@ void panic(const char *format, ...) {
 
 	// Show panic.
 	kprintf_nolock("\nPANIC:\n");
-	kprintf_va(format, args);
+	kprintf_va(false, format, args);
 	kprintf_nolock("\n\nHalted.");
 
 	// Halt other processors.
@@ -151,9 +151,9 @@ void kernel_late() {
 		kprintf("NX enabled!\n");
 	kprintf("\e[0m");
 	
-	//rtc_init();
-	//kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
-	//kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
+	rtc_init();
+	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
+	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
 	// Print logo.
 	kprintf("\n\e[94m");

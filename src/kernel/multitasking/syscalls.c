@@ -60,7 +60,7 @@ static uintptr_t syscalls_uptime_handler(uintptr_t ptrAddr) {
 
 uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5, uintptr_t index) {
     if (index == 0xAB) {
-       kprintf_va(arg0, arg1);
+       kprintf_va(true, arg0, arg1);
        return 0xFE;
     }
     

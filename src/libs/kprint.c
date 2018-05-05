@@ -298,33 +298,31 @@ static void kprintf_sgr(const char *sequence, uint32_t length) {
     }
 }
 
+void kprintf(const char* format, ...) {
+    // Get args.
+    va_list args;
+    va_start(args, format);
+
+    // Call va_list kprintf.
+    kprintf_va(true, format, args);
+}
+
 void kprintf_nolock(const char* format, ...) {
     // Get args.
     va_list args;
     va_start(args, format);
 
     // Call va_list kprintf.
-    kprintf_va(format, args);
-}
-
-void kprintf(const char* format, ...) {
-    // Lock.
-    spinlock_lock(&kprintf_mutex);
-
-    // Get args.
-    va_list args;
-    va_start(args, format);
-
-    // Call va_list kprintf.
-    kprintf_va(format, args);
-
-    // Release lock.
-    spinlock_release(&kprintf_mutex);
+    kprintf_va(false, format, args);
 }
 
 // https://en.wikipedia.org/wiki/Printf_format_string
 // Printf implementation.
-void kprintf_va(const char* format, va_list args) {
+void kprintf_va(bool lock, const char* format, va_list args) {
+    // Lock.
+    if (lock)
+        spinlock_lock(&kprintf_mutex);
+
     // Disable cursor for increased performance.
     vga_disable_cursor();
 
@@ -523,4 +521,8 @@ void kprintf_va(const char* format, va_list args) {
 
     // Re-enable the console driver
     vga_enable_cursor();
+
+    // Release lock.
+    if (lock)
+        spinlock_release(&kprintf_mutex);
 }

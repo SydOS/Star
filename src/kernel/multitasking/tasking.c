@@ -25,13 +25,13 @@ static uint32_t nextThreadId = 0;
 // Thread lists.
 static tasking_proc_t *threadLists;
 
+// Locks.
+lock_t threadLock = { };
+lock_t processLock = { };
 
-// Current process.
-//Process* currentProcess = 0;
-uint32_t lpid = 0;
+
 bool taskingEnabled = false;
 
-static process_t *currentProcess = NULL;
 static process_t *kernelProcess = NULL;
 
 static inline void tasking_freeze() {
@@ -61,37 +61,53 @@ static uint32_t tasking_new_process_id(void) {
 }
 
 void tasking_kill_thread(void) {
-    // Pause tasking.
-    tasking_freeze();
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
 
-    // If this is the last or main thread, we can just kill the process.
-    if (currentProcess->CurrentThread == currentProcess->CurrentThread->Next || currentProcess->CurrentThread == currentProcess->MainThread) {
+    // Pause tasking on processor.
+    threadLists[procIndex].TaskingEnabled = false;
+
+    // Get current thread.
+    thread_t *currentThread = threadLists[procIndex].CurrentThread;
+
+    // Remove thread from schedule.
+    currentThread->SchedPrev->SchedNext = currentThread->SchedNext;
+    currentThread->SchedNext->SchedPrev = currentThread->SchedPrev;
+
+    // Remove thread from process.
+    spinlock_lock(&threadLock);
+    currentThread->Prev->Next = currentThread->Next;
+    currentThread->Next->Prev = currentThread->Prev;
+    spinlock_release(&threadLock);
+
+    // If this is the main thread, we can kill the process too.
+    process_t *parentProcess = currentThread->Parent;
+    if (currentThread == parentProcess->MainThread) {
         // Remove process from list.
-        currentProcess->Prev->Next = currentProcess->Next;
-        currentProcess->Next->Prev = currentProcess->Prev;
+        spinlock_lock(&processLock);
+        parentProcess->Prev->Next = parentProcess->Next;
+        parentProcess->Next->Prev = parentProcess->Prev;
+        spinlock_release(&processLock);
 
         // Free all threads.
-        thread_t *thread = currentProcess->CurrentThread->Next;
-        while (thread != currentProcess->CurrentThread) {
+        thread_t *thread = currentThread->Next;
+        while (thread != currentThread) {
             kheap_free(thread);
             thread = thread->Next;
         }
-        kheap_free(currentProcess->CurrentThread);
+        kheap_free(currentThread);
 
         // Free process from memory.
-        kheap_free(currentProcess);
+        kheap_free(parentProcess);
     }
     else {
-        // Remove thread from list.
-        currentProcess->CurrentThread->Prev->Next = currentProcess->CurrentThread->Next;
-        currentProcess->CurrentThread->Next->Prev = currentProcess->CurrentThread->Prev;
-
         // Free thread from memory. The scheduler will move away from it at the next cycle.
-        kheap_free(currentProcess->CurrentThread);
+        kheap_free(currentThread);
     }
 
     // Resume tasking.
-    tasking_unfreeze();
+    threadLists[procIndex].TaskingEnabled = true;
 }
 
 void __notified(int sig) {
@@ -115,155 +131,11 @@ void __notified(int sig) {
     }
 }
 
-void tasking_fork(void) {
 
-}
 
-thread_t *tasking_thread_create(char* name, uintptr_t addr, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {
-    // Allocate memory for thread.
-    thread_t *thread = (thread_t*)kheap_alloc(sizeof(thread_t));
-    memset(thread, 0, sizeof(thread_t));
-    thread->Name = name;
 
-    // Pop new page for stack and map to temp address.
-    thread->StackPage = pmm_pop_frame();
-    thread->StackPointer = (uintptr_t)paging_device_alloc(thread->StackPage, thread->StackPage) + PAGE_SIZE_4K;
 
-    // Set up registers.
-    uintptr_t stackTop = thread->StackPointer;
-    thread->StackPointer -= sizeof(irq_regs_t);
-    /*thread->Regs = (irq_regs_t*)thread->StackPointer;
-    thread->Regs->SP = thread->Regs->BP = stackTop;
-    thread->Regs->FLAGS.AlwaysTrue = true;
-    thread->Regs->FLAGS.InterruptsEnabled = true;
-
-    // AX contains the address of thread's main function.
-    thread->Regs->IP = _tasking_thread_exec;
-    thread->Regs->AX = addr;
-
-    // BX, CX, and DX contain args to be passed to that function, in order.
-    thread->Regs->BX = arg1;
-    thread->Regs->CX = arg2;
-    thread->Regs->DX = arg3;*/
-    
-    // Return the thread.
-    thread->Next = thread;
-    thread->Prev = thread;
-    return thread;
-}
-
-uint32_t tasking_thread_add(thread_t *thread, process_t *process) {
-    // Pause tasking.
-    tasking_freeze();
-
-    // Set segments for thread.
-  /*  thread->Regs->CS = process->KernelMode ? GDT_KERNEL_CODE_OFFSET : (GDT_USER_CODE_OFFSET | GDT_SELECTOR_RPL_RING3);
-    thread->Regs->DS = thread->Regs->ES = thread->Regs->FS = thread->Regs->GS = thread->Regs->SS =
-        process->KernelMode ? GDT_KERNEL_DATA_OFFSET : (GDT_USER_DATA_OFFSET | GDT_SELECTOR_RPL_RING3);*/
-
-    // Add thread into process schedule.
-    thread->Next = process->CurrentThread->Next;
-    thread->Next->Prev = thread;
-    thread->Prev = process->CurrentThread;
-    process->CurrentThread->Next = thread;
-
-    // Resume tasking.
-    tasking_unfreeze();
-
-    // Return the thread ID.
-    return thread->ThreadId;
-}
-
-uint32_t tasking_thread_add_kernel(thread_t *thread) {
-    return tasking_thread_add(thread, kernelProcess);
-}
-
-process_t* tasking_process_create(char* name, thread_t *mainThread, bool kernel) {
-    // Allocate memory for process.
-    process_t* process = (process_t*)kheap_alloc(sizeof(process_t));
-    memset(process, 0, sizeof(process_t));
-
-    // Set up process fields.
-    process->Name = name;
-  //  process->KernelMode = kernel;
-    //process->Pid = ++lpid;
-    //process->State = PROCESS_STATE_ALIVE;
-    //process->Notify = __notified;
-
-    // Set segments for thread.
-   /* mainThread->Regs->CS = process->KernelMode ? GDT_KERNEL_CODE_OFFSET : (GDT_USER_CODE_OFFSET | GDT_SELECTOR_RPL_RING3);
-    mainThread->Regs->DS = mainThread->Regs->ES = mainThread->Regs->FS = mainThread->Regs->GS = mainThread->Regs->SS =
-        process->KernelMode ? GDT_KERNEL_DATA_OFFSET : (GDT_USER_DATA_OFFSET | GDT_SELECTOR_RPL_RING3);*/
-
-    process->MainThread = mainThread;
-    process->CurrentThread = process->MainThread;
-    
-    interrupts_disable();
-    // Create a new root paging structure, with the higher half of the kernel copied in.
-    //process->PagingTablePhys = paging_create_app_copy();
-
-    // Change to new paging structure.
-    uintptr_t oldPagingTablePhys = paging_get_current_directory();
-    paging_change_directory(process->PagingTablePhys);
-
-    // Map stack of main thread in.
-    paging_map(0x0, process->MainThread->StackPage, false, true);
-    process->MainThread->StackPointer = PAGE_SIZE_4K - sizeof(irq_regs_t);
-  //  process->MainThread->Regs->SP = process->MainThread->Regs->BP = PAGE_SIZE_4K;
-
-    // Change back.
-    paging_change_directory(oldPagingTablePhys);
-    interrupts_enable();
-    return process;
-}
-
-uint32_t tasking_process_add(process_t *process) {
-    // Pause tasking.
-    tasking_freeze();
-
-    // Add process into schedule.
-    process->Next = currentProcess->Next;
-    process->Next->Prev = process;
-    process->Prev = currentProcess;
-    currentProcess->Next = process;
-
-    // Resume tasking.
-    tasking_unfreeze();
-
-    // Return the PID.
-    return process->ProcessId;
-}
-
-static void tasking_exec(uint32_t procIndex) { 
-    // Send EOI.
-    irqs_eoi(0);
-
-    // Change out paging structure and stack.
-    paging_change_directory(threadLists[procIndex].CurrentThread->Parent->PagingTablePhys);
-#ifdef X86_64
-    asm volatile ("mov %0, %%rsp" : : "r"(threadLists[procIndex].CurrentThread->StackPointer));
-#else
-    asm volatile ("mov %0, %%esp" : : "r"(threadLists[procIndex].CurrentThread->StackPointer));
-#endif
-    asm volatile ("jmp _irq_exit");
-}
-
-void tasking_tick(irq_regs_t *regs, uint32_t procIndex) {
-    // Is tasking enabled both globally and for the current processor?
-    if (!taskingEnabled || !threadLists[procIndex].TaskingEnabled)
-        return;
-
-    // Save stack pointer and move to next thread in schedule.
-    threadLists[procIndex].CurrentThread->StackPointer = (uintptr_t)regs;
-    threadLists[procIndex].CurrentThread = threadLists[procIndex].CurrentThread->SchedNext;
-
-    // Jump to next task.
-    tasking_exec(procIndex);
-}
-
-lock_t threadLock = { };
-
-static thread_t *tasking_t_create(process_t *process, char *name, void *func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2) {
+thread_t *tasking_thread_create(process_t *process, char *name, thread_entry_func_t func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2) {
     // Allocate memory for thread.
     thread_t *thread = (thread_t*)kheap_alloc(sizeof(thread_t));
     memset(thread, 0, sizeof(thread_t));
@@ -272,6 +144,7 @@ static thread_t *tasking_t_create(process_t *process, char *name, void *func, ui
     thread->Parent = process;
     thread->Name = name;
     thread->ThreadId = tasking_new_thread_id();
+    thread->EntryFunc = func;
 
     // Pop new page for stack and map to temp address.
     thread->StackPage = pmm_pop_frame();
@@ -316,7 +189,7 @@ static thread_t *tasking_t_create(process_t *process, char *name, void *func, ui
         thread->StackPointer = stackTop - sizeof(irq_regs_t);
         regs->SP = regs->BP = stackTop;
     }
-    
+
     spinlock_lock(&threadLock);
     // Add thread to process.
     if (process->MainThread != NULL) {
@@ -331,14 +204,19 @@ static thread_t *tasking_t_create(process_t *process, char *name, void *func, ui
         thread->Next = thread;
         thread->Prev = thread;
     }
-    
+
     spinlock_release(&threadLock);
 
     // Return thread.
     return thread;
-} 
+}
 
-process_t *tasking_p_create(process_t *parent, char *name, bool userMode, char *mainThreadName, void *mainThreadFunc,
+thread_t *tasking_thread_create_kernel(char *name, thread_entry_func_t func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2) {
+    // Create kernel thread.
+    return tasking_thread_create(kernelProcess, name, func, arg0, arg1, arg2);
+}
+
+process_t *tasking_process_create(process_t *parent, char *name, bool userMode, char *mainThreadName, thread_entry_func_t mainThreadFunc,
     uintptr_t mainThreadArg0, uintptr_t mainThreadArg1, uintptr_t mainThreadArg2) {
     // Allocate memory for process.
     process_t *process = (process_t*)kheap_alloc(sizeof(process_t));
@@ -353,9 +231,10 @@ process_t *tasking_p_create(process_t *parent, char *name, bool userMode, char *
     nextProcessId++;
 
     // Create main thread.
-    tasking_t_create(process, mainThreadName, mainThreadFunc, mainThreadArg0, mainThreadArg1, mainThreadArg2);
+    tasking_thread_create(process, mainThreadName, mainThreadFunc, mainThreadArg0, mainThreadArg1, mainThreadArg2);
 
     // Add to list of system processes.
+    spinlock_lock(&processLock);
     if (kernelProcess != NULL) {
         process->Next = kernelProcess;
         kernelProcess->Prev->Next = process;
@@ -368,12 +247,13 @@ process_t *tasking_p_create(process_t *parent, char *name, bool userMode, char *
         process->Next = process;
         process->Prev = process;
     }
+    spinlock_release(&processLock);
 
     // Return process.
     return process;
 }
 
-void tasking_t_schedule(thread_t *thread, uint32_t procIndex) {
+void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex) {
     // Pause tasking on processor.
     threadLists[procIndex].TaskingEnabled = false;
 
@@ -382,7 +262,7 @@ void tasking_t_schedule(thread_t *thread, uint32_t procIndex) {
     thread->SchedNext->SchedPrev = thread;
     thread->SchedPrev = threadLists[procIndex].CurrentThread;
     threadLists[procIndex].CurrentThread->SchedNext = thread;
-    
+
     // Resume tasking on processor.
     threadLists[procIndex].TaskingEnabled = true;
 }
@@ -415,8 +295,8 @@ static void kernel_main_thread(void) {
 
     // Create userspace process.
     kprintf("Creating userspace process...\n");
-    process_t *initProcess = tasking_p_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
-    tasking_t_schedule(initProcess->MainThread, 2);
+    process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
+    tasking_thread_schedule_proc(initProcess->MainThread, 1);
 
     kernel_late();
 }
@@ -431,7 +311,32 @@ static void kernel_idle_thread(uintptr_t procIndex) {
     }
 }
 
+static void tasking_exec(uint32_t procIndex) {
+    // Send EOI.
+    irqs_eoi(0);
 
+    // Change out paging structure and stack.
+    paging_change_directory(threadLists[procIndex].CurrentThread->Parent->PagingTablePhys);
+#ifdef X86_64
+    asm volatile ("mov %0, %%rsp" : : "r"(threadLists[procIndex].CurrentThread->StackPointer));
+#else
+    asm volatile ("mov %0, %%esp" : : "r"(threadLists[procIndex].CurrentThread->StackPointer));
+#endif
+    asm volatile ("jmp _irq_exit");
+}
+
+void tasking_tick(irq_regs_t *regs, uint32_t procIndex) {
+    // Is tasking enabled both globally and for the current processor?
+    if (!taskingEnabled || !threadLists[procIndex].TaskingEnabled)
+        return;
+
+    // Save stack pointer and move to next thread in schedule.
+    threadLists[procIndex].CurrentThread->StackPointer = (uintptr_t)regs;
+    threadLists[procIndex].CurrentThread = threadLists[procIndex].CurrentThread->SchedNext;
+
+    // Jump to next task.
+    tasking_exec(procIndex);
+}
 
 void tasking_init_ap(void) {
     // Disable interrupts, we don't want to screw the following code up.
@@ -453,7 +358,7 @@ void tasking_init_ap(void) {
     gdt_tss_set_kernel_stack(gdt_tss_get(), kernelStack);
 
     // Create idle kernel thread.
-    thread_t *idleThread = tasking_t_create(kernelProcess, "core_idle", kernel_idle_thread, proc->Index, 0, 0);
+    thread_t *idleThread = tasking_thread_create_kernel("core_idle", kernel_idle_thread, proc->Index, 0, 0);
     threadLists[proc->Index].CurrentThread = idleThread;
     idleThread->SchedNext = idleThread;
     idleThread->SchedPrev = idleThread;
@@ -485,7 +390,7 @@ void tasking_init(void) {
 
     // Create main kernel process.
     kprintf("Creating kernel process...\n");
-    tasking_p_create(NULL, "kernel", false, "kernel_main", kernel_main_thread, 0, 0, 0);
+    tasking_process_create(NULL, "kernel", false, "kernel_main", kernel_main_thread, 0, 0, 0);
     threadLists[0].CurrentThread = kernelProcess->MainThread;
     kernelProcess->MainThread->SchedNext = kernelProcess->MainThread;
     kernelProcess->MainThread->SchedPrev = kernelProcess->MainThread;
