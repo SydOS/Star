@@ -206,8 +206,8 @@ _ap_bootstrap_higherhalf:
 
     ; Get stack address. Address is placed in RAX.
     mov rdi, rax
-    extern ap_get_stack
-    call ap_get_stack
+    extern smp_ap_get_stack
+    call smp_ap_get_stack
 
     ; Load up stack for this processor.
     mov rsp, rax
@@ -215,8 +215,8 @@ _ap_bootstrap_higherhalf:
     mov rbp, rsp
 
     ; Pop into C code.
-    extern ap_main
-    call ap_main
+    extern smp_ap_main
+    call smp_ap_main
 
     ; Never should get here, but if we do halt the processor.
     jmp $

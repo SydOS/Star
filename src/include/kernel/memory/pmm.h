@@ -54,6 +54,7 @@ extern mem_info_t memInfo;
 extern bool pmm_dma_get_free_frame(uintptr_t *frameOut);
 extern void pmm_dma_set_frame(uintptr_t frame, bool status);
 extern uintptr_t pmm_dma_get_phys(uintptr_t frame);
+extern uintptr_t pmm_dma_get_virtual(uintptr_t frame);
 extern uint32_t pmm_frames_available();
 extern uint64_t pmm_pop_frame();
 extern void pmm_push_frame(uint64_t frame);

@@ -2,33 +2,107 @@
 #define GDT_H
 
 #include <main.h>
+#include <kernel/tss.h>
+
+#ifdef X86_64
+#define GDT32_ENTRIES 5
+#define GDT64_ENTRIES 7
+#else
+#define GDT32_ENTRIES 6
+#endif
+
+#define GDT_PRIVILEGE_KERNEL    0x0
+#define GDT_PRIVILEGE_USER      0x3
 
 // This structure contains the value of one GDT entry.
 // We use the attribute 'packed' to tell GCC not to change
 // any of the alignment in the structure.
-struct gdt_entry {
-    uint16_t limitLow;          // The lower 16 bits of the limit.
-    uint16_t baseLow;           // The lower 16 bits of the base.
-    uint8_t  baseMiddle;        // The next 8 bits of the base.
-    uint8_t  access;            // Access flags, determine what ring this segment can be used in.
-    uint8_t  granularity;       // Limit and flags
-    uint8_t  baseHigh;          // The last 8 bits of the base.
-} __attribute__((packed));
-typedef struct gdt_entry gdt_entry_t;
+typedef struct {
+    // Low 16 bits of limit.
+    uint16_t LimitLow : 16;
+
+    // Low 24 bits of base address.
+    uint32_t BaseLow : 24;
+
+    // Access bits.
+    bool Accessed : 1;
+    bool Writeable : 1;
+    bool DirectionConforming : 1;
+    bool Executable : 1;
+    bool DescriptorBit : 1;
+    uint8_t Privilege : 2;
+    bool Present : 1;
+
+    // High 4 bits of limit.
+    uint8_t LimitHigh : 4;
+
+    // Flags bits.
+    uint8_t ReservedZero : 1;
+    bool Is64Bits : 1;
+    bool Is32Bits : 1;
+    bool IsLimit4K : 1;
+
+    // High 8 bits of base address.
+    uint8_t BaseHigh : 8;
+} __attribute__((packed)) gdt_entry_t;
 
 // This struct describes a GDT pointer. It points to the start of
 // our array of GDT entries, and is in the format required by the
 // lgdt instruction.
-struct gdt_ptr {
-    uint16_t limit;               // The upper 16 bits of all selector limits.
-    uintptr_t base;               // The address of the first gdt_entry_t struct.
-} __attribute__((packed));
-typedef struct gdt_ptr gdt_ptr_t;
+typedef struct {
+    // The upper 16 bits of all selector limits.
+    uint16_t Limit;
 
-#define GDT32_ENTRIES 5
-#define GDT64_ENTRIES 5
+    // The address of the first GDT entry.     
+    gdt_entry_t *Table;          
+    //uintptr_t Base;
+} __attribute__((packed)) gdt_ptr_t;
 
-extern void gdt_load();
-extern void gdt_init();
+#define GDT32_SIZE  (sizeof(gdt_entry_t) * GDT32_ENTRIES)
+
+#ifdef X86_64
+#define GDT64_SIZE  (sizeof(gdt_entry_t) * GDT64_ENTRIES)
+#endif
+
+#define GDT_NULL_INDEX          0
+#define GDT_KERNEL_CODE_INDEX   1
+#define GDT_KERNEL_DATA_INDEX   2
+
+// User-mode code and data segments have to be flipped in x64.
+#ifdef X86_64
+#define GDT_USER_DATA_INDEX     3
+#define GDT_USER_CODE_INDEX     4
+#else
+#define GDT_USER_CODE_INDEX     3
+#define GDT_USER_DATA_INDEX     4
+#endif
+
+#define GDT_TSS_INDEX           5
+
+// GDT offsets. SYSCALL requires user code to be after user data for some reason.
+#define GDT_NULL_OFFSET         (uint8_t)(GDT_NULL_INDEX * sizeof(gdt_entry_t))
+#define GDT_KERNEL_CODE_OFFSET  (uint8_t)(GDT_KERNEL_CODE_INDEX * sizeof(gdt_entry_t))
+#define GDT_KERNEL_DATA_OFFSET  (uint8_t)(GDT_KERNEL_DATA_INDEX * sizeof(gdt_entry_t))
+#define GDT_USER_DATA_OFFSET    (uint8_t)(GDT_USER_DATA_INDEX * sizeof(gdt_entry_t))
+#define GDT_USER_CODE_OFFSET    (uint8_t)(GDT_USER_CODE_INDEX * sizeof(gdt_entry_t))
+#define GDT_TSS_OFFSET          (uint8_t)(GDT_TSS_INDEX * sizeof(gdt_entry_t))
+
+extern gdt_entry_t *gdt_get_bsp32(void);
+#ifdef X86_64
+extern gdt_entry_t *gdt_get_bsp64(void);
+#endif
+
+extern void gdt_tss_set_kernel_stack(tss_t *tss, uintptr_t stack);
+extern uintptr_t gdt_tss_get_kernel_stack(tss_t *tss);
+
+extern gdt_ptr_t gdt_create_ptr(gdt_entry_t gdt[], uint8_t entries);
+extern void gdt_load(gdt_entry_t gdt[], uint8_t entries);
+extern void gdt_tss_load(tss_t *tss);
+
+extern gdt_entry_t *gdt_get(void);
+extern tss_t *gdt_tss_get(void);
+
+extern void gdt_fill(gdt_entry_t gdt[], bool is64Bits, tss_t *tss);
+extern void gdt_init_bsp(void);
 
 #endif

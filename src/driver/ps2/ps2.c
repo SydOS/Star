@@ -3,13 +3,10 @@
 #include <kprint.h>
 #include <tools.h>
 #include <driver/ps2/ps2.h>
-#include <driver/ps2/keyboard.h>
-#include <driver/ps2/mouse.h>
+#include <driver/ps2/ps2_keyboard.h>
+#include <driver/ps2/ps2_mouse.h>
 
-// Ports used for comms with controller.
-
-
-void ps2_wait_send()
+void ps2_wait_send(void)
 {
     // Input buffer must be clear before sending data.
     uint32_t timeout = 10000;
@@ -18,7 +15,7 @@ void ps2_wait_send()
             return;
 }
 
-void ps2_wait_receive()
+void ps2_wait_receive(void)
 {
     // Output buffer must be set before we can get data.
     uint32_t timeout = 10000;
@@ -69,21 +66,25 @@ uint8_t ps2_send_data_response(uint8_t data)
     return inb(PS2_DATA_PORT);
 }
 
-uint8_t ps2_get_data()
+uint8_t ps2_get_data(void)
 {
     // Wait for and get response.
     ps2_wait_receive();
     return inb(PS2_DATA_PORT);
 }
 
-uint8_t ps2_get_status()
+uint8_t ps2_get_status(void)
 {
     // Return status register.
     return inb(PS2_CMD_PORT);
 }
 
-void ps2_init()
-{
+void ps2_reset_system(void) {
+    // Bring reset line low.
+    ps2_send_cmd(0xFE);
+}
+
+void ps2_init(void) {
     // Disable ports.
     ps2_send_cmd(PS2_CMD_DISABLE_KEYBPORT);
     ps2_send_cmd(PS2_CMD_DISABLE_MOUSEPORT);
@@ -187,8 +188,6 @@ void ps2_init()
     if(!(test_byte == PS2_DATA_RESPONSE_SELFTEST_PASS || test_byte == PS2_DATA_RESPONSE_ACK))
         kprintf("Mouse self-test failed!\n");
 
-    // Initialize devices.
-    ps2_keyboard_init();
     ps2_mouse_init();
 
     // Read the current configuration byte.
@@ -204,5 +203,7 @@ void ps2_init()
     config = ps2_send_cmd_response(PS2_CMD_READ_BYTE);
     //kprintf("New PS/2 configuration byte: 0x%X\n", config);
 
+    // Initialize devices.
+    ps2_keyboard_init();
     kprintf("PS/2 controller initialized!\n");
 }

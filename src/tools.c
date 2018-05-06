@@ -1,5 +1,5 @@
 #include <main.h>
-#include <kernel/pit.h>
+#include <kernel/timer.h>
 
 /**
  * Convert int to char array
@@ -76,9 +76,9 @@ uint32_t maxrand(uint32_t seed, uint32_t max) {
 void sleep(uint32_t ms)
 {
 	// 1 tick = 1 ms.
-	uint64_t startTick = pit_ticks();
+	uint64_t startTick = timer_ticks();
 	uint64_t endTick = startTick + ms;
-	uint32_t tick = pit_ticks();
+	uint32_t tick = timer_ticks();
 	while (tick < endTick)
-		tick = pit_ticks();
+		tick = timer_ticks();
 }

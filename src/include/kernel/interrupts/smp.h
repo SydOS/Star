@@ -13,6 +13,21 @@
 
 #define SMP_AP_STACK_SIZE           0x4000
 
-extern void smp_init();
+// Struct for mapping APIC IDs to a 0-based index.
+typedef struct smp_proc_t {
+    // Link to next processor.
+    struct smp_proc_t *Next;
+
+    // APIC ID and index.
+    uint32_t ApicId;
+    uint32_t Index;
+
+    // Set once processor is started up.
+    bool Started;
+} smp_proc_t;
+
+extern uint32_t smp_get_proc_count(void);
+extern smp_proc_t *smp_get_proc(uint32_t apicId);
+extern void smp_init(void);
 
 #endif

@@ -185,17 +185,17 @@ _ap_bootstrap_higherhalf:
 
     ; Get stack address. Address is placed in EAX.
     push eax
-    extern ap_get_stack
-    call ap_get_stack
+    extern smp_ap_get_stack
+    call smp_ap_get_stack
 
     ; Load up stack for this processor.
     mov esp, eax
     add esp, 0x4000
-    ;mov ebp, esp
+    mov ebp, esp
 
     ; Pop into C code.
-    extern ap_main
-    call ap_main
+    extern smp_ap_main
+    call smp_ap_main
 
     ; Never should get here, but if we do halt the processor.
     jmp $

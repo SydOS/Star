@@ -4,6 +4,7 @@
 
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
+#include <kernel/lock.h>
 
 // Constants determined by linker and early boot.
 extern uint32_t MULTIBOOT_INFO;
@@ -27,6 +28,9 @@ extern bool PAE_ENABLED;
 // Used to store info about memory in the system.
 mem_info_t memInfo;
 uint32_t earlyPagesLast;
+
+// Locks.
+static lock_t pagingLock = { };
 
 // DMA bitmap. Each bit represents a 64KB page, in order.
 static bool dmaFrames[PMM_NO_OF_DMA_FRAMES];
@@ -77,7 +81,17 @@ void pmm_dma_set_frame(uintptr_t frame, bool status) {
 }
 
 uintptr_t pmm_dma_get_phys(uintptr_t frame) {
+    // If specified frame is 0, just return 0.
+    if (!frame)
+        return 0;
     return frame - memInfo.kernelVirtualOffset;
+}
+
+uintptr_t pmm_dma_get_virtual(uintptr_t frame) {
+    // If specified frame is 0, just return 0.
+    if (!frame)
+        return 0;
+    return frame + memInfo.kernelVirtualOffset;
 }
 
 /**
@@ -158,12 +172,16 @@ uint32_t pmm_pop_frame_nonpae() {
     if (pmm_frames_available() == 0)
         panic("PMM: No more page frames!\n");
 
+    // Lock to prevent concurrent pops.
+    spinlock_lock(&pagingLock);
+
     // Get frame off stack.
     uintptr_t frame = *pageFrameStack;
 
     // Decrement stack and return frame.
     pageFrameStack--;
     pageFramesAvailable--;
+    spinlock_release(&pagingLock);
     return frame;
 }
 
@@ -180,6 +198,9 @@ uint32_t pmm_frames_available_pae() {
  * @return 		The physical address of the page frame.
  */
 uint64_t pmm_pop_frame() {
+    // Lock to prevent concurrent pops.
+    spinlock_lock(&pagingLock);
+
 #ifndef X86_64 // PAE does not apply to the 64-bit kernel.
     // Are there PAE frames available? If so pop one of those.
     if (pmm_frames_available_pae()) {
@@ -189,6 +210,7 @@ uint64_t pmm_pop_frame() {
         // Decrement stack and return frame.
         pageFrameStackPae--;
         pageFramesPaeAvailable--;
+        spinlock_release(&pagingLock);
         return frame;
     }
 #endif
@@ -203,6 +225,7 @@ uint64_t pmm_pop_frame() {
     // Decrement stack and return frame.
     pageFrameStack--;
     pageFramesAvailable--;
+    spinlock_release(&pagingLock);
     return frame;
 }
 
@@ -211,6 +234,9 @@ uint64_t pmm_pop_frame() {
  * @param frame	The physical address of the page frame to push.
  */
 void pmm_push_frame(uint64_t frame) {
+    // Lock to prevent concurrent pushes.
+    spinlock_lock(&pagingLock);
+
 #ifndef X86_64 // PAE does not apply to the 64-bit kernel.
     // Is the frame above 4GB? If so, its a PAE frame.
     if (frame >= PAGE_SIZE_4G) {
@@ -226,6 +252,7 @@ void pmm_push_frame(uint64_t frame) {
         // Push frame to stack.
         *pageFrameStackPae = frame;
         pageFramesPaeAvailable++;
+        spinlock_release(&pagingLock);
         return;
     }
 #endif
@@ -238,6 +265,7 @@ void pmm_push_frame(uint64_t frame) {
     // Push frame to stack.
     *pageFrameStack = (uintptr_t)frame;
     pageFramesAvailable++;
+    spinlock_release(&pagingLock);
 }
 
 /**
@@ -453,7 +481,7 @@ static void pmm_build_stacks() {
  * Initializes the physical memory manager.
  */
 void pmm_init() {
-    kprintf("PMM: Initializing physical memory manager...\n");
+    kprintf("\e[35mPMM: Initializing physical memory manager...\n");
 
     // Store away Multiboot info.
     memInfo.mbootInfo = (multiboot_info_t*)(MULTIBOOT_INFO + (uintptr_t)&KERNEL_VIRTUAL_OFFSET);
@@ -488,5 +516,5 @@ void pmm_init() {
 
     // Build stacks.
     pmm_build_stacks();
-    kprintf("PMM: Initialized!\n");
+    kprintf("PMM: Initialized!\e[0m\n");
 }

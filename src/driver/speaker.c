@@ -2,7 +2,7 @@
 #include <tools.h>
 #include <io.h>
 #include <driver/speaker.h>
-#include <kernel/pit.h>
+#include <driver/pit.h>
 
 // https://wiki.osdev.org/PC_Speaker
 

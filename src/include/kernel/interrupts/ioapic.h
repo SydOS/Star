@@ -3,13 +3,6 @@
 
 #include <main.h>
 
-// Address that the I/O APIC is mapped to.
-#ifdef X86_64
-#define IOAPIC_ADDRESS  0xFFFFFF00FF0A0000
-#else
-#define IOAPIC_ADDRESS  0xFF0A0000
-#endif
-
 // I/O APIC memory registers.
 #define IOAPIC_IOREGSL      0x00 // I/O Register Select (index).
 #define IOAPIC_IOWIN        0x10 // I/O Window (data).
@@ -80,11 +73,11 @@ struct ioapic_redirection_entry {
 typedef struct ioapic_redirection_entry ioapic_redirection_entry_t;
 
 extern uint32_t ioapic_remap_interrupt(uint32_t interrupt);
-extern bool ioapic_supported();
-extern uint8_t ioapic_id();
-extern uint8_t ioapic_version();
-extern uint8_t ioapic_max_interrupts();
+extern bool ioapic_supported(void);
+extern uint8_t ioapic_id(void);
+extern uint8_t ioapic_version(void);
+extern uint8_t ioapic_max_interrupts(void);
 extern void ioapic_enable_interrupt(uint8_t interrupt, uint8_t vector);
-extern void ioapic_init();
+extern void ioapic_init(void);
 
 #endif

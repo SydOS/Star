@@ -6,10 +6,8 @@
 // Address that the local APIC is mapped to.
 
 #ifdef X86_64
-#define LAPIC_ADDRESS           0xFFFFFF00FF0B0000
 #define LAPIC_BASE_ADDR_MASK    0xFFFFFFFFFFFFF000
 #else
-#define LAPIC_ADDRESS           0xFF0B0000
 #define LAPIC_BASE_ADDR_MASK    0xFFFFF000
 #endif
 
@@ -43,9 +41,22 @@
 #define LAPIC_REG_LVT_LINT0             0x350
 #define LAPIC_REG_LVT_LINT1             0x360
 #define LAPIC_REG_LVT_ERROR             0x370
-#define LAPIC_REG_TIMER_INITIAL_COUNT   0x380
-#define LAPIC_REG_TIMER_CURRENT_COUNT   0x390
-#define LAPIC_REG_TIMER_DIVIDE_CONF     0x3E0
+#define LAPIC_REG_TIMER_INITIAL         0x380
+#define LAPIC_REG_TIMER_CURRENT         0x390
+#define LAPIC_REG_TIMER_DIVIDE          0x3E0
+
+#define LAPIC_SPURIOUS_INT              0xFF
+
+#define LAPIC_TIMER_MASKED          0x10000        
+
+#define LAPIC_TIMER_MODE_ONESHOT    0x00000
+#define LAPIC_TIMER_MODE_PERIODIC   0x20000
+#define LAPIC_TIMER_MODE_TSC        0x40000
+
+#define LAPIC_TIMER_DIVIDE2         0x0
+#define LAPIC_TIMER_DIVIDE4         0x1
+#define LAPIC_TIMER_DIVIDE8         0x2
+#define LAPIC_TIMER_DIVIDE16        0x3
 
 // Delivery mode.
 enum LAPIC_DELIVERY_MODE {
@@ -106,59 +117,62 @@ enum LAPIC_DEST_SHORTHAND {
 };
 
 // LAPIC ICR packet.
-struct lapic_icr {
+typedef struct {
     // The vector number of the interrupt being sent.
-    uint8_t vector                  : 8;
+    uint8_t Vector                  : 8;
 
     // Specifies the type of IPI to be sent. This field is also know as the IPI message type field.
-    uint8_t deliveryMode            : 3;
+    uint8_t DeliveryMode            : 3;
 
     // Selects either physical (0) or logical (1) destination mode.
-    uint8_t destinationMode         : 1;
+    uint8_t DestinationMode         : 1;
 
     // Indicates the IPI delivery status.
-    uint8_t deliveryStatus          : 1;
+    uint8_t DeliveryStatus          : 1;
 
     // Reserved.
-    uint8_t reserved1               : 1;
+    uint8_t Reserved1               : 1;
 
     // For the INIT level de-assert delivery mode this flag must be set to 0; for all other delivery
     // modes it must be set to 1. (This flag has no meaning in Pentium 4 and Intel Xeon processors,
     // and will always be issued as a 1.)
-    uint8_t level                   : 1;
+    uint8_t Level                   : 1;
 
     // Selects the trigger mode when using the INIT level de-assert delivery mode: edge (0) or level (1).
     // It is ignored for all other delivery modes. (This flag has no meaning in Pentium 4 and Intel Xeon processors,
     // and will always be issued as a 0.)
-    uint8_t triggerMode             : 1;
+    uint8_t TriggerMode             : 1;
 
     // Reserved.
-    uint8_t reserved2               : 2;
+    uint8_t Reserved2               : 2;
 
     // Indicates whether a shorthand notation is used to specify the destination of the interrupt and,
     // if so, which shorthand is used.
-    uint8_t destinationShorthand    : 2;
+    uint8_t DestinationShorthand    : 2;
     
     // Reserved.
-    uint64_t reserved3              : 36;
+    uint64_t Reserved3              : 36;
 
     // Specifies the target processor or processors. This field is only used when the destination
     // shorthand field is set to 00B.
-    uint8_t destination             : 8;
-} __attribute__((packed));
-typedef struct lapic_icr lapic_icr_t;
+    uint8_t Destination             : 8;
+} __attribute__((packed)) lapic_icr_t;
 
-extern bool lapic_supported();
-extern bool lapic_x2apic();
-extern bool lapic_enabled();
+extern bool lapic_supported(void);
+extern bool lapic_x2apic(void);
+extern bool lapic_enabled(void);
 extern void lapic_send_init(uint8_t apic);
 extern void lapic_send_startup(uint8_t apic, uint8_t vector);
-extern uint32_t lapic_id();
-extern uint8_t lapic_version();
-extern uint8_t lapic_max_lvt();
-extern void lapic_eoi();
-extern void lapic_create_spurious_interrupt(uint8_t interrupt);
-extern void lapic_setup();
-extern void lapic_init();
+
+extern uint32_t lapic_timer_get_rate(void);
+extern void lapic_timer_start(uint32_t rate);
+
+extern uint32_t lapic_id(void);
+extern uint8_t lapic_version(void);
+extern uint8_t lapic_max_lvt(void);
+extern void lapic_eoi(void);
+extern int16_t lapic_get_irq(void);
+extern void lapic_setup(void);
+extern void lapic_init(void);
 
 #endif

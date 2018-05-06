@@ -1,13 +1,16 @@
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
+#include <string.h>
 
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/pmm.h>
+#include <kernel/lock.h>
 
 // Based on code from https://github.com/CCareaga/heap_allocator. Licensed under the MIT.
 
+static lock_t kheap_lock = { };
 static size_t currentKernelHeapSize;
 static kheap_bin_t bins[KHEAP_BIN_COUNT];
 
@@ -185,7 +188,7 @@ static bool kheap_expand(size_t size) {
         currentKernelHeapSize += PAGE_SIZE_4K;
     }
 
-    kprintf("Heap expanded by 4KB to %u!\n", currentKernelHeapSize);
+    //kprintf("KHEAP: Heap expanded by 4KB to %u bytes!\n", currentKernelHeapSize);
     return true;
 }
 
@@ -194,6 +197,9 @@ static void kheap_contract() {
 }
 
 void *kheap_alloc(size_t size) {
+    // Lock.
+    spinlock_lock(&kheap_lock);
+
     // Get bin index that the chunk should be in
     uint32_t binIndex = kheap_get_bin_index(size);
 
@@ -206,11 +212,13 @@ void *kheap_alloc(size_t size) {
 
     // If a chunk still couldn't be found, expand heap.
     if (node == NULL) {
-        if (!kheap_expand(size))
+        if (!kheap_expand(size)) {
+            kprintf("KHEAP: Failed to expand heap!\n");
             return NULL;
+        }
 
-        // Get bin index that the chunk should be in
-        binIndex = kheap_get_bin_index(size);
+        // Start at index 0.
+        binIndex = 0;
 
         // Try to find a good fitting chunk.
         node = kheap_get_best_fit(binIndex, size);
@@ -221,6 +229,8 @@ void *kheap_alloc(size_t size) {
     }
 
     // If the difference between the found and requested chunks is bigger than overhead, then split the chunk.
+    if (node == NULL)
+        kheap_dump_all_bins();
     if ((node->size - size) > (KHEAP_OVERHEAD + 4)) {
         // Determine where to split at.
         kheap_node_t *splitNode = (kheap_node_t*)(((uint8_t*)node + KHEAP_OVERHEAD) + size);
@@ -256,10 +266,16 @@ void *kheap_alloc(size_t size) {
     // As the chunk is in use, clear the next and previous node fields.
     node->previousNode = NULL;
     node->nextNode = NULL;
+
+    // Unlock and return allocation.
+    spinlock_release(&kheap_lock);
     return (uint8_t*)node + KHEAP_HEADER_OFFSET;
 }
 
 void kheap_free(void *ptr) {
+    // Lock.
+    spinlock_lock(&kheap_lock);
+
     // Get header of node to free.
     kheap_node_t *header = (kheap_node_t*)((uint8_t*)ptr - KHEAP_HEADER_OFFSET);
 
@@ -267,6 +283,9 @@ void kheap_free(void *ptr) {
     if (header == (kheap_node_t*)KHEAP_START) {
         header->hole = true;
         kheap_add_node(kheap_get_bin_index(header->size), header);
+        
+        // Unlock.
+        spinlock_release(&kheap_lock);
         return;
     }
 
@@ -309,10 +328,38 @@ void kheap_free(void *ptr) {
     // Chunk is now a hole, place it in correct bin.
     header->hole = true;
     kheap_add_node(kheap_get_bin_index(header->size), header);
+
+    // Unlock.
+    spinlock_release(&kheap_lock);
 }
 
-void kheap_init() {
-    kprintf("KHEAP: Initializing at 0x%p...\n", KHEAP_START);
+void *kheap_realloc(void *oldPtr, size_t newSize) {
+    // Allocate new space using the new size.
+    void *newPtr = kheap_alloc(newSize);
+    if (newPtr == NULL)
+        return NULL;
+
+    // If the old space is a valid pointer, copy data and free old space when done.
+    if (oldPtr != NULL) {
+        // Get header of existing node.
+        kheap_node_t *header = (kheap_node_t*)((uint8_t*)oldPtr - KHEAP_HEADER_OFFSET);
+
+        // Copy data.
+        size_t copySize = header->size;
+        if (newSize < header->size)
+            copySize = newSize;
+        memcpy(newPtr, oldPtr, copySize);
+
+        // Free old node.
+        kheap_free(oldPtr);
+    }
+
+    // Return new node.
+    return newPtr;
+}
+
+void kheap_init(void) {
+    kprintf("\e[91mKHEAP: Initializing at 0x%p...\n", KHEAP_START);
 
     // Start with 4MB heap.
     currentKernelHeapSize = KHEAP_INITIAL_SIZE;
@@ -383,5 +430,5 @@ void kheap_init() {
     kheap_free(big);
     kheap_free(test2);
     kheap_free(test4);
-    kprintf("KHEAP: Initialized!\n");
+    kprintf("KHEAP: Initialized!\e[0m\n");
 }
