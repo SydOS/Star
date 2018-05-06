@@ -294,9 +294,9 @@ static void kernel_main_thread(void) {
     tasking_unfreeze();
 
     // Create userspace process.
-    kprintf("Creating userspace process...\n");
-    process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
-    tasking_thread_schedule_proc(initProcess->MainThread, 0);
+   // kprintf("Creating userspace process...\n");
+    //process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
+    //tasking_thread_schedule_proc(initProcess->MainThread, 0);
     
     kernel_late();
 }
