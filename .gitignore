@@ -47,7 +47,9 @@ Thumbs.db
 docs/
 build/
 acpcia_build/
-.vscode/
+.vscode/launch.json
+.vscode/tasks.json
+os.iso
 
 # ACPICA cache
 LASTARCH
