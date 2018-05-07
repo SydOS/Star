@@ -92,7 +92,7 @@ void rtc_thread() {
 	while(true) {
 		rtc_get_time();
 		sleep(500);
-		kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
+		//kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 	}
 }
 

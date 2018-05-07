@@ -177,6 +177,8 @@ enum {
 #define FLOPPY_VERSION_NONE     0xFF
 #define FLOPPY_VERSION_ENHANCED 0x90
 
+extern int8_t floppy_read(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize);
+
 extern int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize);
 extern int8_t floppy_read_track(uint8_t drive, uint8_t track, uint8_t buffer[], uint16_t bufferSize);
 

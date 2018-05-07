@@ -26,6 +26,7 @@
 #define ATA_H
 
 #include <main.h>
+#include <driver/pci.h>
 
 // Primary PATA interface ports.
 #define ATA_PRI_COMMAND_PORT    0x1F0
@@ -139,6 +140,6 @@ typedef struct {
     ata_channel_t Secondary;
 } ata_device_t;
 
-//extern void ata_init();
+extern bool ata_init(pci_device_t *pciDevice);
 
 #endif

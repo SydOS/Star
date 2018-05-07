@@ -1,5 +1,5 @@
 /*
- * File: storage.h
+ * File: gpt.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,23 +22,12 @@
  * SOFTWARE.
  */
 
-#ifndef STORAGE_H
-#define STORAGE_H
+#ifndef GPT_H
+#define GPT_H
 
 #include <main.h>
+#include <driver/storage/storage.h>
 
-typedef struct storage_device_t {
-    struct storage_device_t *Next;
-    struct storage_device_t *Prev;
-
-    void *Device;
-
-    void (*Read)(struct storage_device_t *storageDevice, uint64_t startByte, uint32_t count, uint8_t *outData);
-    void (*Write)(struct storage_device_t *storageDevice, uint64_t startByte, uint32_t count, const uint8_t *data);
-    uint64_t (*GetSize)(struct storage_device_t *storageDevice);
-} storage_device_t;
-
-extern storage_device_t *storageDevices;
-extern void storage_register(storage_device_t *device);
+extern bool gpt_init(storage_device_t *storageDevice);
 
 #endif

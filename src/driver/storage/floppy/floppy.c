@@ -29,6 +29,7 @@
 #include <string.h>
 #include <driver/storage/floppy.h>
 
+#include <driver/storage/storage.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>
@@ -271,6 +272,10 @@ static bool floppy_recalibrate(uint8_t drive) {
 	return false;
 }
 
+static bool floppy_storage_read(storage_device_t *storageDevice, uint64_t startByte, uint32_t count, uint8_t *outData) {
+	floppy_read(0, startByte / 512, outData, count);
+}
+
 /**
  * Initializes the floppy driver.
  */
@@ -318,7 +323,7 @@ void floppy_init() {
 	floppy_recalibrate(0);
 	floppy_set_motor(0, false);
 
-	uint8_t *data = kheap_alloc(FLOPPY_DMALENGTH);
+	/*uint8_t *data = kheap_alloc(FLOPPY_DMALENGTH);
 	kprintf("Getting track 0...\n");
 	floppy_read_track(0, 0, data, FLOPPY_DMALENGTH);
 	floppy_set_motor(0, false);
@@ -332,6 +337,14 @@ void floppy_init() {
 	volumeName[11] = '\0';
 
 	// Print volume name.
-	kprintf("FAT12 volume string: %s\n", volumeName);
+	kprintf("FAT12 volume string: %s\n", volumeName);*/
+
+	// Register storage device.
+	storage_device_t *floppyStorageDevice = (storage_device_t*)kheap_alloc(sizeof(storage_device_t));
+	memset(floppyStorageDevice, 0, sizeof(storage_device_t));
+	floppyStorageDevice->Read = floppy_storage_read;
+
+	storage_register(floppyStorageDevice);
+
 	kprintf("FLOPPY: Initialized!\e[0m\n");
 }

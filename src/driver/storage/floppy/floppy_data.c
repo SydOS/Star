@@ -27,6 +27,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <string.h>
+#include <math.h>
 #include <driver/storage/floppy.h>
 
 #include <kernel/memory/pmm.h>
@@ -109,10 +110,10 @@ static uint8_t floppy_parse_error(uint8_t st0, uint8_t st1, uint8_t st2) {
 		kprintf("Drive not ready.\n");
 		error = 1;
 	}
-	//if (st1 & FLOPPY_ST1_MISSING_ADDR_MARK || st2 & FLOPPY_ST2_MISSING_DATA_MARK) {
-	//	kprintf("Missing address mark.\n");
-	//	error = 1;
-	//}
+	if (st1 & FLOPPY_ST1_MISSING_ADDR_MARK || st2 & FLOPPY_ST2_MISSING_DATA_MARK) {
+		kprintf("Missing address mark.\n");
+		error = 1;
+	}
 	if (st1 & FLOPPY_ST1_NOT_WRITABLE) {
 		kprintf("Disk is write-protected.\n");
 		error = 2;
@@ -190,6 +191,131 @@ bool floppy_seek(uint8_t drive, uint8_t track) {
 	return false;
 }
 
+// Read the specified sectors.
+int8_t floppy_read(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize) {
+	if (drive >= 4)
+		return -1;
+	//uint8_t st0, cyl = 0;
+
+	// Convert LBA to CHS.
+	uint16_t head = 0, track = 0, sector = 1;
+	floppy_lba_to_chs(sectorLba, &track, &head, &sector);
+
+	// Get required number of sectors.
+	uint16_t remainingSectors = DIVIDE_ROUND_UP(bufferSize, 512);
+
+	// Seek to track.	
+	if (!floppy_seek(drive, track))
+		return -1;
+
+	while (remainingSectors > 0) {
+		// Get sectors to read.
+		uint16_t maxSectors = remainingSectors;
+		if (maxSectors + sector > FLOPPY_SECTORS_PER_TRACK)
+			maxSectors = FLOPPY_SECTORS_PER_TRACK - sector - 1;
+
+		// Attempt to read sector.
+		for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
+			// Initialize DMA.
+			floppy_set_dma(false);
+
+			// Send read command to disk.
+			kprintf("Attempting to read head %u, track %u, sector %u...\n", head, track, sector);
+			floppy_write_data(FLOPPY_CMD_READ_DATA | FLOPPY_CMD_EXT_SKIP | FLOPPY_CMD_EXT_MFM | FLOPPY_CMD_EXT_MT);
+			floppy_write_data(head << 2 | drive);
+			floppy_write_data(track);
+			floppy_write_data(head);
+			floppy_write_data(sector);
+			floppy_write_data(FLOPPY_BYTES_SECTOR_512);
+			floppy_write_data((uint8_t)maxSectors);
+			floppy_write_data(FLOPPY_GAP3_3_5);
+			floppy_write_data(0xFF);
+
+			// Wait for IRQ.
+			floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
+			//floppy_sense_interrupt(&st0, &cyl);
+
+			// Get status registers.
+			uint8_t st0 = floppy_read_data();
+			uint8_t st1 = floppy_read_data();
+			uint8_t st2 = floppy_read_data();
+			uint8_t rTrack = floppy_read_data();
+			uint8_t rHead = floppy_read_data();
+			uint8_t rSector = floppy_read_data();
+			uint8_t bytesPerSector = floppy_read_data();
+
+			// Determine errors if any.
+			uint8_t error = floppy_parse_error(st0, st1, st2);
+
+			// If no error, we are done.
+			if (!error) {
+				// Copy data to buffer.
+				memcpy(buffer, floppyDmaBuffer, bufferSize);
+				return 0;
+			}
+			else if (error > 1) {
+				kprintf("Not retrying...\n");
+				return 2;
+			}
+
+			sleep(100);
+		}
+
+		remainingSectors -= maxSectors;
+	}
+
+	// Attempt to read sector.
+/*	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
+		sleep(100);
+
+		// Initialize DMA.
+		floppy_set_dma(false);
+
+		// Send read command to disk.
+		kprintf("Attempting to read head %u, track %u, sector %u...\n", head, track, sector);
+		floppy_write_data(FLOPPY_CMD_READ_DATA | FLOPPY_CMD_EXT_SKIP | FLOPPY_CMD_EXT_MFM | FLOPPY_CMD_EXT_MT);
+		floppy_write_data(head << 2 | drive);
+		floppy_write_data(track);
+		floppy_write_data(head);
+		floppy_write_data(sector);
+		floppy_write_data(FLOPPY_BYTES_SECTOR_512);
+		floppy_write_data(FLOPPY_SECTORS_PER_TRACK);
+		floppy_write_data(FLOPPY_GAP3_3_5);
+		floppy_write_data(0xFF);
+
+		// Wait for IRQ.
+		floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
+		//floppy_sense_interrupt(&st0, &cyl);
+
+		// Get status registers.
+		uint8_t st0 = floppy_read_data();
+		uint8_t st1 = floppy_read_data();
+		uint8_t st2 = floppy_read_data();
+		uint8_t rTrack = floppy_read_data();
+		uint8_t rHead = floppy_read_data();
+		uint8_t rSector = floppy_read_data();
+		uint8_t bytesPerSector = floppy_read_data();
+
+		// Determine errors if any.
+		uint8_t error = floppy_parse_error(st0, st1, st2);
+
+		// If no error, we are done.
+		if (!error) {
+			// Copy data to buffer.
+			memcpy(buffer, floppyDmaBuffer, bufferSize);
+			return 0;
+		}
+		else if (error > 1) {
+			kprintf("Not retrying...\n");
+			return 2;
+		}
+	}*/
+
+	// Failed.
+	kprintf("Read failed!\n");
+	return -1;
+}
+
 // Read the specified sector.
 int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize) {
 	if (drive >= 4)
@@ -198,7 +324,7 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], u
 
 	// Convert LBA to CHS.
 	uint16_t head = 0, track = 0, sector = 1;
-	floppy_lba_to_chs(sectorLba, &head, &track, &sector);
+	floppy_lba_to_chs(sectorLba, &track, &head, &sector);
 
 	// Seek to track.	
 	if (!floppy_seek(drive, track))
@@ -226,7 +352,7 @@ int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], u
 
 		// Wait for IRQ.
 		floppy_wait_for_irq(FLOPPY_IRQ_WAIT_TIME);
-		floppy_sense_interrupt(&st0, &cyl);
+		//floppy_sense_interrupt(&st0, &cyl);
 
 		// Get status registers.
 		st0 = floppy_read_data();

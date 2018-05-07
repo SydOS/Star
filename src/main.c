@@ -51,6 +51,9 @@
 
 #include <acpi.h>
 
+#include <driver/fs/fat.h>
+#include <driver/storage/storage.h>
+
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
 	// Disable interrupts.
@@ -193,6 +196,9 @@ void kernel_late() {
 
     // Ring serial terminals.
 	kprintf("\a");
+
+	// Mount? floppy drive.
+	fat_init(storageDevices);
 
 	char buffer[100];
 	while (true) {
