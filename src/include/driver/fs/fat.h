@@ -31,59 +31,97 @@
 #define FAT_DIRECTORY_ENTRY_SIZE    32
 
 typedef struct {
-    uint8_t BootHeader[3];
+    // Jump instruction.
+    uint8_t JumpInstruction[3];
 
-    char OemIdentifier[8];
+    // OEM name. Determines what system formatted the disk.
+    char OemName[8];
 
+    // Bytes per sector, typically 512.
     uint16_t BytesPerSector;
 
+    // Number of sectors per cluster, used for determining cluster size.
     uint8_t SectorsPerCluster;
-    uint16_t ReservedSectors;
+
+    // Number of reserved sectors, which is the number of sectors
+    // before the first FAT on disk.
+    uint16_t ReservedSectorsCount;
+
+    // Number of File Allocation Tables (FATs). Usually 2.
     uint8_t TableCount;
+
+    // Maximum amount of root directory entries in FAT12/FAT16.
+    // This is zero for FAT32.
     uint16_t MaxRootDirectoryEntries;
-    uint16_t TotalSectors16;
-    uint8_t MediaDescriptorType;
-    uint16_t TableSize16;
+
+    // Total number of sectors. FAT32 may set this value to zero.
+    // If zero, use the 32-bit count value.
+    uint16_t TotalSectors;
+
+    // Media descriptor.
+    uint8_t MediaType;
+
+    // Size of File Allocation Tables (FATs) in sectors.
+    // FAT32 sets this to zero.
+    uint16_t TableSize;
+
+    // Number of physical sectors per track on drives that use CHS.
     uint16_t SectorsPerTrack;
-    uint16_t HeadsSides;
+
+    // Number of heads for disks that use CHS.
+    uint16_t HeadCount;
+
+    // Number of hidden sectors preceding this FAT partition, or zero for unpartitioned disks.
     uint32_t HiddenSectors;
+
+    // Total number of sectors if it exceeds 65535.
     uint32_t TotalSectors32;
 } __attribute__((packed)) fat_bpb_header_t;
 
 typedef struct {
-    uint8_t DriverNumber;
-    uint8_t WindowsNtFlags;
-    uint8_t Signature;
-
-    char SerialNumber[4];
-    char VolumeLabel[11];
-    char SystemIdentifier[8];
-} __attribute__((packed)) fat_ebr_header_t;
-
-typedef struct {
-    fat_bpb_header_t BiosParameterBlock;
-    fat_ebr_header_t ExtendedBootRecord;
-} __attribute__((packed)) fat_disk_header_t;
-
-typedef struct {
-    uint32_t TotalSectors;
-    uint32_t TableSizeSectors;
+    // BIOS Parameter Block.
+    fat_bpb_header_t BPB;
     
+    // Physical drive number.
+    uint8_t DriveNumber;
 
-    uint16_t BytesPerSector;
+    // Reserved, generally used by Windows NT.
+    uint8_t Reserved;
 
-    uint32_t StartTableSector;
-    uint32_t StartDataSector;
+    // Extended boot signature. Should be either 0x29 or 0x28.
+    uint8_t ExtendedBootSignature;
 
-    uint32_t RootDirectorySizeSectors;
-    uint32_t StartRootDirectorySector;
-    uint16_t MaxRootDirectoryEntries;
+    // Volume serial number.
+    uint32_t SerialNumber;
 
-    uint32_t TotalClusters;
-    uint32_t TotalDataSectors;
+    // Volume label.
+    char VolumeLabel[11];
 
-    char VolumeName[12];
+    // Type of FAT, should be used for display only.
+    char FileSystemType[8];
+} __attribute__((packed)) fat_header_t;
+
+typedef struct {
+    // Header area.
+    fat_header_t Header;
+
+    // FAT starting sector and length in sectors.
+    uint32_t TableStart;
+    uint32_t TableLength;
+
+    // Root directory starting sector and length in sectors.
+    uint32_t RootDirectoryStart;
+    uint32_t RootDirectoryLength;
+
+    // Data area starting sector and length in sectors.
+    uint32_t DataStart;
+    uint32_t DataLength;
 } fat_t;
+
+typedef struct {
+    uint16_t Cluster1 : 12;
+    uint16_t Cluster2 : 12;
+} __attribute__((packed)) fat12_cluster_pair_t;
 
 typedef struct {
     char FileName[11];
