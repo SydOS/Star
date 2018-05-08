@@ -29,6 +29,14 @@
 
 #define FLOPPY_IRQ  6
 
+// Floppy drive types (from CMOS).
+#define FLOPPY_TYPE_NONE        0x0
+#define FLOPPY_TYPE_360_525     0x1
+#define FLOPPY_TYPE_1200_525    0x2
+#define FLOPPY_TYPE_720_35      0x3
+#define FLOPPY_TYPE_1440_35     0x4
+#define FLOPPY_TYPE_2880_35     0x5
+
 // Floppy registers.
 enum {
     FLOPPY_REG_SRA  = 0x3F0, // Status Register A, read-only.
@@ -163,12 +171,11 @@ enum {
 };
 
 // Floppy data rates.
-enum {
-    FLOPPY_DRATE_1MBPS      = 0x3,
-    FLOPPY_DRATE_500KBPS    = 0x0,
-    FLOPPY_DRATE_300KBPS    = 0x1,
-    FLOPPY_DRATE_250KBPS    = 0x2
-};
+#define FLOPPY_SPEED_500KBPS    0x0
+#define FLOPPY_SPEED_300KBPS    0x1
+#define FLOPPY_SPEED_250KBPS    0x2
+#define FLOPPY_SPEED_1MBPS      0x3
+
 
 #define FLOPPY_CMD_RETRY_COUNT  10
 #define FLOPPY_IRQ_WAIT_TIME    500
@@ -177,16 +184,28 @@ enum {
 #define FLOPPY_VERSION_NONE     0xFF
 #define FLOPPY_VERSION_ENHANCED 0x90
 
-extern int8_t floppy_read(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize);
 
-extern int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize);
-extern int8_t floppy_read_track(uint8_t drive, uint8_t track, uint8_t buffer[], uint16_t bufferSize);
+typedef struct {
+    uint16_t BaseAddress;
+    uint8_t Number;
+
+    uint8_t Version;
+    uint8_t Type;
+
+    uint8_t *DmaBuffer;
+} floppy_drive_t;
+
+
+//extern bool floppy_read_blocks(uint8_t drive, const uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length);
+
+
+extern bool floppy_seek(floppy_drive_t *floppyDrive, uint8_t track);
 
 extern void floppy_write_data(uint8_t data);
 extern uint8_t floppy_read_data();
 extern void floppy_sense_interrupt(uint8_t* st0, uint8_t* cyl);
 extern void floppy_set_motor(uint8_t drive, bool on);
 extern uint8_t floppy_version();
-extern void floppy_init();
+extern bool floppy_init(void);
 
 #endif

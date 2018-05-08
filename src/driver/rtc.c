@@ -46,7 +46,7 @@ uint8_t rtc_read(uint16_t reg) {
  * Converts BCD to human readable and comprehendable integers.
  * BCD is the time, written in hex. Like 0x32, 0x54, etc.
  */
-void rtc_bcd_to_int() {
+void rtc_bcd_to_int(void) {
 	rtc_time->seconds = (rtc_time->seconds & 0x0F) + ((rtc_time->seconds / 16) * 10);
     rtc_time->minutes = (rtc_time->minutes & 0x0F) + ((rtc_time->minutes / 16) * 10);
     rtc_time->hours = ( (rtc_time->hours & 0x0F) + (((rtc_time->hours & 0x70) / 16) * 10) ) | (rtc_time->hours & 0x80);
@@ -67,7 +67,7 @@ void rtc_get_time() {
 	rtc_time->year = rtc_read(0x09);
 
 	if(rtc_settings->binary_input == 0) {
-		rtc_bcd_to_int(rtc_time);
+		rtc_bcd_to_int();
 	}
 }
 
@@ -90,7 +90,7 @@ struct RTC_Status_Register_B* rtc_get_settings() {
  */
 void rtc_thread() {
 	while(true) {
-		rtc_get_time();
+		//rtc_get_time();
 		sleep(500);
 		//kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 	}

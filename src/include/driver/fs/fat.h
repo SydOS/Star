@@ -102,12 +102,19 @@ typedef struct {
 } __attribute__((packed)) fat_header_t;
 
 typedef struct {
+    uint16_t Cluster1 : 12;
+    uint16_t Cluster2 : 12;
+} __attribute__((packed)) fat12_cluster_pair_t;
+
+typedef struct {
     // Header area.
     fat_header_t Header;
 
     // FAT starting sector and length in sectors.
     uint32_t TableStart;
     uint32_t TableLength;
+
+    fat12_cluster_pair_t *Table;
 
     // Root directory starting sector and length in sectors.
     uint32_t RootDirectoryStart;
@@ -117,11 +124,6 @@ typedef struct {
     uint32_t DataStart;
     uint32_t DataLength;
 } fat_t;
-
-typedef struct {
-    uint16_t Cluster1 : 12;
-    uint16_t Cluster2 : 12;
-} __attribute__((packed)) fat12_cluster_pair_t;
 
 typedef struct {
     char FileName[11];
