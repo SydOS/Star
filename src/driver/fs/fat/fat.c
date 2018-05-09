@@ -62,7 +62,7 @@ bool fat_entry_read_fat12(fat12_t *fat, fat_dir_entry_t *entry, uint8_t *outBuff
     uint32_t totalClusters = DIVIDE_ROUND_UP(entry->Length > 0 ? entry->Length : length, bytesPerCluster);
 
     // Create list of clusters.
-    uint64_t *blocks = (uint64_t*)kheap_alloc(totalClusters);
+    uint64_t *blocks = (uint64_t*)kheap_alloc(totalClusters * sizeof(uint64_t));
     memset(blocks, 0, totalClusters);
     uint32_t remainingClusters = totalClusters;
     uint32_t offset = 0;
@@ -180,8 +180,13 @@ void fat_print_dir(fat12_t *fat, fat_dir_entry_t *directoryEntries, uint32_t dir
             uint32_t subCount = 0;
             fat_get_dir_fat12(fat, directoryEntries+i, &subEntries, &subCount);
             fat_print_dir(fat, subEntries, subCount, level+1);
+            kheap_free(subEntries);
         }
 
+        if (strcmp(fileName, "BEEMOVIE") == 0) {
+            uint8_t *bees = (uint8_t*)kheap_alloc(directoryEntries[i].Length);
+            fat_entry_read_fat12(fat, directoryEntries+i, bees, directoryEntries[i].Length);
+        }
     }
 }
 
@@ -205,6 +210,7 @@ bool fat_init(storage_device_t *storageDevice) {
     fatVolume->RootDirectoryLength = ((fatVolume->Header.BPB.MaxRootDirectoryEntries * sizeof(fat_dir_entry_t)) + (fatVolume->Header.BPB.BytesPerSector - 1)) / fatVolume->Header.BPB.BytesPerSector;
     fatVolume->DataStart = fatVolume->RootDirectoryStart + fatVolume->RootDirectoryLength;
     fatVolume->DataLength = fatVolume->Header.BPB.TotalSectors - fatVolume->DataStart;
+    kheap_free(fatHeader);
 
     char tempVolName[12];
     strncpy(tempVolName, fatVolume->Header.VolumeLabel, 11);
@@ -228,10 +234,12 @@ bool fat_init(storage_device_t *storageDevice) {
     memset(fatVolume->Table, 0, fat12ClustersLength);
     storageDevice->Read(storageDevice, fatVolume->TableStart * fatVolume->Header.BPB.BytesPerSector, fatVolume->Table, fat12ClustersLength);
 
-
     // Get root dir.
     fat_dir_entry_t *rootDirEntries;
     uint32_t rootDirEntriesCount = 0;
     fat_get_root_dir(fatVolume, &rootDirEntries, &rootDirEntriesCount);
     fat_print_dir(fatVolume, rootDirEntries, rootDirEntriesCount, 0);
+    kheap_free(rootDirEntries);
+    kheap_free(fatVolume->Table);
+    kheap_free(fatVolume);
 }
