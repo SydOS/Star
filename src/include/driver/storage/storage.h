@@ -33,7 +33,7 @@ typedef struct storage_device_t {
 
     void *Device;
 
-    void (*Read)(struct storage_device_t *storageDevice, uint64_t startByte, uint8_t *outBuffer, uint32_t length);
+    bool (*Read)(struct storage_device_t *storageDevice, uint64_t startByte, uint8_t *outBuffer, uint32_t length);
     void (*Write)(struct storage_device_t *storageDevice, uint64_t startByte, uint32_t count, const uint8_t *data);
     uint64_t (*GetSize)(struct storage_device_t *storageDevice);
 

@@ -99,7 +99,7 @@ typedef struct {
 
     // Type of FAT, should be used for display only.
     char FileSystemType[8];
-} __attribute__((packed)) fat_header_t;
+} __attribute__((packed)) fat12_header_t;
 
 typedef struct {
     uint16_t Cluster1 : 12;
@@ -107,13 +107,17 @@ typedef struct {
 } __attribute__((packed)) fat12_cluster_pair_t;
 
 typedef struct {
+    // Underlying storage device.
+    storage_device_t *Device;
+
     // Header area.
-    fat_header_t Header;
+    fat12_header_t Header;
 
     // FAT starting sector and length in sectors.
     uint32_t TableStart;
     uint32_t TableLength;
 
+    // FAT.
     fat12_cluster_pair_t *Table;
 
     // Root directory starting sector and length in sectors.
@@ -123,7 +127,7 @@ typedef struct {
     // Data area starting sector and length in sectors.
     uint32_t DataStart;
     uint32_t DataLength;
-} fat_t;
+} fat12_t;
 
 typedef struct {
     char FileName[11];
@@ -151,8 +155,8 @@ typedef struct {
     uint16_t LastModificationDate;
 
     uint16_t StartClusterLow;
-    uint32_t FileSize;
-} __attribute__((packed)) fat_directory_entry_t;
+    uint32_t Length;
+} __attribute__((packed)) fat_dir_entry_t;
 
 extern bool fat_init(storage_device_t *storageDevice);
 

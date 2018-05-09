@@ -39,29 +39,36 @@ static inline uint16_t fat_fat12_get_cluster(fat12_cluster_pair_t *clusters, uin
         return clusters[clusterNum / 2].Cluster1;
 }
 
-bool fat_read_entry(storage_device_t *storageDevice, fat_t *fat, fat_directory_entry_t *entry) {
-    if (entry->FileSize == 0)
-        return false;
+static inline uint32_t fat_fat12_get_num_clusters(fat12_t *fat, fat_dir_entry_t *entry) {
+    // Get clusters.
+    uint16_t cluster = entry->StartClusterLow;
+    uint32_t clusterCount = 0;
+    while (cluster >= 0x002 && cluster <= 0xFEF) {
+        // Get value of next cluster from FAT.
+        cluster = fat_fat12_get_cluster(fat->Table, cluster);
+        clusterCount++;
+    }
 
-    // Get the total clusters of the file.
+    return clusterCount;
+}
+
+bool fat_entry_read_fat12(fat12_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, uint32_t length) {
+    // Ensure length isn't bigger than the entry size, if the entry size isn't zero.
+    if (entry->Length > 0 && length > entry->Length)
+        length = entry->Length;
+
+    // Get the total clusters of the entry.
     uint16_t bytesPerCluster = fat->Header.BPB.SectorsPerCluster * fat->Header.BPB.BytesPerSector;
-    uint32_t totalClusters = DIVIDE_ROUND_UP(entry->FileSize, bytesPerCluster);
-
-    
-
-    // Get the total sectors of file.
-   // uint32_t totalSectors = DIVIDE_ROUND_UP(entry->FileSize, (fat->Header.BPB.SectorsPerCluster * fat->Header.BPB.BytesPerSector));
-
-    // Create space in memory.
-    uint8_t *data = (uint8_t*)kheap_alloc(entry->FileSize + 1);
-    memset(data, 0, entry->FileSize);
+    uint32_t totalClusters = DIVIDE_ROUND_UP(entry->Length > 0 ? entry->Length : length, bytesPerCluster);
 
     // Create list of clusters.
     uint64_t *blocks = (uint64_t*)kheap_alloc(totalClusters);
     memset(blocks, 0, totalClusters);
-    uint16_t cluster = entry->StartClusterLow;
     uint32_t remainingClusters = totalClusters;
     uint32_t offset = 0;
+
+    // Get clusters.
+    uint16_t cluster = entry->StartClusterLow;
     while (cluster >= 0x002 && cluster <= 0xFEF && remainingClusters) {
         // Get value of next cluster from FAT.
         uint16_t nextCluster = fat_fat12_get_cluster(fat->Table, cluster);
@@ -69,90 +76,133 @@ bool fat_read_entry(storage_device_t *storageDevice, fat_t *fat, fat_directory_e
         // Add cluster to block list.
         blocks[offset] = (fat->DataStart + cluster - 2) * bytesPerCluster;
 
-        if (cluster > 90)
-        {
-            int d = 0;
-        }
-
         offset++;
         cluster = nextCluster;
         remainingClusters--;
     }
 
     // Read blocks from storage device.
-    storageDevice->ReadBlocks(storageDevice, blocks, 1, totalClusters, data, entry->FileSize);
+    bool result = fat->Device->ReadBlocks(fat->Device, blocks, 1, totalClusters, outBuffer, length);
 
-  /*  uint8_t test[512];
+    // Free cluster list.
+    kheap_free(blocks);
+    return result;
+}
 
-    // Get each cluster in file.
-    uint16_t cluster = entry->StartClusterLow;
-    uint32_t remainingClusters = totalClusters;
-    uint32_t offset = 0;
-    while (cluster >= 0x002 && cluster <= 0xFEF && remainingClusters) {
-        // Get value of next cluster from FAT.
-        uint16_t nextCluster = fat_fat12_get_cluster(fat->Table, cluster);
+void fat_display_entries(fat_dir_entry_t *dirEntries, uint32_t entryCount) {
+    //for (uint32_t i = 0; i < entryCount)
+        //kprintf("FAT:  %s: %s");
+}
 
-        uint32_t size = remainingClusters * bytesPerCluster;
-        if (size > bytesPerCluster)
-            size = bytesPerCluster;
+bool fat_get_dir_fat12(fat12_t *fat, fat_dir_entry_t *directory, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount) {
+    // Get number of clusters directory consumes.
+    uint32_t clusterCount = fat_fat12_get_num_clusters(fat, directory);
 
-        // Get data contents of cluster.
-        //storageDevice->Read(storageDevice, (fat->DataStart + cluster - 2) * bytesPerCluster, size, data + offset);
-        storageDevice->Read(storageDevice, (fat->DataStart + cluster - 2) * bytesPerCluster, 512, test);
-        for (uint32_t i = 0; i < 512; i++)
-            kprintf("%c", test[i]);
+    // Determine number of bytes in clusters.
+    uint16_t bytesPerCluster = fat->Header.BPB.SectorsPerCluster * fat->Header.BPB.BytesPerSector;
+    uint32_t length = clusterCount * bytesPerCluster;
 
-        offset += bytesPerCluster;
-        cluster = nextCluster;
-        remainingClusters--;
-    }*/
+    // Allocate space for directory bytes.
+    fat_dir_entry_t *directoryEntries = (fat_dir_entry_t*)kheap_alloc(length);
+    memset(directoryEntries, 0, length);
 
-    // Get sectors.
-  /*  uint32_t remainingSize = entry->FileSize;
-    for (uint32_t sector = 0; sector < 5; sector += fat->Header.BPB.SectorsPerCluster) {
-        uint32_t size = remainingSize;
-        if (size > (fat->Header.BPB.SectorsPerCluster * fat->Header.BPB.BytesPerSector))
-            size = (fat->Header.BPB.SectorsPerCluster * fat->Header.BPB.BytesPerSector);
-        storageDevice->Read(storageDevice, (sector + fat->DataStart + entry->StartClusterLow - 2) * fat->Header.BPB.BytesPerSector, size, data+ (sector * fat->Header.BPB.BytesPerSector));
-    }*/
+    // Read from storage.
+    bool result = fat_entry_read_fat12(fat, directory, (uint8_t*)directoryEntries, length);
+    if (!result) {
+        kheap_free(directoryEntries);
+        return false;
+    }
+    
+    // Count up entries.
+    uint32_t entryCount = 0;
+    for (uint32_t i = 0; i < length / sizeof(fat_dir_entry_t) && directoryEntries[i].FileName[0] != 0; i++)
+        entryCount++;
 
-    data[entry->FileSize] = '\0';
-    kprintf("%s", data);
+    // Reduce size of directory array.
+    directoryEntries = (fat_dir_entry_t*)kheap_realloc(directoryEntries, entryCount * sizeof(fat_dir_entry_t));
+
+    // Get outputs.
+    *outDirEntries = directoryEntries;
+    *outEntryCount = entryCount;
+    return true;
+}
+
+bool fat_get_root_dir(fat12_t *fat, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount) {
+    // Allocate space for directory bytes.
+    const uint32_t rootDirLength = sizeof(fat_dir_entry_t) * fat->Header.BPB.MaxRootDirectoryEntries;
+    fat_dir_entry_t *rootDirEntries = (fat_dir_entry_t*)kheap_alloc(rootDirLength);
+    memset(rootDirEntries, 0, rootDirLength);
+
+    // Read from storage.
+    bool result = fat->Device->Read(fat->Device, fat->RootDirectoryStart * fat->Header.BPB.BytesPerSector, rootDirEntries, rootDirLength);
+    if (!result) {
+        kheap_free(rootDirEntries);
+        return false;
+    }
+
+    // Count up entries.
+    uint32_t entryCount = 0;
+    for (uint32_t i = 0; i < rootDirLength / sizeof(fat_dir_entry_t) && rootDirEntries[i].FileName[0] != 0; i++)
+        entryCount++;
+
+    // Reduce size of directory array.
+    rootDirEntries = (fat_dir_entry_t*)kheap_realloc(rootDirEntries, entryCount * sizeof(fat_dir_entry_t));
+
+    // Get outputs.
+    *outDirEntries = rootDirEntries;
+    *outEntryCount = entryCount;
+    return true;
+}
+
+void fat_print_dir(fat12_t *fat, fat_dir_entry_t *directoryEntries, uint32_t directoryEntriesCount, uint32_t level) {
+    for (uint32_t i = 0; i < directoryEntriesCount; i++) {
+        kprintf("FAT:  ");
+        for (uint32_t p = 0; p < level; p++)
+            kprintf(" ");
+        
+
+        // Get file name and extension.
+        char fileName[9];
+        strncpy(fileName, directoryEntries[i].FileName, 8);
+        fileName[8] = '\0';
+
+        char extension[4];
+        strncpy(extension, directoryEntries[i].FileName+8, 3);
+        extension[3] = '\0';
+
+        if (extension[0] != ' ' && extension[0] != '\0')
+            kprintf("%s: %s.%s (%u bytes)\n", directoryEntries[i].Subdirectory ? "DIR " : "FILE", fileName, extension, directoryEntries[i].Length);
+        else
+            kprintf("%s: %s (%u bytes)\n", directoryEntries[i].Subdirectory ? "DIR " : "FILE", fileName, directoryEntries[i].Length);
+
+        if (directoryEntries[i].Subdirectory && directoryEntries[i].FileName[0] != '.') {
+            fat_dir_entry_t *subEntries;
+            uint32_t subCount = 0;
+            fat_get_dir_fat12(fat, directoryEntries+i, &subEntries, &subCount);
+            fat_print_dir(fat, subEntries, subCount, level+1);
+        }
+
+    }
 }
 
 bool fat_init(storage_device_t *storageDevice) {
     // Get header.
-    fat_header_t *fatHeader = (fat_header_t*)kheap_alloc(sizeof(fat_header_t));
-    memset(fatHeader, 0, sizeof(fat_header_t));
+    fat12_header_t *fatHeader = (fat12_header_t*)kheap_alloc(sizeof(fat12_header_t));
+    memset(fatHeader, 0, sizeof(fat12_header_t));
 
-    storageDevice->Read(storageDevice, 0, fatHeader, sizeof(fat_header_t));
+    storageDevice->Read(storageDevice, 0, fatHeader, sizeof(fat12_header_t));
 
     // Create FAT object.
-    fat_t *fatVolume = (fat_t*)kheap_alloc(sizeof(fat_t));
-    memset(fatVolume, 0, sizeof(fat_t));
+    fat12_t *fatVolume = (fat12_t*)kheap_alloc(sizeof(fat12_t));
+    memset(fatVolume, 0, sizeof(fat12_t));
 
     // Populate.
-  /*  fatVolume->MaxRootDirectoryEntries = fatHeader->BiosParameterBlock.MaxRootDirectoryEntries;
-    fatVolume->TotalSectors = (fatHeader->BiosParameterBlock.TotalSectors16 == 0) ? fatHeader->BiosParameterBlock.TotalSectors32 : fatHeader->BiosParameterBlock.TotalSectors16;
-    fatVolume->TableSizeSectors = fatHeader->BiosParameterBlock.TableSize16;
-    fatVolume->RootDirectorySizeSectors = ((fatVolume->MaxRootDirectoryEntries * FAT_DIRECTORY_ENTRY_SIZE) + (fatHeader->BiosParameterBlock.BytesPerSector - 1)) / fatHeader->BiosParameterBlock.BytesPerSector;
-    fatVolume->StartTableSector = fatHeader->BiosParameterBlock.ReservedSectors;
-    fatVolume->StartDataSector = fatVolume->StartTableSector + (fatHeader->BiosParameterBlock.TableCount * fatVolume->TableSizeSectors) + fatVolume->RootDirectorySizeSectors;
-    fatVolume->BytesPerSector = fatHeader->BiosParameterBlock.BytesPerSector;
-    fatVolume->StartRootDirectorySector = fatVolume->StartDataSector - fatVolume->RootDirectorySizeSectors;
-
-    fatVolume->TotalDataSectors = fatVolume->TotalSectors - (fatHeader->BiosParameterBlock.ReservedSectors + (fatHeader->BiosParameterBlock.TableCount * fatVolume->TableSizeSectors) + fatVolume->RootDirectorySizeSectors);
-    fatVolume->TotalClusters = fatVolume->TotalDataSectors / fatHeader->BiosParameterBlock.SectorsPerCluster;
-
-    strncpy(fatVolume->VolumeName, fatHeader->ExtendedBootRecord.VolumeLabel, 11);
-    fatVolume->VolumeName[11] = '\n';*/
-
-    // Populate.
+    fatVolume->Device = storageDevice;
     fatVolume->Header = *fatHeader;
     fatVolume->TableStart = fatVolume->Header.BPB.ReservedSectorsCount;
     fatVolume->TableLength = fatVolume->Header.BPB.TableSize;
     fatVolume->RootDirectoryStart = fatVolume->TableStart + (fatVolume->Header.BPB.TableSize * fatVolume->Header.BPB.TableCount);
-    fatVolume->RootDirectoryLength = ((fatVolume->Header.BPB.MaxRootDirectoryEntries * sizeof(fat_directory_entry_t)) + (fatVolume->Header.BPB.BytesPerSector - 1)) / fatVolume->Header.BPB.BytesPerSector;
+    fatVolume->RootDirectoryLength = ((fatVolume->Header.BPB.MaxRootDirectoryEntries * sizeof(fat_dir_entry_t)) + (fatVolume->Header.BPB.BytesPerSector - 1)) / fatVolume->Header.BPB.BytesPerSector;
     fatVolume->DataStart = fatVolume->RootDirectoryStart + fatVolume->RootDirectoryLength;
     fatVolume->DataLength = fatVolume->Header.BPB.TotalSectors - fatVolume->DataStart;
 
@@ -177,28 +227,11 @@ bool fat_init(storage_device_t *storageDevice) {
     fatVolume->Table = (fat12_cluster_pair_t*)kheap_alloc(fat12ClustersLength);
     memset(fatVolume->Table, 0, fat12ClustersLength);
     storageDevice->Read(storageDevice, fatVolume->TableStart * fatVolume->Header.BPB.BytesPerSector, fatVolume->Table, fat12ClustersLength);
-    //uint16_t test1 = fat12Clusters[0];
-    //uint16_t test2 = fat12Clusters[1];
 
 
-
-    // Get root directory.
-    fat_directory_entry_t *rootDir = (fat_directory_entry_t*)kheap_alloc(sizeof(fat_directory_entry_t) * fatVolume->Header.BPB.MaxRootDirectoryEntries);
-    memset(rootDir, 0, sizeof(fat_directory_entry_t) * fatVolume->Header.BPB.MaxRootDirectoryEntries);
-    
-    storageDevice->Read(storageDevice, fatVolume->RootDirectoryStart * fatVolume->Header.BPB.BytesPerSector, rootDir, sizeof(fat_directory_entry_t) * fatVolume->Header.BPB.MaxRootDirectoryEntries);
-    for (uint8_t i = 0; i < fatVolume->Header.BPB.MaxRootDirectoryEntries && rootDir[i].FileName[0] != 0; i++) {
-        if (rootDir[i].FileName[0] == 0xE5)
-            continue;
-
-        char fileName[13];
-        strncpy(fileName, rootDir[i].FileName, 8);
-        fileName[8] = '.';
-        strncpy(fileName+9, rootDir[i].FileName+8, 3);
-        fileName[12] = '\0';
-        
-        kprintf("FAT:   %u: %s: %s | Size: %u bytes | Cluster %u\n", i, rootDir[i].Subdirectory ? "Folder" : "File", fileName, rootDir[i].FileSize, rootDir[i].StartClusterLow);
-        if (strcmp(fileName, "BEEMOVIE.TXT") == 0)
-            fat_read_entry(storageDevice, fatVolume, rootDir+i);
-    }
+    // Get root dir.
+    fat_dir_entry_t *rootDirEntries;
+    uint32_t rootDirEntriesCount = 0;
+    fat_get_root_dir(fatVolume, &rootDirEntries, &rootDirEntriesCount);
+    fat_print_dir(fatVolume, rootDirEntries, rootDirEntriesCount, 0);
 }

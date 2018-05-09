@@ -328,7 +328,7 @@ static void floppy_lba_to_chs(uint32_t lba, uint16_t* cyl, uint16_t* head, uint1
 
 // Parse and print errors.
 static uint8_t floppy_parse_error(uint8_t st0, uint8_t st1, uint8_t st2) {
-	if (st0 > 0 || st1 > 0 || st2 > 0)
+	if (st0 & FLOPPY_ST0_INTERRUPT_CODE || st1 > 0 || st2 > 0)
 		kprintf("FLOPPY: Error status ST0: 0x%X  ST1: 0x%X  ST2: 0x%X\n", st0, st1, st2);
 
 	uint8_t error = 0;
