@@ -62,6 +62,12 @@
 #define AHCI_REG_PORT_DEVICE_SLEEP          0x44
 #define AHCI_REG_PORT_VENDOR_SPECIFIC       0x70
 
+#define AHCI_DEV_TYPE_NONE          0
+#define AHCI_DEV_TYPE_SATA          1
+#define AHCI_DEV_TYPE_SEMB          2
+#define AHCI_DEV_TYPE_PORT_MULT     3
+#define AHCI_DEV_TYPE_SATA_ATAPI    4
+
 typedef struct {
     // Number of ports.
     uint8_t PortCount : 5;
@@ -229,6 +235,11 @@ typedef struct {
     uint16_t Reserved;
 } __attribute__((packed)) ahci_port_task_file_data_t;
 
+#define AHCI_SIG_ATA        0x00000101
+#define AHCI_SIG_ATAPI      0xEB140101
+#define AHCI_SIG_SEMB       0xC33C0101
+#define AHCI_SIG_PORT_MULT  0x96690101
+
 // Offset 0x24, Port x Signature.
 typedef struct {
     uint8_t SectorCount;
@@ -236,6 +247,22 @@ typedef struct {
     uint8_t LbaMid;
     uint8_t LbaHigh;
 } __attribute__((packed)) ahci_port_signature_t;
+
+#define AHCI_SATA_STATUS_IPM_NOT_PRESENT    0x0
+#define AHCI_SATA_STATUS_IPM_ACTIVE         0x1
+#define AHCI_SATA_STATUS_IPM_PARTIAL        0x2
+#define AHCI_SATA_STATUS_IPM_SLUMBER        0x6
+#define AHCI_SATA_STATUS_IPM_DEVSLEEP       0x8
+
+#define AHCI_SATA_STATUS_SPEED_NOT_PRESENT  0x0
+#define AHCI_SATA_STATUS_SPEED_GEN1         0x1
+#define AHCI_SATA_STATUS_SPEED_GEN2         0x2
+#define AHCI_SATA_STATUS_SPEED_GEN3         0x3
+
+#define AHCI_SATA_STATUS_DETECT_NOT_PRESENT 0x0
+#define AHCI_SATA_STATUS_DETECT_NO_PHY      0x1
+#define AHCI_SATA_STATUS_DETECT_CONNECTED   0x3
+#define AHCI_SATA_STATUS_DETECT_OFFLINE     0x4
 
 // Offset 0x28, Port x Serial ATA Status.
 typedef struct {
@@ -322,7 +349,11 @@ typedef struct {
     uint8_t Reserved1[0x20-0x1C];
 
     ahci_port_task_file_data_t TaskFileData;
-    ahci_port_signature_t Signature;
+
+    union {
+        uint32_t Value;
+        ahci_port_signature_t Data;
+    } Signature;
 
     ahci_port_sata_status_t SataStatus;
     ahci_port_sata_control_t SataControl;
@@ -362,12 +393,15 @@ struct ahci_controller_t;
 typedef struct {
     struct ahci_controller_t *Controller;
     uint8_t Number;
+
+    uint8_t Type;
 } ahci_port_t;
 
 typedef struct {
     // Register access.
     uint32_t BaseAddress;
     uint32_t *BasePointer;
+    ahci_memory_t *Memory;
 
     // Ports.
     ahci_port_t **Ports;

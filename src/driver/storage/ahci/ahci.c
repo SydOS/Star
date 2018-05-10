@@ -52,6 +52,31 @@ uint32_t ahci_version(ahci_controller_t *ahciController) {
     return ahci_read(ahciController, AHCI_REG_VERSION);
 }
 
+bool ahci_probe_port(ahci_port_t *ahciPort) {
+    // Get controller.
+    ahci_controller_t *ahciController = ahciPort->Controller;
+
+    // Check status.
+    ahciPort->Type = AHCI_DEV_TYPE_NONE;
+    if (ahciController->Memory->Ports[ahciPort->Number].SataStatus.DeviceDetection != AHCI_SATA_STATUS_DETECT_CONNECTED)
+        return false;
+    if (ahciController->Memory->Ports[ahciPort->Number].SataStatus.InterfacePowerManagement != AHCI_SATA_STATUS_IPM_ACTIVE)
+        return false; 
+
+    // Determine type.
+    switch (ahciController->Memory->Ports[ahciPort->Number].Signature.Value) {
+        case AHCI_SIG_ATA:
+            ahciPort->Type = AHCI_DEV_TYPE_SATA;
+            return true;
+
+        case AHCI_SIG_ATAPI:
+            ahciPort->Type = AHCI_DEV_TYPE_SATA_ATAPI;
+            return true;
+    }
+
+    return false;
+}
+
 bool ahci_init(pci_device_t *pciDevice) {
     // Is the PCI device an ATA controller?
     if (!(pciDevice->Class == PCI_CLASS_MASS_STORAGE && pciDevice->Subclass == PCI_SUBCLASS_MASS_STORAGE_SATA && pciDevice->Interface == PCI_INTERFACE_MASS_STORAGE_SATA_VENDOR_AHCI))
@@ -68,7 +93,7 @@ bool ahci_init(pci_device_t *pciDevice) {
     ahciController->BaseAddress = pciDevice->BaseAddresses[5].BaseAddress;
     ahciController->BasePointer = (uint32_t*)paging_device_alloc(ahciController->BaseAddress, ahciController->BaseAddress);
 
-    ahci_memory_t *ahciMemory = (ahci_memory_t*)ahciController->BasePointer;
+    ahciController->Memory = (ahci_memory_t*)ahciController->BasePointer;
 
     // Get port count.
     ahci_host_cap_t caps = ahci_get_cap(ahciController);
@@ -77,19 +102,31 @@ bool ahci_init(pci_device_t *pciDevice) {
     memset(ahciController->Ports, 0, sizeof(ahci_port_t*) * ahciController->PortCount);
 
     // Create ports.
-    uint32_t portMap = ahci_read(ahciController, AHCI_REG_PORTS_IMPLEMENTED);
     uint32_t enabledPorts = 0;
     for (uint8_t port = 0; port < ahciController->PortCount; port++) {
-        if (portMap & (1 << port)) {
+        if (ahciController->Memory->PortsImplemented & (1 << port)) {
             ahciController->Ports[port] = (ahci_port_t*)kheap_alloc(sizeof(ahci_port_t));
             memset(ahciController->Ports[port], 0, sizeof(ahci_port_t));
             ahciController->Ports[port]->Controller = ahciController;
             ahciController->Ports[port]->Number = port;
+
+            // Probe port.
+            if (ahci_probe_port(ahciController->Ports[port])) {
+                switch (ahciController->Ports[port]->Type) {
+                    case AHCI_DEV_TYPE_SATA:
+                        kprintf("AHCI: Found SATA drive on port %u.\n", port);
+                        break;
+
+                    case AHCI_DEV_TYPE_SATA_ATAPI:
+                        kprintf("AHCI: Found SATA ATAPI drive on port %u.\n", port);
+                        break;
+                }
+            }
             enabledPorts++;
         }
     }
 
     // Print info.
-    kprintf("AHCI: Version 0x%X\n", ahci_version(ahciController));
+    kprintf("AHCI: Version major 0x%X, minor 0x%X\n", ahciController->Memory->Version.Major, ahciController->Memory->Version.Minor);
     kprintf("AHCI: Total ports: %u (%u enabled)\n", ahciController->PortCount, enabledPorts);
 }
