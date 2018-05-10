@@ -175,17 +175,20 @@ void fat_print_dir(fat12_t *fat, fat_dir_entry_t *directoryEntries, uint32_t dir
         else
             kprintf("%s: %s (%u bytes)\n", directoryEntries[i].Subdirectory ? "DIR " : "FILE", fileName, directoryEntries[i].Length);
 
-        if (directoryEntries[i].Subdirectory && directoryEntries[i].FileName[0] != '.') {
+       /* if (directoryEntries[i].Subdirectory && directoryEntries[i].FileName[0] != '.') {
             fat_dir_entry_t *subEntries;
             uint32_t subCount = 0;
             fat_get_dir_fat12(fat, directoryEntries+i, &subEntries, &subCount);
             fat_print_dir(fat, subEntries, subCount, level+1);
             kheap_free(subEntries);
-        }
+        }*/
 
         if (strcmp(fileName, "BEEMOVIE") == 0) {
-            uint8_t *bees = (uint8_t*)kheap_alloc(directoryEntries[i].Length);
+            uint8_t *bees = (uint8_t*)kheap_alloc(directoryEntries[i].Length + 1);
             fat_entry_read_fat12(fat, directoryEntries+i, bees, directoryEntries[i].Length);
+            bees[directoryEntries[i].Length] ='\0';
+            kprintf(bees);
+            kheap_free(bees);
         }
     }
 }
