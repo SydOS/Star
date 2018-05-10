@@ -68,6 +68,9 @@
 #define AHCI_DEV_TYPE_PORT_MULT     3
 #define AHCI_DEV_TYPE_SATA_ATAPI    4
 
+#define AHCI_CMDLIST_SIZE       0x1000
+#define AHCI_FIS_SIZE           0x100
+
 typedef struct {
     // Number of ports.
     uint8_t PortCount : 5;
@@ -389,6 +392,25 @@ typedef struct {
     ahci_port_memory_t Ports[32];
 } __attribute__((packed)) ahci_memory_t;
 
+// Command List Structure.
+typedef struct {
+    uint8_t CommandFisLength : 5;
+    bool Atapi : 1;
+    bool Write : 1;
+    bool Prefetchable : 1;
+    bool Reset : 1;
+    bool Bist : 1;
+    bool ClearBusyUponOk : 1;
+    bool Reserved1 : 1;
+
+    uint8_t PortMultiplierPort : 4;
+    uint16_t PhyRegionDescTableLength : 16;
+    uint32_t PhyRegionDescByteCount;
+    uint64_t CommandTableBaseAddress;
+
+    uint32_t Reserved2[4];
+} __attribute__((packed)) ahci_command_header_t;
+
 struct ahci_controller_t;
 typedef struct {
     struct ahci_controller_t *Controller;
@@ -402,6 +424,10 @@ typedef struct {
     uint32_t BaseAddress;
     uint32_t *BasePointer;
     ahci_memory_t *Memory;
+
+    // Pages used for memory.
+    uintptr_t DmaPage;
+    uintptr_t DmaPageSecondary;
 
     // Ports.
     ahci_port_t **Ports;
