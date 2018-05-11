@@ -1,3 +1,27 @@
+;
+; File: ap_boot.asm
+; 
+; Copyright (c) 2017-2018 Sydney Erickson, John Davis
+; 
+; Permission is hereby granted, free of charge, to any person obtaining a copy
+; of this software and associated documentation files (the "Software"), to deal
+; in the Software without restriction, including without limitation the rights
+; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+; copies of the Software, and to permit persons to whom the Software is
+; furnished to do so, subject to the following conditions:
+; 
+; The above copyright notice and this permission notice shall be included in all
+; copies or substantial portions of the Software.
+; 
+; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+; SOFTWARE.
+;
+
 ; Constants. These should match the ones in smp.h.
 SMP_GDT32_ADDRESS equ 0x5A0
 SMP_GDT64_ADDRESS equ 0x600
@@ -206,8 +230,8 @@ _ap_bootstrap_higherhalf:
 
     ; Get stack address. Address is placed in RAX.
     mov rdi, rax
-    extern ap_get_stack
-    call ap_get_stack
+    extern smp_ap_get_stack
+    call smp_ap_get_stack
 
     ; Load up stack for this processor.
     mov rsp, rax
@@ -215,8 +239,8 @@ _ap_bootstrap_higherhalf:
     mov rbp, rsp
 
     ; Pop into C code.
-    extern ap_main
-    call ap_main
+    extern smp_ap_main
+    call smp_ap_main
 
     ; Never should get here, but if we do halt the processor.
     jmp $

@@ -1,3 +1,27 @@
+/*
+ * File: main.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <tools.h>
 #include <io.h>
@@ -6,11 +30,11 @@
 #include <kernel/gdt.h>
 #include <kernel/interrupts/interrupts.h>
 #include <kernel/acpi/acpi.h>
-#include <kernel/pit.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
+#include <kernel/timer.h>
 #include <kernel/interrupts/smp.h>
 #include <kernel/cpuid.h>
 #include <driver/vga.h>
@@ -21,6 +45,7 @@
 #include <driver/ps2/ps2.h>
 #include <libs/keyboard.h>
 #include <driver/rtc.h>
+#include <kernel/multitasking/syscalls.h>
 
 #include <driver/usb/devices/usb_device.h>
 
@@ -36,9 +61,9 @@ void panic(const char *format, ...) {
 	va_start(args, format);
 
 	// Show panic.
-	kprintf_nlock("\nPANIC:\n");
-	kprintf_va(format, args);
-	kprintf("\n\nHalted.");
+	kprintf_nolock("\nPANIC:\n");
+	kprintf_va(false, format, args);
+	kprintf_nolock("\n\nHalted.");
 
 	// Halt other processors.
 	//lapic_send_nmi_all();
@@ -52,35 +77,26 @@ void panic(const char *format, ...) {
  * The main function for the kernel, called from boot.asm
  */
 void kernel_main() {
-	vga_disable_cursor();
-	
 	// Initialize serial for logging.
 	serial_init();
 
-	vga_initialize();
+	// Initialize VGA.
+	vga_init();
 
-	gdt_init();
+	// Initialize the GDT.
+	gdt_init_bsp();
 
-	// -------------------------------------------------------------------------
-	// MEMORY RELATED STUFF
-	vga_setcolor(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
-	
-	// Initialize memory.
+	// Initialize memory system.
 	pmm_init();
     paging_init();
 	kheap_init();
 
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
 	// Initialize ACPI and interrupts.
 	acpi_init();
-	interrupts_init();
+	interrupts_init_bsp();
 
-
-	kprintf("Setting up PIT...\n");
-    pit_init();
-
-
+	// Initialize timer.
+    timer_init();
 
 	kprintf("Initializing PS/2...\n");
 	ps2_init();
@@ -88,18 +104,30 @@ void kernel_main() {
 	// Initialize SMP.
 	smp_init();
 
+	// Print CPUID info.
+	cpuid_print_capabilities();
+
 	// Start up tasking and create kernel task.
 	kprintf("Starting tasking...\n");
 	tasking_init();
 
 	// We should never get here.
-	panic("Tasking failed to start!\n");
+	panic("MAIN: Tasking failed to start!\n");
 }
 
-void hmmm_thread(void) {
+void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
 	while (1) { 
-		//kprintf("hmm(): %u seconds\n", pit_ticks() / 1000);
+		kprintf("hmm(): %u seconds\n", timer_ticks() / 1000);
 		sleep(2000);
+	 }
+}
+
+void secondprocess_thread(void) {
+	while (1) { 
+		uint64_t uptime = 0;
+		syscalls_syscall(&uptime, 0, 0, 0, 0, 0, SYSCALL_UPTIME);
+		syscalls_kprintf("Hi from ring 3, via syscall! Uptime: %u\n", uptime);
+		sleep(4000);
 	 }
 }
 
@@ -125,78 +153,50 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 }
 
 void kernel_late() {
-	kprintf("Adding second task...\n");
-	tasking_add_process(tasking_create_process("hmmm", (uintptr_t)hmmm_thread, 0, 0));
-	kprintf("Starting tasking...\n");
+	//kprintf("MAIN: Adding second kernel thread...\n");
+	//tasking_thread_add_kernel(tasking_thread_create("hmm", (uintptr_t)hmmm_thread, 12, 3, 4));
 
-		acpi_late_init();
+	kprintf("MAIN: Adding second process...\n"); 
+	//tasking_process_add(tasking_process_create("another one", tasking_thread_create("ring3", (uintptr_t)secondprocess_thread, 0, 0, 0), false));
 
-	// Initialize PS/2.
-	vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);	
-
+	acpi_late_init();
 	
 	// Initialize floppy.
-	vga_setcolor(VGA_COLOR_LIGHT_BROWN, VGA_COLOR_BLACK);
 	floppy_init();
-
-    vga_enable_cursor();
-
-	vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-
-	// Print CPUID info.
-	cpuid_print_capabilities();
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 
 	pci_init();
 
-	kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
-	
-	vga_setcolor(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-	kprintf("Kernel is located at 0x%p!\n", memInfo.kernelStart);
+	// Print info.
+	kprintf("\e[92mKernel is located at 0x%p!\n", memInfo.kernelStart);
 	kprintf("Detected usable RAM: %uMB\n", memInfo.memoryKb / 1024);
 	if (memInfo.paeEnabled)
 		kprintf("PAE enabled!\n");
 	if (memInfo.nxEnabled)
 		kprintf("NX enabled!\n");
-
-	vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+	kprintf("\e[0m");
+	
 	rtc_init();
 	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
+	// Print logo.
+	kprintf("\n\e[94m");
+	kprintf("   _____           _  ____   _____ \n");
+	kprintf("  / ____|         | |/ __ \\ / ____|\n");
+	kprintf(" | (___  _   _  __| | |  | | (___  \n");
+	kprintf("  \\___ \\| | | |/ _` | |  | |\\___ \\ \n");
+	kprintf("  ____) | |_| | (_| | |__| |____) |\n");
+	kprintf(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
+	kprintf("          __/ |                    \n");
+	kprintf("         |___/                     \n");
+	kprintf("\e[36mCopyright (c) Sydney Erickson 2017 - 2018\e[0m\n\n");
 
-
-	vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-	vga_writes("   _____           _  ____   _____ \n");
-	vga_writes("  / ____|         | |/ __ \\ / ____|\n");
-	vga_writes(" | (___  _   _  __| | |  | | (___  \n");
-	vga_writes("  \\___ \\| | | |/ _` | |  | |\\___ \\ \n");
-	vga_writes("  ____) | |_| | (_| | |__| |____) |\n");
-	vga_writes(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
-	vga_writes("          __/ |                    \n");
-	vga_writes("         |___/                     \n");
-	vga_writes("Copyright (c) Sydney Erickson 2017 - 2018\n");
-
-
-    
-
-    // Ring serial and VGA terminals.
-	serial_write('\a');
-	//vga_putchar('\a');
-  
-	// If serial isn't present, just loop.
-	//if (!serial_present()) {
-		//kprintf("No serial port present for logging, waiting here.");
-	//	while (true);
-	//}
+    // Ring serial terminals.
+	kprintf("\a");
 
 	char buffer[100];
-
 	while (true) {
-		vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-		kprintf("root@sydos ~: ");
-		vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+		kprintf("\e[96mroot@sydos ~:\e[0m ");
 
 		uint16_t i = 0;
 		while (i < 98) {
@@ -247,7 +247,7 @@ void kernel_late() {
 			ps2_reset_system();
 
 		else if (strcmp(buffer, "uptime") == 0)
-			kprintf("Current uptime: %i milliseconds.\n", pit_ticks());
+			kprintf("Current uptime: %i milliseconds.\n", timer_ticks());
 
 		else if (strcmp(buffer, "corp") == 0)
 			kprintf("Hacking CorpNewt's computer and installing SydOS.....\n");
@@ -287,19 +287,5 @@ void kernel_late() {
 				usbDevice = usbDevice->Next;
 			}
 		}
-
-
-		/*char c = serial_read();
-
-		if (c == '\r' || c == '\n') {
-			vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-			kprintf("\nroot@sydos ~: ");
-			serial_writes("\nroot@sydos ~: ");
-			vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-		} else {
-			vga_putchar(c);
-			serial_write(c);
-			vga_trigger_cursor_update();
-		}*/
 	}
 }

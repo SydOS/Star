@@ -1,8 +1,33 @@
+/*
+ * File: paging.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
 #include <string.h>
 #include <kernel/memory/paging.h>
+#include <kernel/lock.h>
 
 #include <kernel/interrupts/exceptions.h>
 #include <kernel/memory/pmm.h>
@@ -19,12 +44,22 @@ extern void paging_late_pae();
 #endif
 
 /**
+ * Gets the current paging structure.
+ */
+uintptr_t paging_get_current_directory(void) {
+    // Tell CPU the directory and enable paging.
+    uintptr_t directoryPhysicalAddr;
+    asm volatile ("mov %%cr3, %%eax" : "=a"(directoryPhysicalAddr));
+    return directoryPhysicalAddr;
+}
+
+/**
  * Changes the current paging structure.
  * @param directoryPhysicalAddr The physical address of the root paging structure.
  */
 void paging_change_directory(uintptr_t directoryPhysicalAddr) {
     // Tell CPU the directory and enable paging.
-    asm volatile ("mov %%eax, %%cr3": :"a"(directoryPhysicalAddr)); 
+    asm volatile ("mov %%eax, %%cr3" : : "a"(directoryPhysicalAddr)); 
     asm volatile ("mov %cr0, %eax");
     asm volatile ("orl $0x80000000, %eax");
     asm volatile ("mov %eax, %cr0");
@@ -108,7 +143,7 @@ void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress) {
 
     // Unmap range, freeing page frames.
     for (uint32_t i = 0; i <= (endAddress - startAddress) / PAGE_SIZE_4K; i++) {
-        uintptr_t frame = 0;
+        uint64_t frame = 0;
         bool mapped = paging_get_phys(startAddress + (i * PAGE_SIZE_4K), &frame);
         paging_unmap(startAddress + (i * PAGE_SIZE_4K));
 
@@ -118,6 +153,8 @@ void paging_unmap_region(uintptr_t startAddress, uintptr_t endAddress) {
     }
 }
 
+static lock_t paging_device_alloc_lock = { };
+
 void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
     // Ensure addresses are on 4KB boundaries.
     if (MASK_PAGEFLAGS_4K_64BIT(startPhys) || MASK_PAGEFLAGS_4K_64BIT(endPhys))
@@ -125,6 +162,8 @@ void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
     if (startPhys > endPhys)
         panic("PAGING: Start address (0x%llX) is after end address (0x%llX)!\n", startPhys, endPhys);
 
+    // Lock.
+    spinlock_lock(&paging_device_alloc_lock);
     uint32_t pageCount = ((endPhys - startPhys) / PAGE_SIZE_4K) + 1;// DIVIDE_ROUND_UP(MASK_PAGEFLAGS_4K(PhysicalAddress) + Length, PAGE_SIZE_4K);
 
     // Get next available virtual range.
@@ -151,7 +190,10 @@ void *paging_device_alloc(uint64_t startPhys, uint64_t endPhys) {
         panic("PAGING: Out of device virtual addresses!\n");
 
     // Map range.
-    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), startPhys, true, true);
+    paging_map_region_phys(page, page + ((pageCount - 1) * PAGE_SIZE_4K), startPhys, false, true); // TODO change back to kernel only.
+
+    // unlock.
+    spinlock_release(&paging_device_alloc_lock);
 
     // Return address.
     return (void*)(page);
@@ -179,7 +221,7 @@ void paging_device_free(uintptr_t startAddress, uintptr_t endAddress) {
 }
 
 static void paging_pagefault_handler(ExceptionRegisters_t *regs) {
-    page_t addr;
+    uintptr_t addr;
     asm volatile ("mov %%cr2, %0" : "=r"(addr));
 /*#ifdef X86_64
     kprintf("RAX: 0x%p, RBX: 0x%p, RCX: 0x%p, RDX: 0x%p\n", regs->rax, regs->rbx, regs->rcx, regs->rdx);
@@ -193,14 +235,14 @@ static void paging_pagefault_handler(ExceptionRegisters_t *regs) {
     kprintf("EAX: 0x%p, EBX: 0x%p, ECX: 0x%p, EDX: 0x%p\n", regs->ax, regs->bx, regs->cx, regs->dx);
     kprintf("ESI: 0x%p, EDI: 0x%p, EBP: 0x%p, ESP: 0x%p\n", regs->si, regs->di, regs->bp, regs->sp);
     kprintf("EIP: 0x%p, EFLAGS: 0x%p\n", regs->ip, regs->flags);
-    panic("PAGING: Page fault at 0x%X!\n", addr);
+    panic("PAGING: Page fault at 0x%p (0x%X)!\n", addr, regs->errorCode);
 }
 
 /**
  * Initializes paging.
  */
 void paging_init() {
-    kprintf("PAGING: Initializing...\n");
+    kprintf("\e[95mPAGING: Initializing...\n");
 
     // Wire up page fault handler.
     exceptions_install_handler(EXCEPTION_PAGE_FAULT, paging_pagefault_handler);
@@ -243,5 +285,5 @@ void paging_init() {
     kprintf("PAGING: Unmapping test region...\n");
     paging_unmap_region(0x1000, 0x5000);
 
-    kprintf("PAGING: Initialized!\n");
+    kprintf("PAGING: Initialized!\e[0m\n");
 }

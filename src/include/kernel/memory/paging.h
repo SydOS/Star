@@ -1,3 +1,27 @@
+/*
+ * File: paging.h
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #ifndef PAGING_H
 #define PAGING_H
 
@@ -80,18 +104,21 @@ enum {
 };
 
 #ifdef X86_64
-
+#define PAGING_FIRST_DEVICE_ADDRESS 0xFFFFFF00F0000000
+#define PAGING_LAST_DEVICE_ADDRESS  (PAGE_LONG_TABLES_ADDRESS - PAGE_SIZE_4K)
 #else
 #define PAGING_FIRST_DEVICE_ADDRESS 0xF0000000
 #define PAGING_LAST_DEVICE_ADDRESS  (PAGE_TABLES_ADDRESS - PAGE_SIZE_4K)
 #endif
 
+extern uintptr_t paging_get_current_directory(void);
 extern void paging_change_directory(uintptr_t directoryPhysicalAddr);
 extern void paging_flush_tlb();
 extern void paging_flush_tlb_address(uintptr_t address);
 extern void paging_map(uintptr_t virt, uint64_t phys, bool kernel, bool writeable);
 extern void paging_unmap(uintptr_t virtual);
 extern bool paging_get_phys(uintptr_t virtual, uint64_t *physOut);
+extern uintptr_t paging_create_app_copy(void);
 
 extern void paging_map_region(uintptr_t startAddress, uintptr_t endAddress, bool kernel, bool writeable);
 extern void paging_map_region_phys(uintptr_t startAddress, uintptr_t endAddress, uint64_t startPhys, bool kernel, bool writeable);

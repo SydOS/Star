@@ -1,3 +1,27 @@
+/*
+ * File: lapic.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <kprint.h>
 #include <io.h>
@@ -61,11 +85,11 @@ static void lapic_send_icr(lapic_icr_t icr) {
 void lapic_send_init(uint8_t apic) {
     // Send INIT to specified APIC.
     lapic_icr_t icr = {};
-    icr.deliveryMode = LAPIC_DELIVERY_INIT;
-    icr.destinationMode = LAPIC_DEST_MODE_PHYSICAL;
-    icr.triggerMode = LAPIC_TRIGGER_EDGE;
-    icr.level = LAPIC_LEVEL_ASSERT;
-    icr.destination = apic;
+    icr.DeliveryMode = LAPIC_DELIVERY_INIT;
+    icr.DestinationMode = LAPIC_DEST_MODE_PHYSICAL;
+    icr.TriggerMode = LAPIC_TRIGGER_EDGE;
+    icr.Level = LAPIC_LEVEL_ASSERT;
+    icr.Destination = apic;
 
     // Send ICR.
     lapic_send_icr(icr);;
@@ -74,12 +98,12 @@ void lapic_send_init(uint8_t apic) {
 void lapic_send_startup(uint8_t apic, uint8_t vector) {
     // Send startup to specified APIC.
     lapic_icr_t icr = {};
-    icr.vector = vector;
-    icr.deliveryMode = LAPIC_DELIVERY_STARTUP;
-    icr.destinationMode = LAPIC_DEST_MODE_PHYSICAL;
-    icr.triggerMode = LAPIC_TRIGGER_EDGE;
-    icr.level = LAPIC_LEVEL_ASSERT;
-    icr.destination = apic;
+    icr.Vector = vector;
+    icr.DeliveryMode = LAPIC_DELIVERY_STARTUP;
+    icr.DestinationMode = LAPIC_DEST_MODE_PHYSICAL;
+    icr.TriggerMode = LAPIC_TRIGGER_EDGE;
+    icr.Level = LAPIC_LEVEL_ASSERT;
+    icr.Destination = apic;
 
     // Send ICR.
     lapic_send_icr(icr);
@@ -88,18 +112,48 @@ void lapic_send_startup(uint8_t apic, uint8_t vector) {
 void lapic_send_nmi_all(void) {
     // Send NMI to all LAPICs but ourself.
     lapic_icr_t icr = {};
-    icr.deliveryMode = LAPIC_DELIVERY_NMI;
-    icr.triggerMode = LAPIC_TRIGGER_EDGE;
-    icr.destinationShorthand = LAPIC_DEST_SHORTHAND_ALL_BUT_SELF;
-    icr.level = LAPIC_LEVEL_ASSERT;
+    icr.DeliveryMode = LAPIC_DELIVERY_NMI;
+    icr.TriggerMode = LAPIC_TRIGGER_EDGE;
+    icr.DestinationShorthand = LAPIC_DEST_SHORTHAND_ALL_BUT_SELF;
+    icr.Level = LAPIC_LEVEL_ASSERT;
 
     // Send ICR.
     lapic_send_icr(icr);
 }
 
+uint32_t lapic_timer_get_rate(void) {
+    // Set divider to 16.
+    kprintf("LAPIC: Calculating tick rate for timer...\n");
+    lapic_write(LAPIC_REG_TIMER_DIVIDE, LAPIC_TIMER_DIVIDE16);
+
+    uint32_t averageCount = 0;
+    for (uint8_t i = 0; i < 20; i++) {
+        // Reset initial count to 0xFFFFFFFF.
+        lapic_write(LAPIC_REG_TIMER_INITIAL, 0xFFFFFFFF);
+        lapic_write(LAPIC_REG_TIMER_CURRENT, 0xFFFFFFFF);
+
+        // Wait for 100 ms and get current count.
+        sleep(100);
+        averageCount += 0xFFFFFFFF - lapic_read(LAPIC_REG_TIMER_CURRENT);
+        lapic_write(LAPIC_REG_TIMER_INITIAL, 0);
+        lapic_write(LAPIC_REG_TIMER_CURRENT, 0);
+    }  
+
+    averageCount = averageCount / 20;
+    kprintf("LAPIC: Timer ticked %u times on average in 100ms.\n", averageCount);
+    return averageCount / 100;
+}
+
+void lapic_timer_start(uint32_t rate) {
+    // Start up timer using calculated amount.
+    lapic_write(LAPIC_REG_LVT_TIMER, LAPIC_TIMER_MODE_PERIODIC | (IRQ_OFFSET + IRQ_TIMER));
+    lapic_write(LAPIC_REG_TIMER_DIVIDE, LAPIC_TIMER_DIVIDE16);
+    lapic_write(LAPIC_REG_TIMER_INITIAL, rate);
+}
+
 uint32_t lapic_id(void) {
-    // Get ID.
-    return lapic_read(LAPIC_REG_ID) >> 24;
+    // Get ID if LAPIC is configured, otherwise return 0.
+    return lapicPointer != NULL ? lapic_read(LAPIC_REG_ID) >> 24 : 0;
 }
 
 uint8_t lapic_version(void) {
@@ -152,7 +206,7 @@ void lapic_init(void) {
     lapicPointer = paging_device_alloc(base, base);
     
     kprintf("LAPIC: Mapped LAPIC at 0x%X to 0x%p...\n", base, lapicPointer);
-    idt_open_interrupt_gate(LAPIC_SPURIOUS_INT, (uintptr_t)_irq_empty);
+    //idt_open_interrupt_gate(LAPIC_SPURIOUS_INT, (uintptr_t)_irq_empty);
 
     lapic_setup();
     kprintf("LAPIC: Initialized!\n");

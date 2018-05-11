@@ -1,3 +1,27 @@
+/*
+ * File: acpcia_os.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include "acpi.h"
 #include <accommon.h>
@@ -10,6 +34,7 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/tasking.h>
 #include <driver/pci.h>
+#include <kernel/timer.h>
 
 #include <kernel/interrupts/irqs.h>
 
@@ -107,31 +132,20 @@ ACPI_THREAD_ID AcpiOsGetThreadId() {
     return 1;
 }
 
-//ACPI_OSD_EXEC_CALLBACK functionA;
-//void *ContextA;
-void acpica_thread(void) {
-    // Function is in ECX/RCX, and the context in EDX/RDX.
-    uintptr_t Function = 0;
-    uintptr_t Context = 0;
+void acpica_thread(ACPI_OSD_EXEC_CALLBACK functionPtr, void *contextPtr) {
+    // Execute ACPICA function.
+    // = (ACPI_OSD_EXEC_CALLBACK)arg1;
+  //   = (void*)arg2;
 
-#ifdef X86_64
-    asm volatile ("movq %%rcx, %0" : "=r"(Function));
-    asm volatile ("movq %%rdx, %0" : "=r"(Context));
-#else
-    asm volatile ("movl %%ecx, %0" : "=r"(Function));
-    asm volatile ("movl %%edx, %0" : "=r"(Context));
-#endif
-
-    ACPI_OSD_EXEC_CALLBACK FunctionPtr = (ACPI_OSD_EXEC_CALLBACK)Function;
-    void *ContextPtr = (void*)Context;
-
-    FunctionPtr(Context);
-    _kill();
-    while(true);
+    //kprintf("function 0x%p, context 0x%p\n", arg1, arg2);
+    functionPtr(contextPtr);
+    kprintf("done acpcia handler.\n");
 }
 
 ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Function, void *Context) {
-    tasking_add_process(tasking_create_process("acpica", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context));
+    // Schedule execution by adding a thread. BROKEN
+    //tasking_thread_add_kernel(tasking_thread_create("acpica_worker", (uintptr_t)acpica_thread, (uintptr_t)Function, (uintptr_t)Context, 0));
+    tasking_thread_schedule_proc(tasking_thread_create_kernel("acpica_worker", acpica_thread, (uintptr_t)Function, (uintptr_t)Context, 0), 0);
     return (AE_OK);
 }
 
@@ -200,7 +214,7 @@ return (AE_OK);
 static void *context;
 static ACPI_OSD_HANDLER handler;
 static bool acpi_callback(irq_regs_t *regs, uint8_t irqNum) {
-    kprintf_nlock("ACPI: SCI triggered!\n");
+    kprintf("ACPI: SCI triggered!\n");
     handler(context);
     return false;
 }
@@ -262,7 +276,7 @@ ACPI_STATUS AcpiOsWritePort ( ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Widt
 }
 
 ACPI_STATUS AcpiOsReadPciConfiguration (ACPI_PCI_ID *PciId, UINT32 Reg, UINT64 *Value, UINT32 Width) {
-    kprintf_nlock("ACPI: read pci.\n");
+    kprintf("ACPI: read pci.\n");
 
     uint32_t address = PCI_PORT_ENABLE_BIT | (uint32_t)(PciId->Bus << 16) | (uint32_t)(PciId->Device << 11) |
         (uint32_t)(PciId->Function << 8) | (uint8_t)(Reg & 0xfc);
@@ -303,15 +317,15 @@ void ACPI_INTERNAL_VAR_XFACE AcpiOsPrintf ( const char *Format, ...) {
     // Get args.
     va_list args;
 	va_start(args, Format);
-    kprintf_va(Format, args);
+    kprintf_va(true, Format, args);
 }
 
 void AcpiOsVprintf ( const char *Format, va_list Args) {
-    kprintf_va(Format, Args);
+    kprintf_va(true, Format, Args);
 }
 
 UINT64 AcpiOsGetTimer ( void) {
-    return pit_ticks() * 10;
+    return timer_ticks() * 10;
 }
 
 ACPI_STATUS AcpiOsSignal ( UINT32 Function,  void *Info) {

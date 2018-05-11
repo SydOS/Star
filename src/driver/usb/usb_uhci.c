@@ -1,3 +1,27 @@
+/*
+ * File: usb_uhci.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <tools.h>
 #include <io.h>
@@ -505,9 +529,9 @@ static bool usb_uhci_callback(pci_device_t *pciDevice) {
     usb_uhci_controller_t *controller = (usb_uhci_controller_t*)pciDevice->DriverObject;
     uint16_t status = inw(USB_UHCI_USBSTS(controller->BaseAddress));
     if (status & 0x3F) {
-        kprintf_nlock("IRQ uhci\n");
-        kprintf_nlock("status: 0x%X\n", pci_config_read_word(pciDevice, PCI_REG_STATUS));
-        kprintf_nlock("usb status: 0x%X\n", status);
+        kprintf("IRQ uhci\n");
+        kprintf("status: 0x%X\n", pci_config_read_word(pciDevice, PCI_REG_STATUS));
+        kprintf("usb status: 0x%X\n", status);
         outw(USB_UHCI_USBSTS(controller->BaseAddress), 0x3F);
         pci_config_write_word(pciDevice, PCI_REG_STATUS, 0x8);
         return true;

@@ -1,10 +1,35 @@
+/*
+ * File: kprint.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <kprint.h>
 #include <driver/serial.h>
 #include <driver/vga.h>
 #include <kernel/lock.h>
+#include <string.h>
 
-lock_t kprintf_mutex = 0;
+lock_t kprintf_mutex = { };
 
 // Print a single character.
 void kputchar(char c)
@@ -41,8 +66,6 @@ void kputstring(const char *str, size_t max)
         }
     }
     else {
-        size_t len = strlen(str);
-        
         while (*str && max) {
             kputchar(*str);
             str++;
@@ -135,44 +158,206 @@ void kprint_hex(uint64_t num, bool capital, uint8_t width) {
     }
 }
 
-void kprintf(const char* format, ...) {
-    spinlock_lock(&kprintf_mutex);
+static void kprintf_sgr(const char *sequence, uint32_t length) {
+    // If the length is 0, reset params.
+    if (length == 0) {
+        vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+        return;
+    }
 
-    // Get args.
-    va_list args;
-    va_start(args, format);
+    // Get parameters until we reach the end.
+    uint32_t currentPos = 0;
+    while (currentPos < length) {
+        // Search until we find a number.
+        while ((sequence[currentPos] < '0' || sequence[currentPos] > '9') && currentPos < length)
+            currentPos++;
 
-    // Call va_list kprintf.
-    kprintf_va(format, args);
+        // If we have reached the end, break out.
+        if (currentPos >= length)
+            break;
 
-    spinlock_release(&kprintf_mutex);
+        // Get parameter.
+        uint32_t param = 0;
+		for (; currentPos < length && sequence[currentPos] >= '0' && sequence[currentPos] <= '9'; currentPos++)
+			param = param * 10 + (sequence[currentPos] - '0');
+
+        // Process parameter.
+        switch (param) {
+            case 0:
+                vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+                break;
+
+            // Foreground colors.
+            case 30:
+                vga_setcolor_fg(VGA_COLOR_BLACK);
+                break;
+
+            case 31:
+                vga_setcolor_fg(VGA_COLOR_RED);
+                break;
+
+            case 32:
+                vga_setcolor_fg(VGA_COLOR_GREEN);
+                break;
+
+            case 33:
+                vga_setcolor_fg(VGA_COLOR_BROWN);
+                break;
+
+            case 34:
+                vga_setcolor_fg(VGA_COLOR_BLUE);
+                break;
+
+            case 35:
+                vga_setcolor_fg(VGA_COLOR_MAGENTA);
+                break;
+
+            case 36:
+                vga_setcolor_fg(VGA_COLOR_CYAN);
+                break;
+
+            case 37:
+                vga_setcolor_fg(VGA_COLOR_LIGHT_GREY);
+                break;
+
+            // Background colors.
+            case 40:
+                vga_setcolor_bg(VGA_COLOR_BLACK);
+                break;
+
+            case 41:
+                vga_setcolor_bg(VGA_COLOR_RED);
+                break;
+
+            case 42:
+                vga_setcolor_bg(VGA_COLOR_GREEN);
+                break;
+
+            case 43:
+                vga_setcolor_bg(VGA_COLOR_BROWN);
+                break;
+
+            case 44:
+                vga_setcolor_bg(VGA_COLOR_BLUE);
+                break;
+
+            case 45:
+                vga_setcolor_bg(VGA_COLOR_MAGENTA);
+                break;
+
+            case 46:
+                vga_setcolor_bg(VGA_COLOR_CYAN);
+                break;
+
+            case 47:
+                vga_setcolor_bg(VGA_COLOR_LIGHT_GREY);
+                break;
+
+            // Bright foreground colors.
+            case 90:
+                vga_setcolor_fg(VGA_COLOR_DARK_GREY);
+                break;
+
+            case 91:
+                vga_setcolor_fg(VGA_COLOR_LIGHT_RED);
+                break;
+
+            case 92:
+                vga_setcolor_fg(VGA_COLOR_LIGHT_GREEN);
+                break;
+
+            case 93:
+                vga_setcolor_fg(VGA_COLOR_LIGHT_BROWN);
+                break;
+
+            case 94:
+                vga_setcolor_fg(VGA_COLOR_LIGHT_BLUE);
+                break;
+
+            case 95:
+                vga_setcolor_fg(VGA_COLOR_LIGHT_MAGENTA);
+                break;
+
+            case 96:
+                vga_setcolor_fg(VGA_COLOR_LIGHT_CYAN);
+                break;
+
+            case 97:
+                vga_setcolor_fg(VGA_COLOR_WHITE);
+                break;
+
+            // Bright background colors.
+            case 100:
+                vga_setcolor_bg(VGA_COLOR_DARK_GREY);
+                break;
+
+            case 101:
+                vga_setcolor_bg(VGA_COLOR_LIGHT_RED);
+                break;
+
+            case 102:
+                vga_setcolor_bg(VGA_COLOR_LIGHT_GREEN);
+                break;
+
+            case 103:
+                vga_setcolor_bg(VGA_COLOR_LIGHT_BROWN);
+                break;
+
+            case 104:
+                vga_setcolor_bg(VGA_COLOR_LIGHT_BLUE);
+                break;
+
+            case 105:
+                vga_setcolor_bg(VGA_COLOR_LIGHT_MAGENTA);
+                break;
+
+            case 106:
+                vga_setcolor_bg(VGA_COLOR_LIGHT_CYAN);
+                break;
+
+            case 107:
+                vga_setcolor_bg(VGA_COLOR_WHITE);
+                break;
+        }
+    }
 }
 
-void kprintf_nlock(const char* format, ...) {
+void kprintf(const char* format, ...) {
     // Get args.
     va_list args;
     va_start(args, format);
 
     // Call va_list kprintf.
-    kprintf_va(format, args);
+    kprintf_va(true, format, args);
+}
+
+void kprintf_nolock(const char* format, ...) {
+    // Get args.
+    va_list args;
+    va_start(args, format);
+
+    // Call va_list kprintf.
+    kprintf_va(false, format, args);
 }
 
 // https://en.wikipedia.org/wiki/Printf_format_string
 // Printf implementation.
-void kprintf_va(const char* format, va_list args) {
+void kprintf_va(bool lock, const char* format, va_list args) {
+    // Lock.
+    if (lock)
+        spinlock_lock(&kprintf_mutex);
+
     // Disable cursor for increased performance.
     vga_disable_cursor();
 
     // Iterate through format string.
     char c;
-    while (*format)
-    {
+    while (*format) {
         // Get current character.
         c = *format++;
 
         // Do we have the start of a variable?
-        if (c == '%')
-        {
+        if (c == '%') {
             // Get type of formatting.
             char f = *format++;
 
@@ -206,11 +391,9 @@ void kprintf_va(const char* format, va_list args) {
 
 
             // Do we have a long long?
-            if (f == 'l' && *format++ == 'l')
-            {
+            if (f == 'l' && *format++ == 'l') {
                 // Handle 32-bit integers.
-                switch (*format++)
-                {
+                switch (*format++) {
                     // If we have a null, skip over.
                     case '\0':
                         break;
@@ -258,11 +441,9 @@ void kprintf_va(const char* format, va_list args) {
                         break;
                 }
             }
-            else
-            {
+            else {
                 // Handle 32-bit integers.
-                switch (f)
-                {
+                switch (f) {
                     // If we have a null, skip over.
                     case '\0':
                         break;
@@ -317,6 +498,44 @@ void kprintf_va(const char* format, va_list args) {
                 }
             }       
         }
+        else if (c == '\033') {
+            // Escape sequence.
+            // Get current character.
+            serial_write(c);
+            c = *format++;
+            serial_write(c);
+
+            // Check if CSI (control sequence introducer).
+            if (c == '[') {
+                // Get length of sequence. A byte in the range of 0x40–0x7E signals the end.
+                bool found = false;
+                char *sequence = format;
+                uint32_t formatEnd = strlen(sequence);
+			    for (uint16_t i = 0; i < formatEnd; i++) {
+                    if (sequence[i] >= 0x40 && sequence[i] <= 0x7E) {
+                        formatEnd = i;
+                        found = true;
+                        break;
+				    }
+			    }
+
+                // Check if we even found the end.
+                if (found) {
+                    // Print to serial.
+                    for (uint32_t i = 0; i <= formatEnd; i++)
+                        serial_write(format[i]);
+
+                    // Determine type of sequence (end char).
+                    char seqTypeChar = sequence[formatEnd];
+                    switch (seqTypeChar) {
+                        case 'm':
+                            kprintf_sgr(sequence, formatEnd);
+                            format += formatEnd + 1;
+                            break;
+                    }
+                }
+            }
+        }
         else
         {
             // Print any other characters.
@@ -326,4 +545,8 @@ void kprintf_va(const char* format, va_list args) {
 
     // Re-enable the console driver
     vga_enable_cursor();
+
+    // Release lock.
+    if (lock)
+        spinlock_release(&kprintf_mutex);
 }

@@ -1,3 +1,27 @@
+/*
+ * File: kheap.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
@@ -6,9 +30,11 @@
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/pmm.h>
+#include <kernel/lock.h>
 
 // Based on code from https://github.com/CCareaga/heap_allocator. Licensed under the MIT.
 
+static lock_t kheap_lock = { };
 static size_t currentKernelHeapSize;
 static kheap_bin_t bins[KHEAP_BIN_COUNT];
 
@@ -126,14 +152,14 @@ static void kheap_dump_bin(uint32_t binIndex) {
     kheap_node_t *node = bins[binIndex].header;
 
     while (node != NULL) {
-        kprintf_nlock("NODE: 0x%X size: %u hole: %s\n", node, node->size, node->hole ? "yes" : "no");
+        kprintf("NODE: 0x%X size: %u hole: %s\n", node, node->size, node->hole ? "yes" : "no");
         node = node->nextNode;
     }
 }
 
 void kheap_dump_all_bins() {
     for (uint8_t i = 0; i < 9; i++) {
-        kprintf_nlock("Bin %u:\n", i);
+        kprintf("Bin %u:\n", i);
         kheap_dump_bin(i);
     }
 }
@@ -186,7 +212,7 @@ static bool kheap_expand(size_t size) {
         currentKernelHeapSize += PAGE_SIZE_4K;
     }
 
-    //kprintf_nlock("KHEAP: Heap expanded by 4KB to %u bytes!\n", currentKernelHeapSize);
+    //kprintf("KHEAP: Heap expanded by 4KB to %u bytes!\n", currentKernelHeapSize);
     return true;
 }
 
@@ -195,6 +221,9 @@ static void kheap_contract() {
 }
 
 void *kheap_alloc(size_t size) {
+    // Lock.
+    spinlock_lock(&kheap_lock);
+
     // Get bin index that the chunk should be in
     uint32_t binIndex = kheap_get_bin_index(size);
 
@@ -208,7 +237,7 @@ void *kheap_alloc(size_t size) {
     // If a chunk still couldn't be found, expand heap.
     if (node == NULL) {
         if (!kheap_expand(size)) {
-            kprintf_nlock("KHEAP: Failed to expand heap!\n");
+            kprintf("KHEAP: Failed to expand heap!\n");
             return NULL;
         }
 
@@ -261,10 +290,16 @@ void *kheap_alloc(size_t size) {
     // As the chunk is in use, clear the next and previous node fields.
     node->previousNode = NULL;
     node->nextNode = NULL;
+
+    // Unlock and return allocation.
+    spinlock_release(&kheap_lock);
     return (uint8_t*)node + KHEAP_HEADER_OFFSET;
 }
 
 void kheap_free(void *ptr) {
+    // Lock.
+    spinlock_lock(&kheap_lock);
+
     // Get header of node to free.
     kheap_node_t *header = (kheap_node_t*)((uint8_t*)ptr - KHEAP_HEADER_OFFSET);
 
@@ -272,6 +307,9 @@ void kheap_free(void *ptr) {
     if (header == (kheap_node_t*)KHEAP_START) {
         header->hole = true;
         kheap_add_node(kheap_get_bin_index(header->size), header);
+        
+        // Unlock.
+        spinlock_release(&kheap_lock);
         return;
     }
 
@@ -314,6 +352,9 @@ void kheap_free(void *ptr) {
     // Chunk is now a hole, place it in correct bin.
     header->hole = true;
     kheap_add_node(kheap_get_bin_index(header->size), header);
+
+    // Unlock.
+    spinlock_release(&kheap_lock);
 }
 
 void *kheap_realloc(void *oldPtr, size_t newSize) {
@@ -341,8 +382,8 @@ void *kheap_realloc(void *oldPtr, size_t newSize) {
     return newPtr;
 }
 
-void kheap_init() {
-    kprintf("KHEAP: Initializing at 0x%p...\n", KHEAP_START);
+void kheap_init(void) {
+    kprintf("\e[91mKHEAP: Initializing at 0x%p...\n", KHEAP_START);
 
     // Start with 4MB heap.
     currentKernelHeapSize = KHEAP_INITIAL_SIZE;
@@ -413,5 +454,5 @@ void kheap_init() {
     kheap_free(big);
     kheap_free(test2);
     kheap_free(test4);
-    kprintf("KHEAP: Initialized!\n");
+    kprintf("KHEAP: Initialized!\e[0m\n");
 }

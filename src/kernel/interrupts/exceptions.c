@@ -1,3 +1,27 @@
+/*
+ * File: exceptions.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <kprint.h>
 #include <kernel/interrupts/exceptions.h>
@@ -101,28 +125,28 @@ void exceptions_handler(ExceptionRegisters_t *regs) {
         panic("CPU%d: Exception: %s (error code: %p)\n", lapic_id(), exception_messages[regs->intNum], regs->errorCode);
 }
 
-void exceptions_init(void) {
+void exceptions_init(idt_entry_t *idt) {
     // Add exceptions to the IDT.
     kprintf("EXCEPTIONS: Initializing exceptions...\n");
-    idt_open_interrupt_gate(0, (uintptr_t)_exception0);
-    idt_open_interrupt_gate(1, (uintptr_t)_exception1);
-    idt_open_interrupt_gate(2, (uintptr_t)_exception2);
-    idt_open_interrupt_gate(3, (uintptr_t)_exception3);
-    idt_open_interrupt_gate(4, (uintptr_t)_exception4);
-    idt_open_interrupt_gate(5, (uintptr_t)_exception5);
-    idt_open_interrupt_gate(6, (uintptr_t)_exception6);
-    idt_open_interrupt_gate(7, (uintptr_t)_exception7);
-    idt_open_interrupt_gate(8, (uintptr_t)_exception8);
-    idt_open_interrupt_gate(9, (uintptr_t)_exception9);
-    idt_open_interrupt_gate(10, (uintptr_t)_exception10);
-    idt_open_interrupt_gate(11, (uintptr_t)_exception11);
-    idt_open_interrupt_gate(12, (uintptr_t)_exception12);
-    idt_open_interrupt_gate(13, (uintptr_t)_exception13);
-    idt_open_interrupt_gate(14, (uintptr_t)_exception14);
-    idt_open_interrupt_gate(16, (uintptr_t)_exception16);
-    idt_open_interrupt_gate(17, (uintptr_t)_exception17);
-    idt_open_interrupt_gate(18, (uintptr_t)_exception18);
-    idt_open_interrupt_gate(19, (uintptr_t)_exception19);
-    idt_open_interrupt_gate(20, (uintptr_t)_exception20);
+    idt_open_interrupt_gate(idt, 0, (uintptr_t)_exception0);
+    idt_open_interrupt_gate(idt, 1, (uintptr_t)_exception1);
+    idt_open_interrupt_gate(idt, 2, (uintptr_t)_exception2);
+    idt_open_interrupt_gate(idt, 3, (uintptr_t)_exception3);
+    idt_open_interrupt_gate(idt, 4, (uintptr_t)_exception4);
+    idt_open_interrupt_gate(idt, 5, (uintptr_t)_exception5);
+    idt_open_interrupt_gate(idt, 6, (uintptr_t)_exception6);
+    idt_open_interrupt_gate(idt, 7, (uintptr_t)_exception7);
+    idt_open_interrupt_gate(idt, 8, (uintptr_t)_exception8);
+    idt_open_interrupt_gate(idt, 9, (uintptr_t)_exception9);
+    idt_open_interrupt_gate(idt, 10, (uintptr_t)_exception10);
+    idt_open_interrupt_gate(idt, 11, (uintptr_t)_exception11);
+    idt_open_interrupt_gate(idt, 12, (uintptr_t)_exception12);
+    idt_open_interrupt_gate(idt, 13, (uintptr_t)_exception13);
+    idt_open_interrupt_gate(idt, 14, (uintptr_t)_exception14);
+    idt_open_interrupt_gate(idt, 16, (uintptr_t)_exception16);
+    idt_open_interrupt_gate(idt, 17, (uintptr_t)_exception17);
+    idt_open_interrupt_gate(idt, 18, (uintptr_t)_exception18);
+    idt_open_interrupt_gate(idt, 19, (uintptr_t)_exception19);
+    idt_open_interrupt_gate(idt, 20, (uintptr_t)_exception20);
     kprintf("EXCEPTIONS: Initialized!\n");
 }

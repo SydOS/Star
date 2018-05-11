@@ -10,6 +10,7 @@ extern void kprint_int(int64_t num);
 extern void kprint_uint(uint64_t num);
 extern void kprint_hex(uint64_t num, bool capital, uint8_t padLength);
 extern void kprintf(const char* format, ...);
-extern void kprintf_va(const char* format, va_list args);
+extern void kprintf_nolock(const char* format, ...);
+extern void kprintf_va(bool lock, const char* format, va_list args);
 
 #endif

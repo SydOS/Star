@@ -1,3 +1,27 @@
+/*
+ * File: ps2_keyboard.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
@@ -166,7 +190,7 @@ uint16_t ps2_keyboard_get_last_key(void *Driver) {
 }
 
 // Callback for keyboard on IRQ1.
-static void ps2_keyboard_callback()
+static bool ps2_keyboard_callback(irq_regs_t *regs, uint8_t irqNum)
 {	
     // Read data from keyboard.
     uint8_t data = ps2_get_data();
@@ -174,12 +198,12 @@ static void ps2_keyboard_callback()
 
     // If the data is just an ACK, throw it out.
     if (data == PS2_DATA_RESPONSE_ACK)
-        return;
+        return true;
 
     // Do we have an extended code? If so, return and handle the actual code the next time around.
     if (data == PS2_KEYBOARD_SCANCODE_EXTENDED1 || data == PS2_KEYBOARD_SCANCODE_EXTENDED2) {
         extended = true;
-        return;
+        return true;
     }
 
     // Reset extended status.
@@ -268,6 +292,7 @@ static void ps2_keyboard_callback()
         vga_putchar(keyboard_layout_us[key].shift_ascii);
     else
         vga_putchar(keyboard_layout_us[key].ascii);*/
+    return true;
 }
 
 // Initializes the keyboard.

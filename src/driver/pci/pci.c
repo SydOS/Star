@@ -1,9 +1,34 @@
+/*
+ * File: pci.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
 #include <driver/pci.h>
 
 #include <kernel/memory/kheap.h>
+#include <kernel/interrupts/ioapic.h>
 #include <driver/vga.h>
 
 #include <kernel/interrupts/irqs.h>
@@ -14,14 +39,14 @@
 pci_device_t *PciDevices = NULL;
 
 static bool pci_irq_callback(irq_regs_t *regs, uint8_t irqNum) {
-    kprintf_nlock("PCI: IRQ %u raised!\n", irqNum);
+    kprintf("PCI: IRQ %u raised!\n", irqNum);
 
     // Call handlers of devices that are on the raised IRQ, until the IRQ is handled.
     pci_device_t *pciDevice = PciDevices;
     while (pciDevice != NULL) {
         // Ensure device's IRQ matches and there is an interrupt handler.
         if (pciDevice->InterruptNo == irqNum) {
-            kprintf_nlock("%X:%X status: 0x%X\n", pciDevice->VendorId, pciDevice->DeviceId, pci_config_read_word(pciDevice, PCI_REG_STATUS));
+            kprintf("Checking device %X:%X, status: 0x%X\n", pciDevice->VendorId, pciDevice->DeviceId, pci_config_read_word(pciDevice, PCI_REG_STATUS));
             if ((pciDevice->InterruptHandler != NULL) && pciDevice->InterruptHandler(pciDevice))
                 return true;
         }
@@ -93,14 +118,12 @@ void pci_config_write_byte(pci_device_t *pciDevice, uint8_t reg, uint8_t value) 
  */
 void pci_print_info(pci_device_t *pciDevice) {
     // Print base info
-    vga_setcolor(VGA_COLOR_LIGHT_BLUE, VGA_COLOR_BLACK);
-    kprintf("PCI device: %X:%X (%X:%X) | Class %X Sub %X | Bus %d Device %d Function %d\n", 
+    kprintf("\e[94mPCI device: %X:%X (%X:%X) | Class %X Sub %X | Bus %d Device %d Function %d\n", 
         pciDevice->VendorId, pciDevice->DeviceId, pciDevice->SubVendorId, pciDevice->SubDeviceId, pciDevice->Class, pciDevice->Subclass, pciDevice->Bus, 
         pciDevice->Device, pciDevice->Function);
     
     // Print class info and base addresses
-    vga_setcolor(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
-    kprintf("  - %s\n", pci_class_descriptions[pciDevice->Class]);
+    kprintf("\e[96m  - %s\n", pci_class_descriptions[pciDevice->Class]);
 
     // Print base addresses.
     for (uint8_t i = 0; i < PCI_BAR_COUNT; i++)
@@ -109,7 +132,7 @@ void pci_print_info(pci_device_t *pciDevice) {
 
     // Interrupt info
     if(pciDevice->InterruptNo != 0) { 
-        kprintf("  - Interrupt %u (Pin %u Line %u\n", pciDevice->InterruptNo, pciDevice->InterruptPin, pciDevice->InterruptLine);
+        kprintf("  - Interrupt %u (Pin %u Line %u\e[0m\n", pciDevice->InterruptNo, pciDevice->InterruptPin, pciDevice->InterruptLine);
     }
 }
 
@@ -194,7 +217,7 @@ pci_device_t *pci_get_device(uint8_t bus, uint8_t device, uint8_t function, ACPI
             }        
 
             // Move to next entry.
-            table = (uintptr_t)table + table->Length;
+            table = (ACPI_PCI_ROUTING_TABLE *)((uintptr_t)table + table->Length);
         }
     }
 
@@ -259,8 +282,7 @@ static void pci_check_busses(uint8_t bus, pci_device_t *parentPciDevice) {
 
         // If the card reports more than one function, let's scan those too.
         if ((pciDevice->HeaderType & PCI_HEADER_TYPE_MULTIFUNC) != 0) {
-            vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
-            kprintf("  - Scanning other functions on multifunction device!\n");
+            kprintf("\e[32m  - Scanning other functions on multifunction device!\e[0m\n");
             // Check each function on the device
             for (uint8_t func = 1; func < PCI_NUM_FUNCTIONS; func++) {
                 pci_device_t *funcDevice = pci_get_device(bus, device, func, &buffer);
@@ -275,25 +297,21 @@ static void pci_check_busses(uint8_t bus, pci_device_t *parentPciDevice) {
 
         // Is the device a bridge?
         if (pciDevice->Class == PCI_CLASS_BRIDGE && pciDevice->Subclass == PCI_SUBCLASS_BRIDGE_PCI) {
-            vga_setcolor(VGA_COLOR_GREEN, VGA_COLOR_BLACK); 
             uint16_t secondaryBus = pci_config_read_word(pciDevice, PCI_REG_BAR2);
             uint16_t primaryBus = (secondaryBus & ~0xFF00);
             secondaryBus = (secondaryBus & ~0x00FF) >> 8;
-            kprintf("  - PCI bridge, Primary %X Secondary %X, scanning now.\n", primaryBus, secondaryBus);
+            kprintf("\e[32m  - PCI bridge, Primary %X Secondary %X, scanning now.\e[0m\n", primaryBus, secondaryBus);
             pci_check_busses(secondaryBus, pciDevice);
 
         // If device is a different kind of bridge
         } else if (pciDevice->Class == PCI_CLASS_BRIDGE) {
-            vga_setcolor(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK); 
-            kprintf("  - Ignoring non-PCI bridge\n");
+            kprintf("\e[91m  - Ignoring non-PCI bridge\e[0m\n");
         }
     }
 
     // Free interrupt table.
     if (buffer.Pointer)
         ACPI_FREE(buffer.Pointer);
-
-    vga_setcolor(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 }
 
 static void pci_load_drivers(void) {

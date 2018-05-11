@@ -1,3 +1,27 @@
+/*
+ * File: irqs.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <kprint.h>
 #include <string.h>
@@ -8,6 +32,7 @@
 #include <kernel/interrupts/ioapic.h>
 #include <kernel/interrupts/lapic.h>
 #include <kernel/interrupts/pic.h>
+#include <kernel/interrupts/smp.h>
 #include <kernel/memory/kheap.h>
 
 // Common IRQ assembly handler.
@@ -24,6 +49,11 @@ uint8_t irqs_get_count(void) {
     return irqCount;
 }
 
+static bool irqExecuting = false;
+bool irqs_irq_executing(void) {
+    return irqExecuting;
+}
+
 void irqs_eoi(uint8_t irq) {
     // Send EOI to LAPIC or PIC.
     if (useLapic)
@@ -32,8 +62,7 @@ void irqs_eoi(uint8_t irq) {
         pic_eoi(irq);
 }
 
-// Installs an IRQ handler.
-void irqs_install_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
+void irqs_install_handler_proc(uint8_t irq, irq_handler_func_t handlerFunc, uint32_t procIndex) {
     // Ensure IRQ is valid.
     if (irq >= irqCount)
         panic("IRQS: IRQ out of range.\n");
@@ -42,16 +71,34 @@ void irqs_install_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
     irq_handler_t *handler = kheap_alloc(sizeof(irq_handler_t));
     memset(handler, 0, sizeof(irq_handler_t));
 
-    // Add handler.
+    // Populate handler object.
+    handler->Next = NULL;
     handler->HandlerFunc = handlerFunc;
-    if (irqHandlers[irq] != NULL)
-        handler->Next = irqHandlers[irq];
-    irqHandlers[irq] = handler;
+    handler->ProcessorIndex = procIndex;
+
+    // Add handler to end of list.
+    if (irqHandlers[irq] != NULL) {
+        irq_handler_t *currHandler = irqHandlers[irq];
+        while (currHandler->Next != NULL)
+            currHandler = currHandler->Next;
+        currHandler->Next = handler;
+    }
+    else
+        irqHandlers[irq] = handler;
     kprintf("IRQS: Handler 0x%p for IRQ%u installed!\n", handlerFunc, irq);
 }
 
-// Removes an IRQ handler.
-void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
+// Installs an IRQ handler.
+void irqs_install_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t index = (proc != NULL) ? proc->Index : 0;
+
+    // Add handler.
+    irqs_install_handler_proc(irq, handlerFunc, index);
+}
+
+void irqs_remove_handler_proc(uint8_t irq, irq_handler_func_t handlerFunc, uint32_t procIndex) {
     // Ensure IRQ is valid.
     if (irq >= irqCount)
         panic("IRQS: IRQ out of range.\n");
@@ -60,7 +107,7 @@ void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
     irq_handler_t *prevHandler = NULL;
     irq_handler_t *handler = irqHandlers[irq];
     while (handler != NULL) {
-        if (handler->HandlerFunc == handlerFunc)
+        if (handler->HandlerFunc == handlerFunc && handler->ProcessorIndex == procIndex)
             break;
         prevHandler = handler;
         handler = handler->Next;
@@ -81,7 +128,17 @@ void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
     kprintf("IRQS: Handler 0x%p for IRQ%u removed!\n", handlerFunc, irq);
 }
 
-bool irqs_handler_mapped(uint8_t irq, irq_handler_func_t handlerFunc) {
+// Removes an IRQ handler.
+void irqs_remove_handler(uint8_t irq, irq_handler_func_t handlerFunc) {
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t index = (proc != NULL) ? proc->Index : 0;
+
+    // Remove handler.
+    return irqs_remove_handler_proc(irq, handlerFunc, index);
+}
+
+bool irqs_handler_mapped_proc(uint8_t irq, irq_handler_func_t handlerFunc, uint32_t procIndex) {
     // Ensure IRQ is valid.
     if (irq >= irqCount)
         panic("IRQS: IRQ out of range.\n");
@@ -89,25 +146,39 @@ bool irqs_handler_mapped(uint8_t irq, irq_handler_func_t handlerFunc) {
     // Try to find IRQ handler.
     irq_handler_t *handler = irqHandlers[irq];
     while (handler != NULL) {
-        if (handler->HandlerFunc == handlerFunc)
+        if (handler->HandlerFunc == handlerFunc && handler->ProcessorIndex == procIndex)
             return true;
         handler = handler->Next;
     }
     return false;
 }
 
+bool irqs_handler_mapped(uint8_t irq, irq_handler_func_t handlerFunc) {
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t index = (proc != NULL) ? proc->Index : 0;
+
+    // Determine if handler is mapped.
+    return irqs_handler_mapped_proc(irq, handlerFunc, index);
+}
+
 // Handler for IRQss.
 void irqs_handler(irq_regs_t *regs) {
     // Get IRQ number.
+    irqExecuting = true;
     uint8_t irq = useLapic ? lapic_get_irq() : pic_get_irq();
+
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
 
     // Ensure IRQ is within range.
     if (irq < irqCount) {
         // Invoke registered handlers.
         irq_handler_t *handler = irqHandlers[irq];
         while (handler != NULL) {
-            if (handler->HandlerFunc != NULL) {
-                if (handler->HandlerFunc(regs, irq))
+            if (handler->HandlerFunc != NULL && handler->ProcessorIndex == procIndex) {
+                if (handler->HandlerFunc(regs, irq, procIndex))
                     break;
             }
             handler = handler->Next;
@@ -116,9 +187,10 @@ void irqs_handler(irq_regs_t *regs) {
 
     // Send EOI.
     irqs_eoi(irq);
+    irqExecuting = false;
 }
 
-void irqs_init(void) {
+void irqs_init(idt_entry_t *idt) {
     kprintf("IRQS: Intializing...\n");
 
     // Initialize PIC and I/O APIC.
@@ -127,8 +199,8 @@ void irqs_init(void) {
     useLapic = false;
     irqCount = IRQ_ISA_COUNT;
 
-    // If ACPI and the I/O APIC are supported, changeover to that.
-    if (acpi_supported() && ioapic_supported()) {
+    // If the I/O APIC is supported, changeover to that.
+    if (ioapic_supported()) {
         kprintf("IRQS: Using APICs for IRQs.\n");
 
         // Disable PIC and initialize LAPIC.
@@ -146,7 +218,7 @@ void irqs_init(void) {
             // IRQ 2 is not used.
             if (i == 2)
                 continue;
-            
+
             // Enable IRQ.
             ioapic_enable_interrupt(ioapic_remap_interrupt(i), IRQ_OFFSET + i);
         }
@@ -161,6 +233,6 @@ void irqs_init(void) {
 
     // Open gates in IDT.
     for (uint8_t irq = 0; irq < irqCount; irq++)
-        idt_open_interrupt_gate(irq + IRQ_OFFSET, (uintptr_t)_irq_common);
+        idt_open_interrupt_gate(idt, irq + IRQ_OFFSET, (uintptr_t)_irq_common);
     kprintf("IRQS: Initialized!\n");
 }

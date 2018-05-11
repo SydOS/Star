@@ -1,5 +1,29 @@
+/*
+ * File: tools.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
-#include <kernel/pit.h>
+#include <kernel/timer.h>
 
 /**
  * Convert int to char array
@@ -76,9 +100,9 @@ uint32_t maxrand(uint32_t seed, uint32_t max) {
 void sleep(uint32_t ms)
 {
 	// 1 tick = 1 ms.
-	uint64_t startTick = pit_ticks();
+	uint64_t startTick = timer_ticks();
 	uint64_t endTick = startTick + ms;
-	uint32_t tick = pit_ticks();
+	uint32_t tick = timer_ticks();
 	while (tick < endTick)
-		tick = pit_ticks();
+		tick = timer_ticks();
 }

@@ -1,3 +1,27 @@
+/*
+ * File: ioapic.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <kprint.h>
 #include <io.h>
@@ -49,7 +73,7 @@ uint32_t ioapic_remap_interrupt(uint32_t interrupt) {
     return interrupt;
 }
 
-inline bool ioapic_supported() {
+bool ioapic_supported(void) {
     return ioApicInitialized;
 }
 
@@ -69,15 +93,15 @@ static uint32_t ioapic_read(uint8_t offset) {
     return *(volatile uint32_t*)(ioApicPointer + IOAPIC_IOWIN);
 }
 
-uint8_t ioapic_id() {
+uint8_t ioapic_id(void) {
     return (uint8_t)((ioapic_read(IOAPIC_REG_ID) >> 24) & 0xF);
 }
 
-uint8_t ioapic_version() {
+uint8_t ioapic_version(void) {
     return (uint8_t)(ioapic_read(IOAPIC_REG_VERSION) & 0xFF);
 }
 
-uint8_t ioapic_max_interrupts() {
+uint8_t ioapic_max_interrupts(void) {
     return (uint8_t)(((ioapic_read(IOAPIC_REG_VERSION) >> 16) & 0xFF) + 1);
 }
 
@@ -143,7 +167,7 @@ void ioapic_disable_interrupt(uint8_t interrupt) {
     ioapic_set_redirection_entry(interrupt, entry);
 }
 
-void ioapic_init() {
+void ioapic_init(void) {
     // Only initialize once.
     if (ioApicInitialized)
         panic("IOAPIC: Attempting to initialize multiple times.\n");
