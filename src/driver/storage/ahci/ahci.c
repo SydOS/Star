@@ -34,6 +34,9 @@
 #include <kernel/memory/paging.h>
 #include <driver/pci.h>
 
+#include <driver/storage/ata/ata.h>
+#include <driver/storage/ata/ata_commands.h>
+
 static void ahci_port_cmd_start(ahci_port_t *ahciPort) {
     // Get controller and port.
     ahci_controller_t *ahciController = ahciPort->Controller;
@@ -198,17 +201,29 @@ bool ahci_init(pci_device_t *pciDevice) {
     memset(cmdTable, 0, PAGE_SIZE_4K);
     uint32_t ss = sizeof(ahci_received_fis_t);
     
+    uint32_t dataPage = pmm_pop_frame_nonlong();
+    uint16_t *dataPtr = (uint16_t*)paging_device_alloc(dataPage, dataPage);
+    memset(dataPtr, 0, 0x1000);
+
+    ata_identify_result_t* ata = (ata_identify_result_t*)dataPtr;
+    uint32_t fff = sizeof(ata_identify_result_t);
+
     hddPort->CommandList[0].CommandTableBaseAddress = cmdTablePage;
-    hddPort->CommandList[0].PhyRegionDescTableLength = 8;
+    hddPort->CommandList[0].CommandFisLength = 4;
+    hddPort->CommandList[0].PhyRegionDescTableLength = 1;
+    cmdTable->PhysRegionDescTable[0].DataBaseAddress = dataPage;
+    cmdTable->PhysRegionDescTable[0].DataByteCount = 0x1000 - 1;
     ahci_fis_reg_host_to_device_t *h2d = (ahci_fis_reg_host_to_device_t*)&cmdTable->CommandFis;
     h2d->FisType = 0x27;
     h2d->IsCommand = true;
     h2d->CommandReg = 0xEC;
 
+
+
     // enable command.
     ahciController->Memory->Ports[0].CommandsIssued = 1;
     while (true) {
-        if (ahciController->Memory->Ports[0].CommandsIssued & 1 == 0)
+        if ((ahciController->Memory->Ports[0].CommandsIssued & 1) == 0)
             break;
     }
 
