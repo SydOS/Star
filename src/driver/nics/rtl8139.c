@@ -59,7 +59,12 @@ return true;
 	
 }
 
-void rtl8139_init(pci_device_t* dev) {
+bool rtl8139_init(pci_device_t* dev) {
+	// Is the PCI device an RTL8139?
+    if (!(dev->VendorId == 0x10EC && dev->DeviceId == 0x8139)) {
+        return false;
+    }
+
 	// Allocate RTL8139 struct
 	struct RTL8139 *rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
 	dev->DriverObject = rtl;
@@ -69,7 +74,8 @@ void rtl8139_init(pci_device_t* dev) {
 	//for(uint8_t i = 0; i < 6; i++)
 	//	if ((rtl->BaseAddress = dev->BAR[i]) != 0) break;
 
-	rtl->BaseAddress = rtl->BaseAddress - 1;
+	rtl->BaseAddress = dev->BaseAddresses[0].BaseAddress;
+	//rtl->BaseAddress = 0xC000;
 
 	// Check base address is valid
 	if(rtl->BaseAddress == 0) {
@@ -127,10 +133,12 @@ void rtl8139_init(pci_device_t* dev) {
 	outb(rtl->BaseAddress + 0x37, 0x0C);
 
 
-	kprintf("MEdia statudsfsd: 0x%X", inb(rtl->BaseAddress + 0x58));
+	kprintf("Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
 
 	//while(true);
 
 	// Free device for now
 	//kheap_free(rtl);
+
+	return true;
 }
