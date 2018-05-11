@@ -34,7 +34,7 @@
 #include <kernel/memory/paging.h>
 #include <driver/pci.h>
 
-void ahci_port_cmd_start(ahci_port_t *ahciPort) {
+static void ahci_port_cmd_start(ahci_port_t *ahciPort) {
     // Get controller and port.
     ahci_controller_t *ahciController = ahciPort->Controller;
     ahci_port_memory_t *portMemory = ahciController->Memory->Ports + ahciPort->Number;
@@ -47,7 +47,7 @@ void ahci_port_cmd_start(ahci_port_t *ahciPort) {
     portMemory->CommandStatus.Started = true;
 }
 
-void ahci_port_cmd_stop(ahci_port_t *ahciPort) {
+static void ahci_port_cmd_stop(ahci_port_t *ahciPort) {
     // Get controller and port.
     ahci_controller_t *ahciController = ahciPort->Controller;
     ahci_port_memory_t *portMemory = ahciController->Memory->Ports + ahciPort->Number;
@@ -63,7 +63,7 @@ void ahci_port_cmd_stop(ahci_port_t *ahciPort) {
     portMemory->CommandStatus.FisReceiveEnabled = false;
 }
 
-void ahci_port_init_memory(ahci_port_t *ahciPort) {
+static void ahci_port_init_memory(ahci_port_t *ahciPort) {
     // Get controller and port.
     ahci_controller_t *ahciController = ahciPort->Controller;
     ahci_port_memory_t *portMemory = ahciController->Memory->Ports + ahciPort->Number;
@@ -71,21 +71,17 @@ void ahci_port_init_memory(ahci_port_t *ahciPort) {
     // Stop port.
     ahci_port_cmd_stop(ahciPort);
 
-    // Set command list offset (1KB per port).
-    portMemory->CommandListBaseAddress = (uint32_t)pmm_dma_get_phys(ahciController->DmaPage + (ahciPort->Number << 10));
-    memset((void*)pmm_dma_get_virtual(portMemory->CommandListBaseAddress), 0, AHCI_CMDLIST_SIZE);
+    // Get physical addresses of command list.
+    uint64_t commandListPhys = 0;
+    if (!paging_get_phys((uintptr_t)ahciPort->CommandList, &commandListPhys))
+        panic("AHCI: Attempted to use nonpaged address for command list!\n");
+    portMemory->CommandListBaseAddress = commandListPhys;
 
-    // Set FIS list offset (256 bytes per port).
-    portMemory->FisBaseAddress = (uint32_t)pmm_dma_get_phys(ahciController->DmaPage + (32 << 10) + (ahciPort->Number << 8));
-    memset((void*)pmm_dma_get_virtual(portMemory->FisBaseAddress), 0, AHCI_FIS_SIZE);
-
-    // Configure first command header. This will need changes if we want to
-    // do more than one command at a time.
-    ahci_command_header_t *cmdHeaders = (ahci_command_header_t*)pmm_dma_get_virtual(portMemory->CommandListBaseAddress);
-
-    cmdHeaders[0].PhyRegionDescTableLength = 8;
-    cmdHeaders[0].CommandTableBaseAddress = (uint32_t)pmm_dma_get_phys(ahciController->DmaPage + (40 << 10) + (ahciPort->Number << 8));
-    memset((void*)pmm_dma_get_virtual(cmdHeaders[0].CommandTableBaseAddress), 0, 256);
+    // Get physical addresses of received FISes.
+    uint64_t fisPhys = 0;
+    if (!paging_get_phys((uintptr_t)ahciPort->ReceivedFis, &fisPhys))
+        panic("AHCI: Attempted to use nonpaged address for command list!\n");
+    portMemory->FisBaseAddress = fisPhys;
 
     // Start port.
     ahci_port_cmd_start(ahciPort);
@@ -113,7 +109,6 @@ bool ahci_probe_port(ahci_port_t *ahciPort) {
             ahciPort->Type = AHCI_DEV_TYPE_SATA_ATAPI;
             return true;
     }
-
     return false;
 }
 
@@ -134,29 +129,48 @@ bool ahci_init(pci_device_t *pciDevice) {
     ahciController->BasePointer = (uint32_t*)paging_device_alloc(ahciController->BaseAddress, ahciController->BaseAddress);
     ahciController->Memory = (ahci_memory_t*)ahciController->BasePointer;
 
-    // Get DMA page (TODO: 64-bit capable controller doesn't have to use that).
-    // Pull a DMA frame for USB frame storage.
-    if (!pmm_dma_get_free_frame(&ahciController->DmaPage))
-        panic("AHCI: Couldn't get DMA frame!\n");
-    memset((void*)ahciController->DmaPage, 0, PAGE_SIZE_64K);
-
     // Get port count.
     ahciController->PortCount = ahciController->Memory->Capabilities.PortCount + 1;
     ahciController->Ports = (ahci_port_t**)kheap_alloc(sizeof(ahci_port_t*) * ahciController->PortCount);
     memset(ahciController->Ports, 0, sizeof(ahci_port_t*) * ahciController->PortCount);
 
-    // Create command list buffers.
-    //ahciController->CommandListBuffers = (uintptr_t*)kheap_alloc(sizeof(uintptr_t) * ahciController->PortCount);
+    uint32_t commandListPage = pmm_pop_frame_nonlong();
+    ahci_command_header_t *commandList = (ahci_command_header_t*)paging_device_alloc(commandListPage, commandListPage);
+    memset(commandList, 0, PAGE_SIZE_4K);
+    uint8_t commandListPageCount = 0;
 
+    uint32_t pageFisList = pmm_pop_frame_nonlong();
+    ahci_received_fis_t *fisList = (ahci_received_fis_t*)paging_device_alloc(pageFisList, pageFisList);
+    memset(fisList, 0, PAGE_SIZE_4K);
+    uint8_t fisListPageCount = 0;
 
     // Create ports.
     uint32_t enabledPorts = 0;
     for (uint8_t port = 0; port < ahciController->PortCount; port++) {
         if (ahciController->Memory->PortsImplemented & (1 << port)) {
+            // If no more command list addresses, pop another page.
+            if (commandListPageCount == 4) {
+                commandListPage = pmm_pop_frame_nonlong();
+                commandList = (ahci_command_header_t*)paging_device_alloc(commandListPage, commandListPage);
+                memset(commandList, 0, PAGE_SIZE_4K);
+                commandListPageCount = 0;
+            }
+            if (fisListPageCount == (PAGE_SIZE_4K / sizeof(ahci_received_fis_t))) {
+                pageFisList = pmm_pop_frame_nonlong();
+                fisList = (ahci_received_fis_t*)paging_device_alloc(pageFisList, pageFisList);
+                memset(fisList, 0, PAGE_SIZE_4K);
+                fisListPageCount = 0;
+            }
+
+            // Create port object.
             ahciController->Ports[port] = (ahci_port_t*)kheap_alloc(sizeof(ahci_port_t));
             memset(ahciController->Ports[port], 0, sizeof(ahci_port_t));
             ahciController->Ports[port]->Controller = ahciController;
             ahciController->Ports[port]->Number = port;
+            ahciController->Ports[port]->CommandList = commandList + (AHCI_COMMAND_LIST_COUNT * commandListPageCount);
+            commandListPageCount++;
+            ahciController->Ports[port]->ReceivedFis = fisList + fisListPageCount;
+            fisListPageCount++;
 
             // Probe port.
             if (ahci_probe_port(ahciController->Ports[port])) {
@@ -171,10 +185,31 @@ bool ahci_init(pci_device_t *pciDevice) {
                 }
             }
 
-            // Stop and initialize port's memory.
+            // Initialize port's memory.
             ahci_port_init_memory(ahciController->Ports[port]);
             enabledPorts++;
         }
+    }
+
+    ahci_port_t *hddPort = ahciController->Ports[0];
+
+    uint32_t cmdTablePage = pmm_pop_frame_nonlong();
+    ahci_command_table_t *cmdTable = (ahci_command_table_t*)paging_device_alloc(cmdTablePage, cmdTablePage);
+    memset(cmdTable, 0, PAGE_SIZE_4K);
+    uint32_t ss = sizeof(ahci_received_fis_t);
+    
+    hddPort->CommandList[0].CommandTableBaseAddress = cmdTablePage;
+    hddPort->CommandList[0].PhyRegionDescTableLength = 8;
+    ahci_fis_reg_host_to_device_t *h2d = (ahci_fis_reg_host_to_device_t*)&cmdTable->CommandFis;
+    h2d->FisType = 0x27;
+    h2d->IsCommand = true;
+    h2d->CommandReg = 0xEC;
+
+    // enable command.
+    ahciController->Memory->Ports[0].CommandsIssued = 1;
+    while (true) {
+        if (ahciController->Memory->Ports[0].CommandsIssued & 1 == 0)
+            break;
     }
 
     // Print info.
