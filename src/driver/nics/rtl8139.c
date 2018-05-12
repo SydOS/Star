@@ -109,17 +109,19 @@ bool rtl8139_init(pci_device_t* dev) {
 	while ((inb(rtl->BaseAddress + 0x37) & 0x10) != 0);
 	kprintf("RTL8139: Reset card\n");
 
+	// Get DMA buffer
 	uintptr_t recDma = 0;
 	pmm_dma_get_free_frame(&recDma);
 	kprintf("RTL8139: Allocated DMA buffer\n");
 
+	// Send DMA buffer location to RTL8139
 	outl(rtl->BaseAddress + 0x30, recDma - memInfo.kernelVirtualOffset);
 	outw(rtl->BaseAddress + 0x3C, 0xFFFF);
 	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
 	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
 
+	// Ask for media status of RTL8139
 	outb(rtl->BaseAddress + 0x37, 0x0C);
-
 	kprintf("RTL8139: Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
 
 	return true;
