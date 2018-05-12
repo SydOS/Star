@@ -110,18 +110,27 @@ bool rtl8139_init(pci_device_t* dev) {
 	kprintf("RTL8139: Reset card\n");
 
 	// Get DMA buffer
-	uintptr_t recDma = 0;
-	pmm_dma_get_free_frame(&recDma);
-	kprintf("RTL8139: Allocated DMA buffer\n");
+	uintptr_t rxDMA = 0;
+	pmm_dma_get_free_frame(&rxDMA);
+	kprintf("RTL8139: Allocated RX DMA buffer\n");
 
 	// Send DMA buffer location to RTL8139
-	outl(rtl->BaseAddress + 0x30, recDma - memInfo.kernelVirtualOffset);
-	outw(rtl->BaseAddress + 0x3C, 0xFFFF);
-	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
+	outl(rtl->BaseAddress + 0x30, rxDMA - memInfo.kernelVirtualOffset);
 	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
 
-	// Ask for media status of RTL8139
+	// Set IMR + ISR
+	outw(rtl->BaseAddress + 0x3C, 0x0005);
+	kprintf("RTL8139: Set IMR + ISR\n");
+
+	// Configure RX buffer
+	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
+	kprintf("RTL8139: Configured receive buffer\n");
+
+	// Enable RX and TX
 	outb(rtl->BaseAddress + 0x37, 0x0C);
+	kprintf("RTL8139: Enabled RX and TX\n");
+
+	// Ask for media status of RTL8139
 	kprintf("RTL8139: Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
 
 	// Return true, we have handled the PCI device passed to us
