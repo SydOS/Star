@@ -124,5 +124,6 @@ bool rtl8139_init(pci_device_t* dev) {
 	outb(rtl->BaseAddress + 0x37, 0x0C);
 	kprintf("RTL8139: Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
 
+	// Return true, we have handled the PCI device passed to us
 	return true;
 }
