@@ -51,10 +51,14 @@ struct RTL8139 {
 	uint8_t MACAddress[6];
 };
 
-bool rtl_callbac(pci_device_t *device) {
-	kprintf("Clearing RTL8139 interrupt\n");
-	struct RTL8139 *rtl = (struct RTL8139*)device->DriverObject;
+bool rtl_callback(pci_device_t *dev) {
+	if (!(dev->VendorId == 0x10EC && dev->DeviceId == 0x8139)) {
+        return false;
+    }
+
+	struct RTL8139 *rtl = (struct RTL8139*)dev->DriverObject;
 	outw(rtl->BaseAddress + 0x3E, 0xFFFF);
+	kprintf("RTL8139: Cleared interrupt\n");
 	return true;
 }
 
