@@ -71,7 +71,7 @@ bool rtl8139_init(pci_device_t* dev) {
 	// Allocate RTL8139 struct
 	struct RTL8139 *rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
 	dev->DriverObject = rtl;
-	kprintf("RTL8139: Pointed RTL struct to DriverObject\n");
+	kprintf("\e[35mRTL8139: Pointed RTL struct to DriverObject\n");
 	dev->InterruptHandler = rtl_callback;
 	kprintf("RTL8139: Pointed RTL callback handler function to InterruptHandler\n");
 
