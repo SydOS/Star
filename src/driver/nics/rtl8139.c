@@ -115,22 +115,6 @@ bool rtl8139_init(pci_device_t* dev) {
 	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
 	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
 
-	//interrupts_irq_install_handler(dev->IntLine, rtl_callbac);
-	//interrupts_irq_install_handler(4, rtl_callbac);
-
-
-	//idt_set_gate(IRQ_OFFSET + dev->apicLine, (uintptr_t)_irqT, 0x08, 0x8E);
-	//ioapic_enable_interrupt(ioapic_remap_interrupt(dev->apicLine), dev->apicLine);
-
-	//idt_set_gate(IRQ_OFFSET + 16, (uintptr_t)_irq16, 0x08, 0x8E);
-	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(16), IRQ_OFFSET + 16);
-	//idt_set_gate(IRQ_OFFSET + 17, (uintptr_t)_irq17, 0x08, 0x8E);
-	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(17), IRQ_OFFSET + 17);
-	//idt_set_gate(IRQ_OFFSET + 18, (uintptr_t)_irq18, 0x08, 0x8E);
-	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(18), IRQ_OFFSET + 18);
-	//idt_set_gate(IRQ_OFFSET + 21, (uintptr_t)_irq19, 0x08, 0x8E);
-	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(21), IRQ_OFFSET + 21);
-
 	outb(rtl->BaseAddress + 0x37, 0x0C);
 
 	kprintf("RTL8139: Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
