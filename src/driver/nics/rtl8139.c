@@ -52,12 +52,10 @@ struct RTL8139 {
 };
 
 bool rtl_callbac(pci_device_t *device) {
-	
-kprintf("Clearing RTL8139 interrupt\n");
-struct RTL8139 *rtl = (struct RTL8139*)device->DriverObject;
-outw(rtl->BaseAddress + 0x3E, 0xFFFF);
-return true;
-	
+	kprintf("Clearing RTL8139 interrupt\n");
+	struct RTL8139 *rtl = (struct RTL8139*)device->DriverObject;
+	outw(rtl->BaseAddress + 0x3E, 0xFFFF);
+	return true;
 }
 
 bool rtl8139_init(pci_device_t* dev) {
@@ -116,7 +114,7 @@ bool rtl8139_init(pci_device_t* dev) {
 	outw(rtl->BaseAddress + 0x3C, 0xFFFF);
 	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
 	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
-	
+
 	//interrupts_irq_install_handler(dev->IntLine, rtl_callbac);
 	//interrupts_irq_install_handler(4, rtl_callbac);
 
@@ -133,19 +131,9 @@ bool rtl8139_init(pci_device_t* dev) {
 	//idt_set_gate(IRQ_OFFSET + 21, (uintptr_t)_irq19, 0x08, 0x8E);
 	//ioapic_enable_interrupt_pci(ioapic_remap_interrupt(21), IRQ_OFFSET + 21);
 
-
-
 	outb(rtl->BaseAddress + 0x37, 0x0C);
 
-
 	kprintf("RTL8139: Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
-
-	//while(true);
-
-	// Free device for now
-	//kheap_free(rtl);
-
-	sleep(5000);
 
 	return true;
 }
