@@ -75,9 +75,6 @@ bool rtl8139_init(pci_device_t* dev) {
 	for(uint8_t i = 0; i < 6; i++)
 		if ((rtl->BaseAddress = dev->BaseAddresses[i].BaseAddress) != 0) break;
 
-	//rtl->BaseAddress = dev->BaseAddresses[0].BaseAddress;
-	//rtl->BaseAddress = 0xC000;
-
 	// Check base address is valid
 	if(rtl->BaseAddress == 0) {
 		kprintf("RTL8139: INVALID BAR\n");
