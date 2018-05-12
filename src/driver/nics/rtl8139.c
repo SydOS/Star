@@ -106,13 +106,17 @@ bool rtl8139_init(pci_device_t* dev) {
 	// reset.
 	outb(rtl->BaseAddress + 0x37, 0x10);
 	while ((inb(rtl->BaseAddress + 0x37) & 0x10) != 0);
+	kprintf("RTL8139: Reset card\n");
 
 	uintptr_t recDma = 0;
 	pmm_dma_get_free_frame(&recDma);
+	kprintf("RTL8139: Allocated DMA buffer\n");
 
 	outl(rtl->BaseAddress + 0x30, recDma - memInfo.kernelVirtualOffset);
 	outw(rtl->BaseAddress + 0x3C, 0xFFFF);
 	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
+	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
+	
 	//interrupts_irq_install_handler(dev->IntLine, rtl_callbac);
 	//interrupts_irq_install_handler(4, rtl_callbac);
 
