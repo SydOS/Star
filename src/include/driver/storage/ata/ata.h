@@ -140,6 +140,16 @@ typedef struct {
     ata_channel_t Secondary;
 } ata_device_t;
 
+typedef struct {
+    bool Error : 1;
+    uint8_t Unused : 2;
+    bool DataRequest : 1;
+    bool ServiceRequest : 1;
+    bool DriveFault : 1;
+    bool Ready : 1;
+    bool Busy : 1;
+} __attribute__((packed)) ata_reg_status_t;
+
 extern bool ata_init(pci_device_t *pciDevice);
 
 #endif

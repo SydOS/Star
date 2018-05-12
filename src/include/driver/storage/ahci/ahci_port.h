@@ -27,6 +27,7 @@
 
 #include <main.h>
 #include <driver/pci.h>
+#include <driver/storage/ata/ata.h>
 
 #define AHCI_DEV_TYPE_NONE          0
 #define AHCI_DEV_TYPE_SATA          1
@@ -92,7 +93,10 @@ typedef struct {
 
 // Offset 0x20, Port x Task File Data.
 typedef struct {
-    uint8_t Status;
+    union {
+        uint8_t RawValue;
+        ata_reg_status_t Data;
+    } Status;
     uint8_t Error;
     uint16_t Reserved;
 } __attribute__((packed)) ahci_port_task_file_data_t;
@@ -133,6 +137,10 @@ typedef struct {
     uint8_t InterfacePowerManagement: 4;
     uint32_t Reserved : 20;
 } __attribute__((packed)) ahci_port_sata_status_t;
+
+#define AHCI_SATA_STATUS_DETECT_INIT_NO_ACTION      0x0
+#define AHCI_SATA_STATUS_DETECT_INIT_RESET          0x1
+#define AHCI_SATA_STATUS_DETECT_INIT_DISABLE        0x4
 
 // Offset 0x2C, Port x Serial ATA Control.
 typedef struct {
@@ -204,8 +212,14 @@ typedef struct {
     uint64_t CommandListBaseAddress;
     uint64_t FisBaseAddress;
 
-    ahci_port_interrupt_t InterruptsStatus;
-    ahci_port_interrupt_t InterruptsEnabled;
+    union {
+        uint32_t RawValue;
+        ahci_port_interrupt_t Data;
+    } InterruptsStatus;
+    union {
+        uint32_t RawValue;
+        ahci_port_interrupt_t Data;
+    } InterruptsEnabled;
 
     ahci_port_command_status_t CommandStatus;
     uint8_t Reserved1[0x20-0x1C];
@@ -217,9 +231,17 @@ typedef struct {
         ahci_port_signature_t Data;
     } Signature;
 
-    ahci_port_sata_status_t SataStatus;
+    union {
+        uint32_t RawValue;
+        ahci_port_sata_status_t Data;
+    } SataStatus;
+
     ahci_port_sata_control_t SataControl;
-    ahci_port_sata_error_t SataError;
+    union {
+        uint32_t RawValue;
+        ahci_port_sata_error_t Data;
+    } SataError;
+    
     uint32_t SataActive;
 
     uint32_t CommandsIssued;

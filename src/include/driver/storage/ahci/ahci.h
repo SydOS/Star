@@ -169,7 +169,10 @@ typedef struct {
 } __attribute__((packed)) ahci_handoff_state_t;
 
 typedef struct {
-    ahci_host_cap_t Capabilities;
+    union {
+        uint32_t RawValue;
+        ahci_host_cap_t Data;
+    } Capabilities;
     ahci_global_control_t GlobalControl;
     uint32_t InterruptStatus;
     uint32_t PortsImplemented;
@@ -333,12 +336,7 @@ typedef struct {
 typedef struct {
     // Register access.
     uint32_t BaseAddress;
-    uint32_t *BasePointer;
-    ahci_memory_t *Memory;
-
-    // Pages used for memory.
-    uintptr_t DmaPage;
-    uintptr_t DmaPageSecondary;
+    volatile ahci_memory_t *Memory;
 
     // Ports.
     ahci_port_t **Ports;

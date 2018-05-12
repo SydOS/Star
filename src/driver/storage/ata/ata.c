@@ -300,8 +300,8 @@ static void ata_print_device_info(ata_identify_result_t info) {
     if (info.versionMajor & ATA_VERSION_ATA8)
         kprintf(" ATA-8");
     kprintf("\n");
-    if (info.commandFlags83.info.lba48BitSupported)
-        kprintf("ATA:    48-bit LBA supported.\n");
+    //if (info.commandFlags83.info.lba48BitSupported)
+     //   kprintf("ATA:    48-bit LBA supported.\n");
 
     // Is the device SATA?
     if (!(info.serialAtaFlags76 == 0x0000 || info.serialAtaFlags76 == 0xFFFF)) {
