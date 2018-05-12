@@ -67,13 +67,15 @@ bool rtl8139_init(pci_device_t* dev) {
 	// Allocate RTL8139 struct
 	struct RTL8139 *rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
 	dev->DriverObject = rtl;
-	dev->InterruptHandler = rtl_callbac;
+	kprintf("RTL8139: Pointed RTL struct to DriverObject\n");
+	dev->InterruptHandler = rtl_callback;
+	kprintf("RTL8139: Pointed RTL callback handler function to InterruptHandler\n");
 
 	// Setup base address
-	//for(uint8_t i = 0; i < 6; i++)
-	//	if ((rtl->BaseAddress = dev->BAR[i]) != 0) break;
+	for(uint8_t i = 0; i < 6; i++)
+		if ((rtl->BaseAddress = dev->BaseAddresses[i].BaseAddress) != 0) break;
 
-	rtl->BaseAddress = dev->BaseAddresses[0].BaseAddress;
+	//rtl->BaseAddress = dev->BaseAddresses[0].BaseAddress;
 	//rtl->BaseAddress = 0xC000;
 
 	// Check base address is valid
