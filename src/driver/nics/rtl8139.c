@@ -25,6 +25,7 @@
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
+#include <tools.h>
 #include <driver/pci.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
@@ -59,7 +60,12 @@ return true;
 	
 }
 
-void rtl8139_init(pci_device_t* dev) {
+bool rtl8139_init(pci_device_t* dev) {
+	// Is the PCI device an RTL8139?
+    if (!(dev->VendorId == 0x10EC && dev->DeviceId == 0x8139)) {
+        return false;
+    }
+
 	// Allocate RTL8139 struct
 	struct RTL8139 *rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
 	dev->DriverObject = rtl;
@@ -69,12 +75,13 @@ void rtl8139_init(pci_device_t* dev) {
 	//for(uint8_t i = 0; i < 6; i++)
 	//	if ((rtl->BaseAddress = dev->BAR[i]) != 0) break;
 
-	rtl->BaseAddress = rtl->BaseAddress - 1;
+	rtl->BaseAddress = dev->BaseAddresses[0].BaseAddress;
+	//rtl->BaseAddress = 0xC000;
 
 	// Check base address is valid
 	if(rtl->BaseAddress == 0) {
 		kprintf("RTL8139: INVALID BAR\n");
-		return;
+		return false;
 	}
 
 	kprintf("RTL8139: using BAR 0x%X\n", rtl->BaseAddress);
@@ -99,13 +106,17 @@ void rtl8139_init(pci_device_t* dev) {
 	// reset.
 	outb(rtl->BaseAddress + 0x37, 0x10);
 	while ((inb(rtl->BaseAddress + 0x37) & 0x10) != 0);
+	kprintf("RTL8139: Reset card\n");
 
 	uintptr_t recDma = 0;
 	pmm_dma_get_free_frame(&recDma);
+	kprintf("RTL8139: Allocated DMA buffer\n");
 
 	outl(rtl->BaseAddress + 0x30, recDma - memInfo.kernelVirtualOffset);
 	outw(rtl->BaseAddress + 0x3C, 0xFFFF);
 	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
+	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
+	
 	//interrupts_irq_install_handler(dev->IntLine, rtl_callbac);
 	//interrupts_irq_install_handler(4, rtl_callbac);
 
@@ -127,10 +138,14 @@ void rtl8139_init(pci_device_t* dev) {
 	outb(rtl->BaseAddress + 0x37, 0x0C);
 
 
-	kprintf("MEdia statudsfsd: 0x%X", inb(rtl->BaseAddress + 0x58));
+	kprintf("RTL8139: Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
 
 	//while(true);
 
 	// Free device for now
 	//kheap_free(rtl);
+
+	sleep(5000);
+
+	return true;
 }
