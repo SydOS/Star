@@ -1,1 +1,1 @@
-extern void rtl8139_init(pci_device_t* dev);
+extern bool rtl8139_init(pci_device_t* dev);

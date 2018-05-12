@@ -25,6 +25,7 @@
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
+#include <tools.h>
 #include <driver/pci.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
@@ -80,7 +81,7 @@ bool rtl8139_init(pci_device_t* dev) {
 	// Check base address is valid
 	if(rtl->BaseAddress == 0) {
 		kprintf("RTL8139: INVALID BAR\n");
-		return;
+		return false;
 	}
 
 	kprintf("RTL8139: using BAR 0x%X\n", rtl->BaseAddress);
@@ -133,12 +134,14 @@ bool rtl8139_init(pci_device_t* dev) {
 	outb(rtl->BaseAddress + 0x37, 0x0C);
 
 
-	kprintf("Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
+	kprintf("RTL8139: Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
 
 	//while(true);
 
 	// Free device for now
 	//kheap_free(rtl);
+
+	sleep(5000);
 
 	return true;
 }
