@@ -61,6 +61,7 @@ uint8_t *txData;
 void rtl_thread(void) {
 	while (true) {
 	kprintf("RTL8139: CR: 0x%X\n", inb(rtl->BaseAddress + 0x37));
+	kprintf("rtl capr 0x%X\n", inw(rtl->BaseAddress + 0x38));
 	kprintf("RTD 0x%X\n", rcData[0]);
 	sleep(2000);
 	}
@@ -127,21 +128,26 @@ bool rtl8139_init(pci_device_t* dev) {
 	txData = (uint8_t*)txDMA;
 	memset(txData, 0, PAGE_SIZE_64K);
 
-	// Send DMA buffer location to RTL8139
-	outl(rtl->BaseAddress + 0x30, (uint32_t)pmm_dma_get_phys(rxDMA));
-	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
+
 
 	// Set IMR + ISR
 	outw(rtl->BaseAddress + 0x3C, 0xFFFF);
 	kprintf("RTL8139: Set IMR + ISR\n");
 
-	// Configure RX buffer
-	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
-	kprintf("RTL8139: Configured receive buffer\n");
+
 
 	// Enable RX and TX
 	outb(rtl->BaseAddress + 0x37, 0x0C);
 	kprintf("RTL8139: Enabled RX\n");
+
+	// https://forum.osdev.org/viewtopic.php?t=25750&p=214461.
+		// Send DMA buffer location to RTL8139
+	outl(rtl->BaseAddress + 0x30, (uint32_t)pmm_dma_get_phys(rxDMA));
+	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
+
+		// Configure RX buffer
+	outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
+	kprintf("RTL8139: Configured receive buffer\n");
 
 	txData[0] = 0xFF;
 	txData[1] = 0xFF;
