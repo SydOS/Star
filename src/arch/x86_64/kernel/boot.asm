@@ -300,14 +300,19 @@ _setup_stack_dma_done:
 
     ; Determine number of 64-bit page frames.
     ; Get high and low halfs, and store divisor (4KB page frame size) in ECX.
+    ; This puts the number of page frames in EAX.
     mov edx, [memoryLong+4]
     mov eax, [memoryLong]
     mov ecx, 0x1000
     div ecx
 
+    ; Are there any 64-bit page frames? If not, skip 64-bit stack and set to zero.
+    cmp eax, 0
+    jz _setup_stack_dma_done_nolongpages
+
     ; Determine page frame size and store in EBX.
     mov ebx, 8 ; Space for 64-bit addresses (8 bytes each).
-    mul ebx
+    mul ebx ; Multiply the value of EAX by EBX (8).
     mov ebx, eax
 
     ; Determine end location of 64-bit page frame stack.
@@ -321,7 +326,21 @@ _setup_stack_dma_done:
     mov eax, [PAGE_FRAME_STACK_LONG_END]
     call _align_4k
     mov [PAGE_FRAME_STACK_START], eax
+    jmp _setup_stack_dma_done_setup_pages
 
+_setup_stack_dma_done_nolongpages:
+    ; No 64-bit page frame stack.
+    mov eax, 0
+    mov [PAGE_FRAME_STACK_LONG_START], eax
+    mov [PAGE_FRAME_STACK_LONG_END], eax
+
+    ; Determine start location of 32-bit page frame stack. This is located after the last DMA frame if there are no 64-bit page frames.
+    ; Get first 4KB aligned address after the last DMA frame.
+    mov eax, [DMA_FRAMES_LAST]
+    call _align_4k
+    mov [PAGE_FRAME_STACK_START], eax
+
+_setup_stack_dma_done_setup_pages:
     ; Determine number of 32-bit page frames.
     ; Store divisor (4KB page frame size) in ECX.
     mov eax, [memory]

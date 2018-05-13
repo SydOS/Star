@@ -505,8 +505,8 @@ void pmm_init(void) {
     memInfo.dmaPageFrameLast = DMA_FRAMES_LAST + memInfo.kernelVirtualOffset;
 
     // Store the virtual page frame stack locations. This is determined during early boot in kernel_main_early().
-    memInfo.pageFrameStackLongStart = PAGE_FRAME_STACK_LONG_START + memInfo.kernelVirtualOffset;
-    memInfo.pageFrameStackLongEnd = PAGE_FRAME_STACK_LONG_END + memInfo.kernelVirtualOffset;
+    memInfo.pageFrameStackLongStart = PAGE_FRAME_STACK_LONG_START ? (PAGE_FRAME_STACK_LONG_START + memInfo.kernelVirtualOffset) : 0;
+    memInfo.pageFrameStackLongEnd = PAGE_FRAME_STACK_LONG_END ? (PAGE_FRAME_STACK_LONG_END + memInfo.kernelVirtualOffset) : 0;
     memInfo.pageFrameStackStart = PAGE_FRAME_STACK_START + memInfo.kernelVirtualOffset;
     memInfo.pageFrameStackEnd = PAGE_FRAME_STACK_END + memInfo.kernelVirtualOffset;
     
