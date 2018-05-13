@@ -36,13 +36,14 @@
 // Driver init() function must return a bool and accept a pci_device_t* as the only parameter.
 const pci_driver_t PciDrivers[] = {
     // Storage.
-    { "AHCI controller", ahci_init },
+    //{ "AHCI controller", ahci_init }, // Disable for now.
     { "ATA controller", ata_init },
 
     // USB.
     { "UHCI host controller", usb_uhci_init },
     { "OHCI host controller", usb_ohci_init },
 
+    // Network adapters.
     { "RTL8139", rtl8139_init },
 
     // End driver.
