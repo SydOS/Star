@@ -44,9 +44,9 @@ struct RTL8139 {
 };
 
 bool rtl_callback(pci_device_t *dev) {
-	if (!(dev->VendorId == 0x10EC && dev->DeviceId == 0x8139)) {
+	// If no interrupts were raised by the card, don't handle it.
+	if (inw(rtl->BaseAddress + 0x3E) == 0)
         return false;
-    }
 
 	struct RTL8139 *rtl = (struct RTL8139*)dev->DriverObject;
 	kprintf("RTL8139: Current interrupt bits: 0x%X\n", inw(rtl->BaseAddress + 0x3E));
