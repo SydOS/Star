@@ -119,7 +119,7 @@ bool rtl8139_init(pci_device_t* dev) {
 	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
 
 	// Set IMR + ISR
-	outw(rtl->BaseAddress + 0x3C, 0x0005);
+	outw(rtl->BaseAddress + 0x3C, 0xFFFF);
 	kprintf("RTL8139: Set IMR + ISR\n");
 
 	// Configure RX buffer
