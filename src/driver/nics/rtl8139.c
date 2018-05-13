@@ -26,6 +26,8 @@
 #include <io.h>
 #include <kprint.h>
 #include <tools.h>
+#include <driver/nics/rtl8139.h>
+
 #include <driver/pci.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
@@ -33,138 +35,171 @@
 
 #include <kernel/memory/paging.h>
 
-#include <kernel/tasking.h>
+static inline void rtl8139_writeb(rtl8139_t *rtlDevice, uint16_t reg, uint8_t value) {
+    outb(rtlDevice->BaseAddress + reg, value);
+}
 
-struct RTL8139 {
-    bool UsesEEPROM;
+static inline void rtl8139_writew(rtl8139_t *rtlDevice, uint16_t reg, uint16_t value) {
+    outw(rtlDevice->BaseAddress + reg, value);
+}
 
-    uint32_t BaseAddress;
+static inline void rtl8139_writel(rtl8139_t *rtlDevice, uint16_t reg, uint32_t value) {
+    outl(rtlDevice->BaseAddress + reg, value);
+}
 
-    uint8_t MACAddress[6];
-};
+static inline uint8_t rtl8139_readb(rtl8139_t *rtlDevice, uint16_t reg) {
+    return inb(rtlDevice->BaseAddress + reg);
+}
 
-bool rtl_callback(pci_device_t *dev) {
-    // If no interrupts were raised by the card, don't handle it.
-    if (inw(rtl->BaseAddress + 0x3E) == 0)
+static inline uint16_t rtl8139_readw(rtl8139_t *rtlDevice, uint16_t reg) {
+    return inw(rtlDevice->BaseAddress + reg);
+}
+
+static inline uint32_t rtl8139_readl(rtl8139_t *rtlDevice, uint16_t reg) {
+    return inl(rtlDevice->BaseAddress + reg);
+}
+
+bool rtl8139_send_bytes(rtl8139_t *rtlDevice, const void *data, uint32_t length) {
+    // Ensure length is under 2KB.
+    if (length > RTL8139_TX_BUFFER_SIZE)
         return false;
 
-    struct RTL8139 *rtl = (struct RTL8139*)dev->DriverObject;
-    kprintf("RTL8139: Current interrupt bits: 0x%X\n", inw(rtl->BaseAddress + 0x3E));
-    outw(rtl->BaseAddress + 0x3E, 0xFFFF);
+    // Determine value of TX status register.
+    uint32_t txStatus = (length & 0x1FFF);
+
+    // Determine TX status register to use. Card uses all 4 in a round robin fashion.
+    switch (rtlDevice->CurrentTxBuffer) {
+        case 0:
+            // Copy data to TX buffer 0 and send.
+            memcpy(rtlDevice->TxBuffer0, data, length);
+            rtl8139_writel(rtlDevice, RTL8139_REG_TX_STATUS0, txStatus);
+            break;
+
+        case 1:
+            // Copy data to TX buffer 1 and send.
+            memcpy(rtlDevice->TxBuffer1, data, length);
+            rtl8139_writel(rtlDevice, RTL8139_REG_TX_STATUS1, txStatus);
+            break;
+
+        case 2:
+            // Copy data to TX buffer 2 and send.
+            memcpy(rtlDevice->TxBuffer2, data, length);
+            rtl8139_writel(rtlDevice, RTL8139_REG_TX_STATUS2, txStatus);
+            break;
+
+        case 3:
+            // Copy data to TX buffer 3 and send.
+            memcpy(rtlDevice->TxBuffer3, data, length);
+            rtl8139_writel(rtlDevice, RTL8139_REG_TX_STATUS3, txStatus);
+            break;
+    }
+
+    // Move to next TX buffer, or back to start if we hit 4.
+    rtlDevice->CurrentTxBuffer++;
+    rtlDevice->CurrentTxBuffer %= RTL8139_TX_BUFFER_COUNT;
+    return true;
+}
+
+static bool rtl8139_callback(pci_device_t *dev) {
+    // If no interrupts were raised by the card, don't handle it.
+    rtl8139_t *rtlDevice = (rtl8139_t*)dev->DriverObject;
+    if (inw(rtlDevice->BaseAddress + 0x3E) == 0)
+        return false;
+
+    kprintf("RTL8139: Current interrupt bits: 0x%X\n", inw(rtlDevice->BaseAddress + 0x3E));
+    outw(rtlDevice->BaseAddress + 0x3E, 0xFFFF);
     kprintf("RTL8139: Cleared interrupt\n");
     return true;
 }
-struct RTL8139 *rtl;
-uint8_t *rcData;
-uint8_t *txData;
 
-void rtl_thread(void) {
-    while (true) {
-    kprintf("RTL8139: CR: 0x%X\n", inb(rtl->BaseAddress + 0x37));
-    kprintf("rtl capr 0x%X\n", inw(rtl->BaseAddress + 0x38));
-    kprintf("RTD 0x%X\n", rcData[0]);
-    sleep(2000);
-    }
-
-}
-
-bool rtl8139_init(pci_device_t* dev) {
+bool rtl8139_init(pci_device_t *pciDevice) {
     // Is the PCI device an RTL8139?
-    if (!(dev->VendorId == 0x10EC && dev->DeviceId == 0x8139)) {
+    if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8139)) {
         return false;
     }
 
-    // Allocate RTL8139 struct
-    rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
-    dev->DriverObject = rtl;
+    // Allocate RTL8139 struct.
+    rtl8139_t *rtlDevice = (rtl8139_t*)kheap_alloc(sizeof(rtl8139_t));
+    memset(rtlDevice, 0, sizeof(rtl8139_t));
+    rtlDevice->PciDevice = pciDevice;
+    pciDevice->DriverObject = rtlDevice;
     kprintf("\e[35mRTL8139: Pointed RTL struct to DriverObject\n");
-    dev->InterruptHandler = rtl_callback;
+    pciDevice->InterruptHandler = rtl8139_callback;
     kprintf("RTL8139: Pointed RTL callback handler function to InterruptHandler\n");
 
     // Setup base address
-    rtl->BaseAddress = dev->BaseAddresses[0].BaseAddress;
+    rtlDevice->BaseAddress = pciDevice->BaseAddresses[0].BaseAddress;
 
     // Check base address is valid
-    if(rtl->BaseAddress == 0) {
+    if(rtlDevice->BaseAddress == 0) {
         kprintf("RTL8139: INVALID BAR\n");
+        kheap_free(rtlDevice);
         return false;
     }
+    kprintf("RTL8139: using BAR 0x%X\n", rtlDevice->BaseAddress);
 
-    kprintf("RTL8139: using BAR 0x%X\n", rtl->BaseAddress);
+    // Enable PCI busmastering.
+    pci_enable_busmaster(pciDevice);
 
-        // bus master
-    uint16_t cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
-    pci_config_write_word(dev, PCI_REG_COMMAND, cmd | 0x04);
-    cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
-    kprintf("RTL8139: PCI control reg 0x%X\n", cmd);
+    // Bring card out of low power mode.
+    rtl8139_writeb(rtlDevice, RTL8139_REG_CONFIG1, 0x00);
+    kprintf("RTL8139: Brought card out of low power mode.\n");
 
-    // Bring card out of low power mode
-    outb(rtl->BaseAddress + 0x52, 0x00);
-    kprintf("RTL8139: brought card out of low power mode\n");
+    // Read MAC address from RTL8139.
+    for (uint8_t i = 0; i < 6; i++)
+        rtlDevice->MacAddress[i] = rtl8139_readb(rtlDevice, RTL8139_REG_IDR0 + i);
+    kprintf("RTL8139: MAC %X:%X:%X:%X:%X:%X\n", rtlDevice->MacAddress[0], rtlDevice->MacAddress[1],
+        rtlDevice->MacAddress[2], rtlDevice->MacAddress[3], rtlDevice->MacAddress[4],
+        rtlDevice->MacAddress[5]);
 
-    // Read MAC address from RTL8139
-    for (uint8_t i = 0; i < 6; i++) {
-        rtl->MACAddress[i] = inb(rtl->BaseAddress + i);
-    }
-    kprintf("RTL8139: MAC %X:%X:%X:%X:%X:%X\n", rtl->MACAddress[0], rtl->MACAddress[1],
-        rtl->MACAddress[2], rtl->MACAddress[3], rtl->MACAddress[4],
-        rtl->MACAddress[5]);
+    // Reset card by setting reset bit and waiting for bit to clear.
+    rtl8139_writeb(rtlDevice, RTL8139_REG_CMD, RTL8139_CMD_RESET);
+    while (rtl8139_readb(rtlDevice, RTL8139_REG_CMD) & RTL8139_CMD_RESET);
+    kprintf("RTL8139: Card reset!\n");	
 
-    // reset.
-    outb(rtl->BaseAddress + 0x37, 0x10);
-    while ((inb(rtl->BaseAddress + 0x37) & 0x10) != 0);
-    kprintf("RTL8139: Reset card\n");	
-
-    // Get DMA buffer
-    uintptr_t rxDMA = 0;
-    pmm_dma_get_free_frame(&rxDMA);
-    kprintf("RTL8139: Allocated RX DMA buffer\n");
-    rcData = (uint8_t*)rxDMA;
-    memset(rcData, 0, PAGE_SIZE_64K);
-
-    uintptr_t txDMA = 0;
-    pmm_dma_get_free_frame(&txDMA);
-    kprintf("RTL8139: Allocated TX DMA buffer\n");
-    txData = (uint8_t*)txDMA;
-    memset(txData, 0, PAGE_SIZE_64K);
-
-
+    // Get a 64KB DMA frame to use for buffers.
+    if (!pmm_dma_get_free_frame(&rtlDevice->DmaFrame))
+        panic("RTL8139: Unable to get DMA frame!\n");
+    memset((void*)rtlDevice->DmaFrame, 0, PAGE_SIZE_64K);
+    rtlDevice->RxBuffer = (uint8_t*)rtlDevice->DmaFrame;
+    rtlDevice->TxBuffer0 = (uint8_t*)((uintptr_t)rtlDevice->RxBuffer + RTL8139_RX_BUFFER_SIZE);
+    rtlDevice->TxBuffer1 = (uint8_t*)((uintptr_t)rtlDevice->TxBuffer0 + RTL8139_TX_BUFFER_SIZE);
+    rtlDevice->TxBuffer2 = (uint8_t*)((uintptr_t)rtlDevice->TxBuffer1 + RTL8139_TX_BUFFER_SIZE);
+    rtlDevice->TxBuffer3 = (uint8_t*)((uintptr_t)rtlDevice->TxBuffer2 + RTL8139_TX_BUFFER_SIZE);
+    kprintf("RTL8139: Allocated DMA space for RX and TX buffers.\n");
 
     // Set IMR + ISR
-    outw(rtl->BaseAddress + 0x3C, 0xFFFF);
+    outw(rtlDevice->BaseAddress + 0x3C, 0xFFFF);
     kprintf("RTL8139: Set IMR + ISR\n");
 
-
-
-    // Enable RX and TX
-    outb(rtl->BaseAddress + 0x37, 0x0C);
-    kprintf("RTL8139: Enabled RX\n");
+    // Enable RX and TX.
+    rtl8139_writeb(rtlDevice, RTL8139_REG_CMD, RTL8139_CMD_TX_ENABLE | RTL8139_CMD_RX_ENABLE);
+    kprintf("RTL8139: Enabled RX and TX!\n");
 
     // https://forum.osdev.org/viewtopic.php?t=25750&p=214461.
-        // Send DMA buffer location to RTL8139
-    outl(rtl->BaseAddress + 0x30, (uint32_t)pmm_dma_get_phys(rxDMA));
-    kprintf("RTL8139: Transmitted DMA buffer location to card\n");
+    // Set RX buffer physical memory location.
+    rtl8139_writel(rtlDevice, RTL8139_REG_RX_BUFFER, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->RxBuffer));
+    kprintf("RTL8139: Transmitted RX buffer location to card.\n");
 
-        // Configure RX buffer
-    outl(rtl->BaseAddress + 0x44, 0xF | (1 << 7));
-    kprintf("RTL8139: Configured receive buffer\n");
+    // Configure RX buffer.
+    rtl8139_writel(rtlDevice, RTL8139_REG_RCR, RTL8139_RCR_ACCEPT_ALL_PACKETS | RTL8139_RCR_ACCPET_PHYS_MATCH
+        | RTL8139_RCR_ACCEPT_MULTICAST | RTL8139_RCR_ACCEPT_RUNT | RTL8139_RCR_ACCEPT_ERROR | RTL8139_RCR_WRAP | RTL8139_RCR_BUFFER_LENGTH_32K);
+    kprintf("RTL8139: Configured RX buffer.\n");
 
-    txData[0] = 0xFF;
-    txData[1] = 0xFF;
-    txData[2] = 0xFF;
-    txData[3] = 0xFF;
-    txData[4] = 0xFF;
-    txData[5] = 0xFF;
-    txData[6] = 0xFF;
+    // Configure TX buffers.
+    rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER0, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer0));
+    rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER1, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer1));
+    rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER2, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer2));
+    rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER3, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer3));
 
-    outl(rtl->BaseAddress + 0x20, (uint32_t)pmm_dma_get_phys(txData));
-    outl(rtl->BaseAddress + 0x10, 20);
+    // Just send some garbage to prove it works in Wireshark.
+    uint8_t ddd[54];
+    rtl8139_send_bytes(rtlDevice, ddd, 54);
 
     // Ask for media status of RTL8139
-    kprintf("RTL8139: Media status: 0x%X\n", inb(rtl->BaseAddress + 0x58));
-    kprintf("RTL8139: Mode status: 0x%X\n", inw(rtl->BaseAddress + 0x64));
-    kprintf("RTL8139: CR: 0x%X\n", inb(rtl->BaseAddress + 0x37));
-    tasking_thread_schedule_proc(tasking_thread_create_kernel("rtl", rtl_thread, 0, 0, 0), 0);
+    kprintf("RTL8139: Media status: 0x%X\n", inb(rtlDevice->BaseAddress + 0x58));
+    kprintf("RTL8139: Mode status: 0x%X\n", inw(rtlDevice->BaseAddress + 0x64));
+    kprintf("RTL8139: CR: 0x%X\n", inb(rtlDevice->BaseAddress + 0x37));
 
     // Return true, we have handled the PCI device passed to us
     return true;

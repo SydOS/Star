@@ -112,6 +112,11 @@ void pci_config_write_byte(pci_device_t *pciDevice, uint8_t reg, uint8_t value) 
     pci_config_write_word(pciDevice, reg, newValue);
 }
 
+void pci_enable_busmaster(pci_device_t *pciDevice) {
+    // Set busmaster bit.
+    pci_config_write_word(pciDevice, PCI_REG_COMMAND, pci_config_read_word(pciDevice, PCI_REG_COMMAND) | PCI_CMD_BUSMASTER);
+}
+
 /**
  * Print the description for a PCI device
  * @param dev PCIDevice struct with PCI device info
