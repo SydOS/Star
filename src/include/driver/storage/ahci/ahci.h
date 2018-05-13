@@ -184,7 +184,7 @@ typedef struct {
     ahci_enc_mgmt_location_t EnclosureManagementLocation;
     ahci_enc_mgmt_control_t EnclosureManagementControl;
     ahci_hba_cap_extended_t CapabilitiesExtended;
-    ahci_handoff_state_t Handoff;
+    ahci_handoff_state_t BiosHandoff;
 
     uint8_t Reserved[0x100-0x2C];
     ahci_port_memory_t Ports[32];

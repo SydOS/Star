@@ -88,15 +88,14 @@ static void ahci_port_init_memory(ahci_port_t *ahciPort) {
     if (!paging_get_phys((uintptr_t)ahciPort->CommandList, &commandListPhys))
         panic("AHCI: Attempted to use nonpaged address for command list!\n");
     portMemory->CommandListBaseAddress = commandListPhys;
+    memset(ahciPort->CommandList, 0, AHCI_COMMAND_LIST_SIZE);
 
     // Get physical addresses of received FISes.
     uint64_t fisPhys = 0;
     if (!paging_get_phys((uintptr_t)ahciPort->ReceivedFis, &fisPhys))
         panic("AHCI: Attempted to use nonpaged address for command list!\n");
     portMemory->FisBaseAddress = fisPhys;
-
-    // Start port.
-    ahci_port_cmd_start(ahciPort);
+    memset(ahciPort->ReceivedFis, 0, sizeof(ahci_received_fis_t));
 }
 
 static bool ahci_port_reset(ahci_port_t *ahciPort) {
@@ -173,12 +172,42 @@ static bool ahci_probe_port(ahci_port_t *ahciPort) {
     return false;
 }
 
+static bool ahci_take_ownership(ahci_controller_t *ahciController) {
+    // As per "10.6.3 OS declares ownership request" in the AHCI spec.
+    // Set OS ownership bit.
+    ahciController->Memory->BiosHandoff.OsOwnedSemaphore = true;
+
+    // Wait 25ms and check if BIOS is still busy. If so, wait another 2 seconds.
+    sleep(25);
+    if (ahciController->Memory->BiosHandoff.BiosBusy)
+        sleep(2000);
+
+    // Wait for BIOS to give up ownership.
+    uint32_t timeout = 200;
+    while (ahciController->Memory->BiosHandoff.BiosOwnedSemaphore) {
+        // Was the timeout reached?
+        if (timeout == 0) {
+            kprintf("AHCI: Timeout waiting for ownership of controller!\n");
+            return false;
+        }
+
+        sleep(10);
+        timeout--;
+    }
+
+    // Ownership acquired.
+    kprintf("AHCI: Ownership acquired!\n");
+    return true;
+}
+
 bool ahci_init(pci_device_t *pciDevice) {
     // ICheck that the device is an AHCI controller, and that the BAR is correct.
     if (!(pciDevice->Class == PCI_CLASS_MASS_STORAGE && pciDevice->Subclass == PCI_SUBCLASS_MASS_STORAGE_SATA && pciDevice->Interface == PCI_INTERFACE_MASS_STORAGE_SATA_VENDOR_AHCI))
         return false;
-    if (!(!pciDevice->BaseAddresses[5].PortMapped && pciDevice->BaseAddresses[5].BaseAddress != 0))
+    if (!(!pciDevice->BaseAddresses[5].PortMapped && pciDevice->BaseAddresses[5].BaseAddress != 0)) {
+        kprintf("AHCI: Invalid base address. Aborting!\n");
         return false;
+    }
 
     // Create controller object and map to memory.
     kprintf("AHCI: Initializing controller at 0x%X...\n", pciDevice->BaseAddresses[5].BaseAddress);
@@ -192,6 +221,12 @@ bool ahci_init(pci_device_t *pciDevice) {
     kprintf("AHCI: Current AHCI controller setting: %s.\n", ahciController->Memory->GlobalControl.AhciEnabled ? "on" : "off");
     if (ahciController->Memory->CapabilitiesExtended.Handoff)
         kprintf("AHCI: BIOS handoff required.\n");
+
+    // Get ownership.
+    if (!ahci_take_ownership(ahciController)) {
+        kprintf("AHCI: Failed to get ownership. Aborting!\n");
+        return false;
+    }
 
     // Enable AHCI on controller.
     ahciController->Memory->GlobalControl.AhciEnabled = true;
@@ -245,31 +280,45 @@ bool ahci_init(pci_device_t *pciDevice) {
             ahciController->Ports[port]->ReceivedFis = recievedFises + recievedFisesAllocated;
             recievedFisesAllocated++;
 
+            // Stop port.
+            ahci_port_cmd_stop(ahciController->Ports[port]);
+
             // Initialize port's memory.
-            ahci_port_init_memory(ahciController->Ports[port]);
-
-            // Reset port.
-            ahci_port_reset(ahciController->Ports[port]);
-
-            // Probe port.
-            kprintf("AHCI: Probing port (status 0x%X) %u...\n", ahciController->Memory->Ports[port].SataStatus.Data.DeviceDetection, port);
-            if (ahci_probe_port(ahciController->Ports[port])) {
-                switch (ahciController->Ports[port]->Type) {
-                    case AHCI_DEV_TYPE_SATA:
-                        kprintf("AHCI: Found SATA drive on port %u.\n", port);
-                        break;
-
-                    case AHCI_DEV_TYPE_SATA_ATAPI:
-                        kprintf("AHCI: Found SATA ATAPI drive on port %u.\n", port);
-                        break;
-                }
-            }    
+            ahci_port_init_memory(ahciController->Ports[port]);      
             enabledPorts++;
         }
     }
 
     kprintf("AHCI: Version major 0x%X, minor 0x%X\n", ahciController->Memory->Version.Major, ahciController->Memory->Version.Minor);
     kprintf("AHCI: Total ports: %u (%u enabled)\n", ahciController->PortCount, enabledPorts);
+
+    // Software needs to wait at least 500 ms for ports to be idle, as per spec.
+    sleep(700);
+
+    // Reset and probe ports.
+    for (uint32_t port = 0; port < ahciController->PortCount; port++) {
+        // Skip over disabled ports.
+        if (ahciController->Ports[port] == NULL)
+            continue;
+
+        // Reset port.
+        ahci_port_reset(ahciController->Ports[port]);
+
+        // Probe port.
+        kprintf("AHCI: Probing port (status 0x%X) %u...\n", ahciController->Memory->Ports[port].SataStatus.Data.DeviceDetection, port);
+        if (ahci_probe_port(ahciController->Ports[port])) {
+            switch (ahciController->Ports[port]->Type) {
+                case AHCI_DEV_TYPE_SATA:
+                    kprintf("AHCI: Found SATA drive on port %u.\n", port);
+                    break;
+
+                case AHCI_DEV_TYPE_SATA_ATAPI:
+                    kprintf("AHCI: Found SATA ATAPI drive on port %u.\n", port);
+                    break;
+            }
+        } 
+    }
+
 
     ahci_port_t *hddPort = ahciController->Ports[0];
     
@@ -295,13 +344,14 @@ bool ahci_init(pci_device_t *pciDevice) {
     ata_identify_result_2_t* ata = (ata_identify_result_2_t*)dataPtr;
     uint32_t fff = sizeof(ata_identify_result_2_t);
 
-    hddPort->CommandList[0].CommandTableBaseAddress = cmdTablePage;
+    ahci_port_cmd_stop(hddPort);
+   /* hddPort->CommandList[0].CommandTableBaseAddress = cmdTablePage;
     hddPort->CommandList[0].CommandFisLength = 4;
     hddPort->CommandList[0].PhyRegionDescTableLength = 1;
     hddPort->CommandList[0].Reset = true;
     hddPort->CommandList[0].ClearBusyUponOk = true;
     cmdTable->PhysRegionDescTable[0].DataBaseAddress = dataPage;
-    cmdTable->PhysRegionDescTable[0].DataByteCount = 0x1000 - 1;
+    cmdTable->PhysRegionDescTable[0].DataByteCount = 0x1000 - 1;*/
     ahci_fis_reg_host_to_device_t *h2d = (ahci_fis_reg_host_to_device_t*)&cmdTable->CommandFis;
     h2d->FisType = 0x27;
     h2d->IsCommand = false;
@@ -353,11 +403,16 @@ bool ahci_init(pci_device_t *pciDevice) {
     h2d->ControlReg = 0x00;
     h2d->IsCommand = true;
     h2d->CommandReg = 0xEC;
+    h2d->Count = 1;
+    h2d->Device = 0x40;
 
     // enable command.
     ahciController->Memory->Ports[0].InterruptsStatus.RawValue = -1;
     ahciController->Memory->Ports[0].SataError.RawValue = -1;
     kprintf("int 0x%X\n", ahciController->Memory->Ports[0].InterruptsEnabled.RawValue);
+    ahciController->Memory->Ports[0].SataError.RawValue = -1;
+
+    ahci_port_cmd_start(hddPort);
     ahciController->Memory->Ports[0].CommandsIssued = 1;
     while (true) {
         if ((ahciController->Memory->Ports[0].CommandsIssued & 1) == 0)
@@ -374,6 +429,7 @@ bool ahci_init(pci_device_t *pciDevice) {
         kprintf("AHCI: general: 0x%X\n", ata->GeneralConfig);
         kprintf("AHCI: int status 0x%X\n", ahciController->Memory->Ports[0].InterruptsStatus.RawValue);
         kprintf("AHCI sata error 0x%X\n", ahciController->Memory->Ports[0].SataError.RawValue);
+        ahciController->Memory->Ports[0].SataError.RawValue = -1;
        // kprintf("in pio: %s\n", )
     }
 
