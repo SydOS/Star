@@ -31,17 +31,9 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/irqs.h>
 
-//extern void _irq16();
-//extern void _irq17();
-//extern void _irq18();
-//extern void _irq19();
+#include <kernel/memory/paging.h>
 
-/*void test_handler(IrqRegisters_t* regs, uint8_t irq) {
-kprintf_nlock("Test: APIC INT %d\n", irq);
-
-	// Send EOI
-    lapic_eoi();
-}*/
+#include <kernel/tasking.h>
 
 struct RTL8139 {
 	bool UsesEEPROM;
@@ -57,9 +49,22 @@ bool rtl_callback(pci_device_t *dev) {
     }
 
 	struct RTL8139 *rtl = (struct RTL8139*)dev->DriverObject;
+	kprintf("RTL8139: Current interrupt bits: 0x%X\n", inw(rtl->BaseAddress + 0x3E));
 	outw(rtl->BaseAddress + 0x3E, 0xFFFF);
 	kprintf("RTL8139: Cleared interrupt\n");
 	return true;
+}
+struct RTL8139 *rtl;
+uint8_t *rcData;
+uint8_t *txData;
+
+void rtl_thread(void) {
+	while (true) {
+	kprintf("RTL8139: CR: 0x%X\n", inb(rtl->BaseAddress + 0x37));
+	kprintf("RTD 0x%X\n", rcData[0]);
+	sleep(2000);
+	}
+
 }
 
 bool rtl8139_init(pci_device_t* dev) {
@@ -69,7 +74,7 @@ bool rtl8139_init(pci_device_t* dev) {
     }
 
 	// Allocate RTL8139 struct
-	struct RTL8139 *rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
+	rtl = (struct RTL8139*)kheap_alloc(sizeof(struct RTL8139));
 	dev->DriverObject = rtl;
 	kprintf("\e[35mRTL8139: Pointed RTL struct to DriverObject\n");
 	dev->InterruptHandler = rtl_callback;
@@ -87,10 +92,11 @@ bool rtl8139_init(pci_device_t* dev) {
 
 	kprintf("RTL8139: using BAR 0x%X\n", rtl->BaseAddress);
 
-// bus master
-//		uint16_t cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
-//	pci_config_write_word(dev, PCI_REG_COMMAND, cmd | 0x04);
-//	cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
+		// bus master
+	uint16_t cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
+	pci_config_write_word(dev, PCI_REG_COMMAND, cmd | 0x04);
+	cmd = pci_config_read_word(dev, PCI_REG_COMMAND);
+	kprintf("RTL8139: PCI control reg 0x%X\n", cmd);
 
 	// Bring card out of low power mode
 	outb(rtl->BaseAddress + 0x52, 0x00);
@@ -113,9 +119,17 @@ bool rtl8139_init(pci_device_t* dev) {
 	uintptr_t rxDMA = 0;
 	pmm_dma_get_free_frame(&rxDMA);
 	kprintf("RTL8139: Allocated RX DMA buffer\n");
+	rcData = (uint8_t*)rxDMA;
+	memset(rcData, 0, PAGE_SIZE_64K);
+
+	uintptr_t txDMA = 0;
+	pmm_dma_get_free_frame(&txDMA);
+	kprintf("RTL8139: Allocated TX DMA buffer\n");
+	txData = (uint8_t*)txDMA;
+	memset(txData, 0, PAGE_SIZE_64K);
 
 	// Send DMA buffer location to RTL8139
-	outl(rtl->BaseAddress + 0x30, rxDMA - memInfo.kernelVirtualOffset);
+	outl(rtl->BaseAddress + 0x30, (uint32_t)pmm_dma_get_phys(rxDMA));
 	kprintf("RTL8139: Transmitted DMA buffer location to card\n");
 
 	// Set IMR + ISR
@@ -128,10 +142,24 @@ bool rtl8139_init(pci_device_t* dev) {
 
 	// Enable RX and TX
 	outb(rtl->BaseAddress + 0x37, 0x0C);
-	kprintf("RTL8139: Enabled RX and TX\n");
+	kprintf("RTL8139: Enabled RX\n");
+
+	txData[0] = 0xFF;
+	txData[1] = 0xFF;
+	txData[2] = 0xFF;
+	txData[3] = 0xFF;
+	txData[4] = 0xFF;
+	txData[5] = 0xFF;
+	txData[6] = 0xFF;
+
+	outl(rtl->BaseAddress + 0x20, (uint32_t)pmm_dma_get_phys(txData));
+	outl(rtl->BaseAddress + 0x10, 20);
 
 	// Ask for media status of RTL8139
-	kprintf("RTL8139: Media statudsfsd: 0x%X\n", inb(rtl->BaseAddress + 0x58));
+	kprintf("RTL8139: Media status: 0x%X\n", inb(rtl->BaseAddress + 0x58));
+	kprintf("RTL8139: Mode status: 0x%X\n", inw(rtl->BaseAddress + 0x64));
+	kprintf("RTL8139: CR: 0x%X\n", inb(rtl->BaseAddress + 0x37));
+	tasking_thread_schedule_proc(tasking_thread_create_kernel("rtl", rtl_thread, 0, 0, 0), 0);
 
 	// Return true, we have handled the PCI device passed to us
 	return true;
