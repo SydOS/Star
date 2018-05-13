@@ -76,8 +76,7 @@ bool rtl8139_init(pci_device_t* dev) {
 	kprintf("RTL8139: Pointed RTL callback handler function to InterruptHandler\n");
 
 	// Setup base address
-	for(uint8_t i = 0; i < 6; i++)
-		if ((rtl->BaseAddress = dev->BaseAddresses[i].BaseAddress) != 0) break;
+	rtl->BaseAddress = dev->BaseAddresses[0].BaseAddress;
 
 	// Check base address is valid
 	if(rtl->BaseAddress == 0) {
@@ -107,7 +106,7 @@ bool rtl8139_init(pci_device_t* dev) {
 	// reset.
 	outb(rtl->BaseAddress + 0x37, 0x10);
 	while ((inb(rtl->BaseAddress + 0x37) & 0x10) != 0);
-	kprintf("RTL8139: Reset card\n");
+	kprintf("RTL8139: Reset card\n");	
 
 	// Get DMA buffer
 	uintptr_t rxDMA = 0;
