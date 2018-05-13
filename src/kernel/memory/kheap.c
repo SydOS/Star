@@ -152,7 +152,7 @@ static void kheap_dump_bin(uint32_t binIndex) {
     kheap_node_t *node = bins[binIndex].header;
 
     while (node != NULL) {
-        kprintf("NODE: 0x%X size: %u hole: %s\n", node, node->size, node->hole ? "yes" : "no");
+        kprintf("NODE: 0x%p size: %u hole: %s\n", node, node->size, node->hole ? "yes" : "no");
         node = node->nextNode;
     }
 }
@@ -278,12 +278,12 @@ void *kheap_alloc(size_t size) {
     kheap_remove_node(binIndex, node);
 
     // Check if heap needs to be expanded or contracted.
-    kheap_node_t *wildNode = kheap_get_wilderness();
-    if (wildNode->size < KHEAP_MIN_WILDERNESS) {
+    kheap_node_t *wildNode = kheap_get_wilderness(); // TODO: Should this ever be nothing in the first place???
+    if (wildNode != NULL && wildNode->size < KHEAP_MIN_WILDERNESS) {
         if (!kheap_expand(PAGE_SIZE_4K))
             return NULL;
     }
-    else if (wildNode->size > KHEAP_MAX_WILDERNESS) {
+    else if (wildNode != NULL && wildNode->size > KHEAP_MAX_WILDERNESS) {
         kheap_contract();
     }
 

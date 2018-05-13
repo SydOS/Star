@@ -41,10 +41,16 @@ global DMA_FRAMES_FIRST
 DMA_FRAMES_FIRST: dd 0
 global DMA_FRAMES_LAST
 DMA_FRAMES_LAST: dd 0
+
+global PAGE_FRAME_STACK_LONG_START
+PAGE_FRAME_STACK_LONG_START: dd 0
+global PAGE_FRAME_STACK_LONG_END
+PAGE_FRAME_STACK_LONG_END: dd 0
 global PAGE_FRAME_STACK_START
 PAGE_FRAME_STACK_START: dd 0
 global PAGE_FRAME_STACK_END
 PAGE_FRAME_STACK_END: dd 0
+
 global EARLY_PAGES_LAST
 EARLY_PAGES_LAST: dd 0
 global MULTIBOOT_MAGIC
@@ -52,7 +58,8 @@ MULTIBOOT_MAGIC: dd 0
 global MULTIBOOT_INFO
 MULTIBOOT_INFO: dd 0
 
-memory: dq 0
+memory: dd 0
+memoryLong: dq 0
 memoryEntryEnd: dd 0
 
 ; Page table variables.
@@ -215,14 +222,32 @@ multiboot_memory_entry:
     cmp ebx, 0x1
     jnz multiboot_next_mem_entry
 
-    ; If we get here, the entry is of type available (0x1).
+    ; Get entry's base address.
+    mov ebx, [eax] ; Low 32 bits
+    mov ecx, [eax+4] ; High 32 bits
+
+    ; If ECX is not zero, this is a 64-bit address.
+    ; Otherwise it's 32-bit.
+    cmp ecx, 0
+    jz multiboot_memory_entry_32
+
+    ; If we get here, the entry is of type available (0x1) and it's 64-bit.
     ; Get size of entry. Get high and low half and put them into EBX and ECX.
     mov ebx, [eax+8] ; Low 32 bits
     mov ecx, [eax+12] ; High 32 bits
 
     ; Add to total and move to next entry.
+    add [memoryLong], ebx
+    adc [memoryLong+4], ecx
+    jmp multiboot_next_mem_entry
+
+multiboot_memory_entry_32:
+    ; If we get here, the entry is of type available (0x1) and it's 32-bit.
+    ; Get size of entry into EBX.
+    mov ebx, [eax+8]
+
+    ; Add to total and move to next entry.
     add [memory], ebx
-    adc [memory+4], ecx
     jmp multiboot_next_mem_entry
 
 multiboot_memory_done:
@@ -267,28 +292,70 @@ _setup_stack_dma_done:
     add eax, (0x10000 * 64)
     mov [DMA_FRAMES_LAST], eax
 
-    ; Determine start location of page frame stack. This is located after the DMA pages.
+    ; Determine start location of 64-bit page frame stack. This is located after the DMA pages.
     ; Get first 4KB aligned address after the DMA frames.
+    mov eax, [DMA_FRAMES_LAST]
+    call _align_4k
+    mov [PAGE_FRAME_STACK_LONG_START], eax
+
+    ; Determine number of 64-bit page frames.
+    ; Get high and low halfs, and store divisor (4KB page frame size) in ECX.
+    ; This puts the number of page frames in EAX.
+    mov edx, [memoryLong+4]
+    mov eax, [memoryLong]
+    mov ecx, 0x1000
+    div ecx
+
+    ; Are there any 64-bit page frames? If not, skip 64-bit stack and set to zero.
+    cmp eax, 0
+    jz _setup_stack_dma_done_nolongpages
+
+    ; Determine page frame size and store in EBX.
+    mov ebx, 8 ; Space for 64-bit addresses (8 bytes each).
+    mul ebx ; Multiply the value of EAX by EBX (8).
+    mov ebx, eax
+
+    ; Determine end location of 64-bit page frame stack.
+    mov eax, [PAGE_FRAME_STACK_LONG_START]
+    add eax, ebx ; Add start and size.
+    add eax, 8 ; Add extra address.
+    mov [PAGE_FRAME_STACK_LONG_END], eax
+
+    ; Determine start location of 32-bit page frame stack. This is located after the 64-bit page frame stack.
+    ; Get first 4KB aligned address after the 64-bit page frame stack.
+    mov eax, [PAGE_FRAME_STACK_LONG_END]
+    call _align_4k
+    mov [PAGE_FRAME_STACK_START], eax
+    jmp _setup_stack_dma_done_setup_pages
+
+_setup_stack_dma_done_nolongpages:
+    ; No 64-bit page frame stack.
+    mov eax, 0
+    mov [PAGE_FRAME_STACK_LONG_START], eax
+    mov [PAGE_FRAME_STACK_LONG_END], eax
+
+    ; Determine start location of 32-bit page frame stack. This is located after the last DMA frame if there are no 64-bit page frames.
+    ; Get first 4KB aligned address after the last DMA frame.
     mov eax, [DMA_FRAMES_LAST]
     call _align_4k
     mov [PAGE_FRAME_STACK_START], eax
 
-    ; Determine number of page frames.
-    ; Get high and low halfs, and store divisor (4KB page frame size) in ECX.
-    mov edx, [memory+4]
+_setup_stack_dma_done_setup_pages:
+    ; Determine number of 32-bit page frames.
+    ; Store divisor (4KB page frame size) in ECX.
     mov eax, [memory]
     mov ecx, 0x1000
     div ecx
 
     ; Determine page frame size and store in EBX.
-    mov ebx, 8 ; Space for 64-bit addresses (8 bytes each).
+    mov ebx, 4 ; Space for 32-bit addresses (4 bytes each).
     mul ebx
     mov ebx, eax
 
-    ; Determine end location of page frame stack.
+    ; Determine end location of 32-bit page frame stack.
     mov eax, [PAGE_FRAME_STACK_START]
     add eax, ebx ; Add start and size.
-    add eax, 8 ; Add extra address.
+    add eax, 4 ; Add extra address.
     mov [PAGE_FRAME_STACK_END], eax
     ret
 

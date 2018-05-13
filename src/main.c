@@ -51,6 +51,9 @@
 
 #include <acpi.h>
 
+#include <driver/fs/fat.h>
+#include <driver/storage/storage.h>
+
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
 	// Disable interrupts.
@@ -189,7 +192,7 @@ void kernel_late() {
 	kprintf(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
 	kprintf("          __/ |                    \n");
 	kprintf("         |___/                     \n");
-	kprintf("\e[36mCopyright (c) Sydney Erickson 2017 - 2018\e[0m\n\n");
+	kprintf("\e[36mCopyright (c) Sydney Erickson, John Davis 2017 - 2018\e[0m\n\n");
 
     // Ring serial terminals.
 	kprintf("\a");
@@ -248,6 +251,10 @@ void kernel_late() {
 
 		else if (strcmp(buffer, "uptime") == 0)
 			kprintf("Current uptime: %i milliseconds.\n", timer_ticks());
+		else if (strcmp(buffer, "floppy") == 0) {
+				// Mount? floppy drive.
+			fat_init(storageDevices);
+		}
 
 		else if (strcmp(buffer, "corp") == 0)
 			kprintf("Hacking CorpNewt's computer and installing SydOS.....\n");

@@ -29,14 +29,22 @@
 
 #include <kernel/memory/kheap.h>
 
-// Storage device array.
-static storage_device_t **storageDevices = NULL;
-static uint32_t storageDevicesLength = 0;
+// Storage device list.
+storage_device_t *storageDevices;
 
 void storage_register(storage_device_t *device) {
-    // Add space to array.
-    storageDevices = kheap_realloc(storageDevices, storageDevicesLength * sizeof(uintptr_t));
 
-    // Add device pointer to end.
-    storageDevices[storageDevicesLength - 1] = device;
+    if (storageDevices != NULL) {
+        // Add device to end of list.
+        device->Next = storageDevices;
+        storageDevices->Prev->Next = device;
+        device->Prev = storageDevices->Prev;
+        storageDevices->Prev = device;
+    }
+    else {
+        // First device.
+        storageDevices = device;
+        storageDevices->Next = storageDevices;
+        storageDevices->Prev = storageDevices;
+    }
 }

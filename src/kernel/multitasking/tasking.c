@@ -331,7 +331,7 @@ static void kernel_idle_thread(uintptr_t procIndex) {
     // Do nothing.
     while (true) {
         sleep(1000);
-        kprintf("hi %u\n", lapic_id());
+       // kprintf("hi %u\n", lapic_id());
     }
 }
 
