@@ -81,7 +81,7 @@ uint8_t pci_config_read_byte(pci_device_t *pciDevice, uint8_t reg) {
 void pci_config_write_dword(pci_device_t *pciDevice, uint8_t reg, uint32_t value) {
     // Build address.
     uint32_t address = PCI_PORT_ENABLE_BIT | ((uint32_t)pciDevice->Bus << 16)
-        | ((uint32_t)pciDevice->Device << 11) | ((uint32_t)pciDevice->Function << 8) | (reg << 2);
+        | ((uint32_t)pciDevice->Device << 11) | ((uint32_t)pciDevice->Function << 8) | (reg & 0xFC);
 
     // Send address to PCI system.
     outl(PCI_PORT_ADDRESS, address);
