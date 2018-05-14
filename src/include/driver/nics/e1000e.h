@@ -1,5 +1,5 @@
 /*
- * File: pci_driver.c
+ * File: e1000e.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,36 +22,16 @@
  * SOFTWARE.
  */
 
+#ifndef E1000E_H
+#define E1000E_H
+
 #include <main.h>
 #include <driver/pci.h>
 
-#include <driver/storage/ahci/ahci.h>
-#include <driver/storage/ata/ata.h>
+#define E1000E_VENDOR_ID                0x8086
+#define E1000E_82567LM2_DEVICE_ID       0x10CC
+#define E1000E_82567LM3_DEVICE_ID       0x10DE
 
-#include <driver/usb/usb_uhci.h>
-#include <driver/usb/usb_ohci.h>
+extern bool e1000e_init(pci_device_t *pciDevice);
 
-
-#include <driver/nics/rtl8139.h>
-#include <driver/nics/bcm440x.h>
-#include <driver/nics/e1000e.h>
-
-// Array of PCI device drivers.
-// Driver init() function must return a bool and accept a pci_device_t* as the only parameter.
-const pci_driver_t PciDrivers[] = {
-    // Storage.
-    //{ "AHCI controller", ahci_init }, // Disable for now.
-    { "ATA controller", ata_init },
-
-    // USB.
-    { "UHCI host controller", usb_uhci_init },
-    { "OHCI host controller", usb_ohci_init },
-
-    // Network adapters.
-    { "Realtek RTL8139 Ethernet", rtl8139_init },
-    { "Broadcom BCM440x Ethernet", bcm440x_init },
-    { "Intel PCIe Ethernet", e1000e_init },
-
-    // End driver.
-    { "", NULL }
-};
+#endif
