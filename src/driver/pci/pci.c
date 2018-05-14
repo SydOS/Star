@@ -133,7 +133,7 @@ void pci_print_info(pci_device_t *pciDevice) {
     // Print base addresses.
     for (uint8_t i = 0; i < PCI_BAR_COUNT; i++)
         if (pciDevice->BaseAddresses[i].BaseAddress)
-            kprintf("  - BAR%u: 0x%X (%s)\n", i + 1, pciDevice->BaseAddresses[i].BaseAddress, pciDevice->BaseAddresses[i].PortMapped ? "port-mapped" : "memory-mapped");
+            kprintf("  - BAR%u: 0x%X (%s)\n", i, pciDevice->BaseAddresses[i].BaseAddress, pciDevice->BaseAddresses[i].PortMapped ? "port-mapped" : "memory-mapped");
 
     // Interrupt info
     if(pciDevice->InterruptNo != 0) { 

@@ -1,5 +1,5 @@
 /*
- * File: pci_driver.c
+ * File: bcm440x.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,34 +22,17 @@
  * SOFTWARE.
  */
 
+#ifndef BCM440X_H
+#define BCM440X_H
+
 #include <main.h>
 #include <driver/pci.h>
 
-#include <driver/storage/ahci/ahci.h>
-#include <driver/storage/ata/ata.h>
+#define BCM440X_VENDOR_ID               0x14E4
+#define BCM440X_DEVICE_ID_BCM4401_AX    0x4401
+#define BCM440X_DEVICE_ID_BCM4402_AX    0x4402
+#define BCM440X_DEVICE_ID_BCM4401_B0    0x170C
 
-#include <driver/usb/usb_uhci.h>
-#include <driver/usb/usb_ohci.h>
+extern bool bcm440x_init(pci_device_t *pciDevice);
 
-
-#include <driver/nics/rtl8139.h>
-#include <driver/nics/bcm440x.h>
-
-// Array of PCI device drivers.
-// Driver init() function must return a bool and accept a pci_device_t* as the only parameter.
-const pci_driver_t PciDrivers[] = {
-    // Storage.
-    //{ "AHCI controller", ahci_init }, // Disable for now.
-    { "ATA controller", ata_init },
-
-    // USB.
-    { "UHCI host controller", usb_uhci_init },
-    { "OHCI host controller", usb_ohci_init },
-
-    // Network adapters.
-    { "Realtek RTL8139 Ethernet", rtl8139_init },
-    { "Broadcom BCM440x Ethernet", bcm440x_init },
-
-    // End driver.
-    { "", NULL }
-};
+#endif
