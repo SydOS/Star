@@ -29,8 +29,10 @@
 #include <driver/pci.h>
 
 #define E1000E_VENDOR_ID                0x8086
-#define E1000E_82567LM2_DEVICE_ID       0x10CC
-#define E1000E_82567LM3_DEVICE_ID       0x10DE
+
+typedef struct {
+    void *BasePointer;
+} e1000e_t;
 
 extern bool e1000e_init(pci_device_t *pciDevice);
 

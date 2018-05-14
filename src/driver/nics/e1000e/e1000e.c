@@ -35,41 +35,62 @@
 
 #include <kernel/memory/paging.h>
 
-static const uint16_t e1000eVendorIds[] = {
-    0x1501,
+typedef struct {
+    uint16_t DeviceId;
+    char *DeviceString;
+} e1000e_product_id_t;
 
-    0x10E5,
+static const e1000e_product_id_t e1000eDevices[] = {
+    // Intel 82566 PHYs.
+    { 0x10BD, "82566DM" },
+    { 0x294C, "82566DC" },
 
-    0x10F5,
-    0x10BF,
-    0x10CB,
+    // Intel 82567 PHYs.
+    { 0x1501, "82567V-3" },
+    { 0x10E5, "82567LM-4" },
+    { 0x10F5, "82567LM" },
+    { 0x10BF, "82567LF" },
+    { 0x10CB, "82567V" },
+    { 0x10CC, "82567LM-2" },
+    { 0x10CD, "82567LF-2" },
+    { 0x10CE, "82567V-2" },
+    { 0x10DE, "82567LM-3" },
+    { 0x10DF, "82567LF-3" },
 
-    0x10CC,
-    0x10CD,
-    0x10CE,
-    
-    0x10DE,
-    0x10DF,
-    0xFFFF
+    // Intel 82574 PHY.
+    { 0x10D3, "82574" },
+
+    // Intel 82577 PHYs.
+    { 0x10EA, "82577" },
+    { 0x10EB, "82577" },
+
+    // Intel 82579 PHYs.
+    { 0x1502, "82579LM" },
+    { 0x1503, "82579V" },
+
+    // Intel i217 PHYs.
+    { 0x153A, "I217-LM" },
+    { 0x153B, "I217-V" },
+
+    // Null.
+    { 0xFFFF, "" }
 };
 
-static const char* e1000eProductStrings[] = {
-    "82567V-3",
+static inline uint32_t e1000e_read(e1000e_t *e1000eDevice, uint16_t reg) {
+    return *(volatile uint32_t*)(e1000eDevice->BasePointer + reg);
+}
 
-    "82567LM-4",
+static inline void e1000e_write(e1000e_t *e1000eDevice, uint16_t reg, uint32_t value) {
+    *(volatile uint32_t*)(e1000eDevice->BasePointer + reg) = value;
+}
 
-    "82567LM",
-    "82567LF",
-    "82567V",
 
-    "82567LM-2",
-    "82567LF-2",
-    "82567V-2",
-
-    "82567LM-3",
-    "82567LF-3",
-    ""
-};
+static inline uint32_t e1000e_phy_read(e1000e_t *e1000eDevice, uint16_t reg) {
+    uint32_t mdi = (2 << 26) | (2 << 21) | (reg << 16);
+    e1000e_write(e1000eDevice, 0x20, mdi);
+    sleep(10);
+    return e1000e_read(e1000eDevice, 0x20);
+}
 
 bool e1000e_init(pci_device_t *pciDevice) {
     // Is the PCI device an Intel networking device?
@@ -79,17 +100,52 @@ bool e1000e_init(pci_device_t *pciDevice) {
 
     // Does the device match any IDs?
     uint32_t idIndex = 0;
-    while (pciDevice->DeviceId != e1000eVendorIds[idIndex] && e1000eVendorIds[idIndex] != 0xFFFF)
+    while (pciDevice->DeviceId != e1000eDevices[idIndex].DeviceId && e1000eDevices[idIndex].DeviceId != 0xFFFF)
         idIndex++;
-    if (e1000eVendorIds[idIndex] == 0xFFFF)
+    if (e1000eDevices[idIndex].DeviceId == 0xFFFF)
         return false;
 
-    void *buffer = paging_device_alloc(pciDevice->BaseAddresses[0].BaseAddress, pciDevice->BaseAddresses[0].BaseAddress);
+    e1000e_t *e1000eDevice = (e1000e_t*)kheap_alloc(sizeof(e1000e_t));
+
+    e1000eDevice->BasePointer = paging_device_alloc(pciDevice->BaseAddresses[0].BaseAddress, pciDevice->BaseAddresses[0].BaseAddress + 0x1F000);
 
     
 
-    kprintf("E1000E: Matched %s!\n", e1000eProductStrings[idIndex]);
-    kprintf("E1000e: Status: 0x%X\n", *(uint32_t*)(buffer + 0x08));
+    kprintf("E1000E: Matched %s!\n", e1000eDevices[idIndex].DeviceString);
+    kprintf("El000e: pci cmd 0x%X\n", pci_config_read_word(pciDevice, PCI_REG_COMMAND));
+
+    // REset.
+    uint32_t *bdd = (uint32_t*)(e1000eDevice->BasePointer + 0x00);
+    *bdd |= (1 << 2);
+    while (*bdd & (1 << 19));
+    *(uint32_t*)(e1000eDevice->BasePointer + 0xD8) = 0xFFFFFFFF;
+    *(uint32_t*)(e1000eDevice->BasePointer + 0x100) = 0;
+    *(uint32_t*)(e1000eDevice->BasePointer + 0x400) = 0x8;
+    kprintf("E1000e: Status: 0x%X\n", *(uint32_t*)(e1000eDevice->BasePointer + 0x08));
+    sleep(1000);
+
+    //while (*(uint32_t*)(buffer + 0x05B54) & 0x40);
+    kprintf("reseting...\n");
+
+   // uint32_t rese = *bdd | (1 << 26) | (1 << 31);
+    // Reset card.
+    e1000e_write(e1000eDevice, 0x00, e1000e_read(e1000eDevice, 0x00) | (1 << 26) | (1 << 31));
+  //  *bdd = rese;
+    sleep(20);
+
+    kprintf("E1000e: Status: 0x%X\n", *(uint32_t*)(e1000eDevice->BasePointer + 0x08));
+    kprintf("e1000e control 0x%X\n", *bdd);
+    *(uint32_t*)(e1000eDevice->BasePointer + 0xD8) = 0xFFFFFFFF;
+
+  //  *(uint32_t*)(e1000eDevice->BasePointer + 0x20) = 0x8210000;
+   // sleep(1);
+   // kprintf("e1000e: mac 0x%X\n", *(uint32_t*)(e1000eDevice->BasePointer + 0x20));
+   //int test = 1;
+ // while(test);
+   kprintf("E1000E: PHY status 0x%X\n", e1000e_phy_read(e1000eDevice, 0x1));
+
+    kprintf("E1000E: PHY ID1: 0x%X\n", e1000e_phy_read(e1000eDevice, 0x2) & 0xFFFF);
+    kprintf("E1000E: PHY ID2: 0x%X\n", e1000e_phy_read(e1000eDevice, 0x3) & 0xFFFF);
 
     while(true);
 }
