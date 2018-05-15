@@ -40,6 +40,9 @@ bool rtl8169_init(pci_device_t *pciDevice) {
     kprintf("RTL8169: MAC address: ");
     for (int i = 0; i < 6; i++) {
         kprintf("%X", inb(BaseAddress+i));
+        if (i != 5) {
+            kprintf(":");
+        }
     }
 
     // Return true, we have handled the PCI device passed to us
