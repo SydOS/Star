@@ -123,7 +123,7 @@ void pci_enable_busmaster(pci_device_t *pciDevice) {
  */
 void pci_print_info(pci_device_t *pciDevice) {
     // Print base info
-    kprintf("\e[94mPCI device: %X:%X (%X:%X) | Class %X Sub %X | Bus %d Device %d Function %d\n", 
+    kprintf("\e[94mPCI device: %4X:%4X (%4X:%4X) | Class %X Sub %X | Bus %d Device %d Function %d\n", 
         pciDevice->VendorId, pciDevice->DeviceId, pciDevice->SubVendorId, pciDevice->SubDeviceId, pciDevice->Class, pciDevice->Subclass, pciDevice->Bus, 
         pciDevice->Device, pciDevice->Function);
     
