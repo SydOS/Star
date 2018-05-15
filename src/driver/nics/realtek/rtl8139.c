@@ -26,6 +26,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <tools.h>
+#include <string.h>
 #include <driver/nics/rtl8139.h>
 
 #include <driver/pci.h>
@@ -140,6 +141,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
 
     // Enable PCI busmastering.
     pci_enable_busmaster(pciDevice);
+    kprintf("RTL8139: Enabled PCI busmastering\n");
 
     // Bring card out of low power mode.
     rtl8139_writeb(rtlDevice, RTL8139_REG_CONFIG1, 0x00);
@@ -191,6 +193,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER1, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer1));
     rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER2, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer2));
     rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER3, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer3));
+    kprintf("RTL8139: Configured TX buffers.\n");
 
     // Just send some garbage to prove it works in Wireshark.
     uint8_t ddd[54];

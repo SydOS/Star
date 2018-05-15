@@ -1,0 +1,1 @@
+extern bool rtl8169_init(pci_device_t *pciDevice);
