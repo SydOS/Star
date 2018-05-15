@@ -31,7 +31,7 @@
 
 bool rtl8169_init(pci_device_t *pciDevice) {
     // Is the PCI device an RTL8139?
-    if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8139)) {
+    if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8169)) {
         return false;
     }
 
