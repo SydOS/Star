@@ -104,10 +104,29 @@ static inline uint32_t e1000e_phy_read(e1000e_t *e1000eDevice, uint16_t reg) {
     return e1000e_read(e1000eDevice, E1000E_REG_MDIC);
 }
 
+static void e1000e_get_mac_addr(e1000e_t *e1000eDevice) {
+    // Get value of RAL0 and RAH0, which contains the MAC address of the card.
+    uint32_t ral = e1000e_read(e1000eDevice, E1000E_REG_RAL);
+    uint32_t rah = e1000e_read(e1000eDevice, E1000E_REG_RAH);
+
+    // Decode MAC.
+    e1000eDevice->MacAddress[0] = ral & 0xFF;
+    e1000eDevice->MacAddress[1] = (ral >> 8) & 0xFF;
+    e1000eDevice->MacAddress[2] = (ral >> 16) & 0xFF;
+    e1000eDevice->MacAddress[3] = (ral >> 24) & 0xFF;
+    e1000eDevice->MacAddress[4] = rah & 0xFF;
+    e1000eDevice->MacAddress[5] = (rah >> 8) & 0xFF;
+}
+
 void e1000e_reset(e1000e_t *e1000eDevice) {
     // Reset card.
     e1000e_write(e1000eDevice, E1000E_REG_CTRL, e1000e_read(e1000eDevice, E1000E_REG_CTRL) | (1 << 26) | (1 << 31));
     sleep(20);
+}
+
+static bool e1000e_callback(pci_device_t *pciDevice) {
+    kprintf("E1000E: IRQ raised (0x%X)!\n", e1000e_read((e1000e_t*)pciDevice->DriverObject, E1000E_REG_ICR));
+    return false;
 }
 
 bool e1000e_init(pci_device_t *pciDevice) {
@@ -124,6 +143,8 @@ bool e1000e_init(pci_device_t *pciDevice) {
         return false;
 
     e1000e_t *e1000eDevice = (e1000e_t*)kheap_alloc(sizeof(e1000e_t));
+    pciDevice->DriverObject = e1000eDevice;
+    pciDevice->InterruptHandler = e1000e_callback;
 
     e1000eDevice->BasePointer = paging_device_alloc(pciDevice->BaseAddresses[0].BaseAddress, pciDevice->BaseAddresses[0].BaseAddress + 0x1F000);
         kprintf("E1000E: Matched %s!\n", e1000eDevices[idIndex].DeviceString);
@@ -140,46 +161,40 @@ bool e1000e_init(pci_device_t *pciDevice) {
     sleep(1000);
 
     //while (*(uint32_t*)(buffer + 0x05B54) & 0x40);
-    kprintf("reseting...\n");
+    kprintf("E1000E: Resetting card...\n");
     e1000e_reset(e1000eDevice);
 
-   // uint32_t rese = *bdd | (1 << 26) | (1 << 31);
-    
+    // Get MAC address.
+    e1000e_get_mac_addr(e1000eDevice);
+    kprintf("E1000E: MAC address: %2X:%2X:%2X:%2X:%2X:%2X\n", e1000eDevice->MacAddress[0], e1000eDevice->MacAddress[1],
+        e1000eDevice->MacAddress[2], e1000eDevice->MacAddress[3], e1000eDevice->MacAddress[4], e1000eDevice->MacAddress[5]);
 
     kprintf("E1000e: Status: 0x%X\n", *(uint32_t*)(e1000eDevice->BasePointer + 0x08));
   //  kprintf("e1000e control 0x%X\n", *bdd);
-    *(uint32_t*)(e1000eDevice->BasePointer + 0xD8) = 0xFFFFFFFF;
+    e1000e_write(e1000eDevice, E1000E_REG_IMS, 0xFFFFFFFF);
 
-  //  *(uint32_t*)(e1000eDevice->BasePointer + 0x20) = 0x8210000;
-   // sleep(1);
-   // kprintf("e1000e: mac 0x%X\n", *(uint32_t*)(e1000eDevice->BasePointer + 0x20));
-   //int test = 1;
- // while(test);
+
    kprintf("E1000E: PHY status 0x%X\n", e1000e_phy_read(e1000eDevice, 0x1));
 
     kprintf("E1000E: PHY ID1: 0x%X\n", e1000e_phy_read(e1000eDevice, 0x2) & 0xFFFF);
     kprintf("E1000E: PHY ID2: 0x%X\n", e1000e_phy_read(e1000eDevice, 0x3) & 0xFFFF);
 
-    void *flash = paging_device_alloc(pciDevice->BaseAddresses[1].BaseAddress, pciDevice->BaseAddresses[1].BaseAddress + 0x1F000);
-   // uint32_t eee = flash[0];
-   // uint32_t eef = flash[1];
-   // kprintf("mac 0x%X\n", eee);
-   uint32_t ven = *(volatile uint32_t*)((uintptr_t)flash + 0x04);
-   uint32_t vend = *(volatile uint32_t*)((uintptr_t)flash + 0x16);
+    e1000eDevice->DescPage = pmm_pop_frame();
+    kprintf("E1000E: Popped page 0x%X\n", e1000eDevice->DescPage);
+    void *boop = paging_device_alloc(e1000eDevice->DescPage, e1000eDevice->DescPage);
+    memset(boop, 0, PAGE_SIZE_4K);
 
-   
+    e1000e_receive_desc_t *rxDesc = (e1000e_receive_desc_t*)boop;
+    for (uint16_t i = 0; i < 32; i++) {
+        rxDesc[i].BufferAddress = e1000eDevice->DescPage + 0x1000;
+    }
 
-    uint16_t mac0 = *(volatile uint32_t*)((uint16_t*)flash + 0x00);
-    uint16_t mac1 = *(volatile uint32_t*)((uint16_t*)flash + 0x01);
-    uint16_t mac2 = *(volatile uint32_t*)((uint16_t*)flash + 0x02);
-
-   uint16_t venid = *(volatile uint32_t*)((uint16_t*)flash + 0x0D);
-
-    uint32_t macMem1 = e1000e_read(e1000eDevice, 0x5400);
-    uint32_t macMem2 = e1000e_read(e1000eDevice, 0x5404);
-
-    kprintf("E1000E: Mac from flash: %X:%X:%X:%X:%X:%X\n", mac0 & 0xFF, (mac0 >> 8) & 0xFF, mac1 & 0xFF, (mac1 >> 8) & 0xFF, mac2 & 0xFF, (mac2 >> 8) & 0xFF);
-    kprintf("E1000E: Mac from register: %X:%X:%X:%X:%X:%X\n", macMem1 & 0xFF, (macMem1 >> 8) & 0xFF, (macMem1 >> 16) & 0xFF, (macMem1 >> 24) & 0xFF, macMem2 & 0xFF, (macMem2 >> 8) & 0xFF);
+    e1000e_write(e1000eDevice, E1000E_REG_RDBAL0, (uint32_t)(e1000eDevice->DescPage & 0xFFFFFFFF));
+    e1000e_write(e1000eDevice, E1000E_REG_RDBAH0, (uint32_t)((e1000eDevice->DescPage >> 32) & 0xFFFFFFFF));
+    e1000e_write(e1000eDevice, E1000E_REG_RDLEN0, 32 * 16);
+    e1000e_write(e1000eDevice, E1000E_REG_RDH0, 0);
+    e1000e_write(e1000eDevice, E1000E_REG_RDT0, 32 - 1);
+    e1000e_write(e1000eDevice, E1000E_REG_RCTL, E1000E_RCTL_EN | E1000E_RCTL_SBP | E1000E_RCTL_UPE | E1000E_RCTL_MPE | E1000E_RCTL_RDMTS_HALF | E1000E_RCTL_BAM | E1000E_RCTL_SECRC | E1000E_RCTL_BSIZE_2048);
 
     kprintf("sleeping for 10 seconds...\n");
     sleep(10000);

@@ -34,6 +34,7 @@
 #define E1000E_REG_STATUS       0x00008
 #define E1000E_REG_STRAP        0x0000C
 #define E1000E_REG_EEC          0x00010
+#define E1000E_REG_EERD         0x00014
 #define E1000E_REG_CTRL_EXT     0x00018
 #define E1000E_REG_MDIC         0x00020
 #define E1000E_REG_FEXTNVM      0x00028
@@ -52,6 +53,7 @@
 #define E1000E_REG_PBA          0x01000
 #define E1000E_REG_PBS          0x01008
 
+#define E1000E_REG_ICR          0x000C0
 #define E1000E_REG_ITR          0x000C4
 #define E1000E_REG_ICS          0x000C8
 #define E1000E_REG_IMS          0x000D0
@@ -180,13 +182,52 @@
 
 
 
+#define E1000E_RCTL_EN          (1 << 1)
+#define E1000E_RCTL_SBP         (1 << 2)
+#define E1000E_RCTL_UPE         (1 << 3)
+#define E1000E_RCTL_MPE         (1 << 4)
+#define E1000E_RCTL_LPE         (1 << 5)
+#define E1000E_RCTL_BAM         (1 << 15)
+#define E1000E_RCTL_PMCF        (1 << 23)
+#define E1000E_RCTL_BSEX        (1 << 25)
+#define E1000E_RCTL_SECRC       (1 << 26)
+
+#define E1000E_RCTL_RDMTS_HALF      0
+#define E1000E_RCTL_RDMTS_QUARTER   (1 << 8)
+#define E1000E_RCTL_RDMTS_EIGHTH    (1 << 9)
+
+#define E1000E_RCTL_DTYP_LEGACY     0
+#define E1000E_RCTL_DTYP_SPLIT      (1 << 10)
+
+#define E1000E_RCTL_BSIZE_2048      0
+#define E1000E_RCTL_BSIZE_1024      (1 << 16)
+#define E1000E_RCTL_BSIZE_512       (1 << 17)
+#define E1000E_RCTL_BSIZE_256       ((1 << 16) | (1 << 17))
+
 
 
 
 #define E1000E_PHY_READY                (1 << 28)
 
+
+typedef struct {
+    uint64_t BufferAddress;
+    uint16_t Length;
+    uint16_t Checksum;
+    uint8_t Status;
+    uint8_t Errors;
+
+    // Used for storing info for 802.1q VLAN packets.
+    uint16_t VlanTag;
+} __attribute__((packed)) e1000e_receive_desc_t;
+
 typedef struct {
     void *BasePointer;
+    uint8_t MacAddress[6];
+
+    uint64_t DescPage;
+
+
 } e1000e_t;
 
 extern bool e1000e_init(pci_device_t *pciDevice);
