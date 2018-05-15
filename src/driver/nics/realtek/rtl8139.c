@@ -157,7 +157,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     // Read MAC address from RTL8139.
     for (uint8_t i = 0; i < 6; i++)
         rtlDevice->MacAddress[i] = rtl8139_readb(rtlDevice, RTL8139_REG_IDR0 + i);
-    kprintf("RTL8139: MAC %X:%X:%X:%X:%X:%X\n", rtlDevice->MacAddress[0], rtlDevice->MacAddress[1],
+    kprintf("RTL8139: MAC %2X:%2X:%2X:%2X:%2X:%2X\n", rtlDevice->MacAddress[0], rtlDevice->MacAddress[1],
         rtlDevice->MacAddress[2], rtlDevice->MacAddress[3], rtlDevice->MacAddress[4],
         rtlDevice->MacAddress[5]);
 
