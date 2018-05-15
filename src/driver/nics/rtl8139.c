@@ -26,6 +26,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <tools.h>
+#include <string.h>
 #include <driver/nics/rtl8139.h>
 
 #include <driver/pci.h>
