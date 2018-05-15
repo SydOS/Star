@@ -114,6 +114,11 @@ static bool rtl8139_callback(pci_device_t *dev) {
 }
 
 bool rtl8139_init(pci_device_t *pciDevice) {
+    // Is this actually a NIC?
+    if (!(pciDevice->Class == 0x02 && pciDevice->Subclass == 0)) {
+        return false;
+    }
+
     // Is the PCI device an RTL8139?
     if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8139)) {
         return false;
