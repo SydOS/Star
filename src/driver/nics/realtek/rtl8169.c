@@ -31,7 +31,10 @@
 
 bool rtl8169_init(pci_device_t *pciDevice) {
     // Is the PCI device an RTL8139?
-    if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8169)) {
+        // Official RTL8169
+    if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8169) &&
+        // Linksys E61032 Ver. 3
+        !(pciDevice->VendorId == 0x1737 && pciDevice->DeviceId == 0x1032)) {
         return false;
     }
 
