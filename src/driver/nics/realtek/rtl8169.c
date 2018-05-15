@@ -31,10 +31,11 @@
 
 bool rtl8169_init(pci_device_t *pciDevice) {
     // Is this actually a NIC?
-    if (!(pciDevice->Class == 0x02 && pciDevice->Subclass == 0)) {
+    if (!(pciDevice->Class == PCI_CLASS_NETWORK && 
+        pciDevice->Subclass == PCI_SUBCLASS_NETWORK_ETHERNET)) {
         return false;
     }
-    
+
     // Is the PCI device an RTL8139?
         // Official RTL8169
     if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8169) &&
