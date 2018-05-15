@@ -41,6 +41,8 @@ typedef struct {
 } e1000e_product_id_t;
 
 static const e1000e_product_id_t e1000eDevices[] = {
+    { 0x105E, "PRO 1000 PT" },
+
     // Intel 82566 PHYs.
     { 0x10BD, "82566DM" },
     { 0x294C, "82566DC" },
@@ -87,9 +89,25 @@ static inline void e1000e_write(e1000e_t *e1000eDevice, uint16_t reg, uint32_t v
 
 static inline uint32_t e1000e_phy_read(e1000e_t *e1000eDevice, uint16_t reg) {
     uint32_t mdi = (2 << 26) | (2 << 21) | (reg << 16);
-    e1000e_write(e1000eDevice, 0x20, mdi);
-    sleep(10);
-    return e1000e_read(e1000eDevice, 0x20);
+    e1000e_write(e1000eDevice, E1000E_REG_MDIC, mdi);
+    
+    // Wait for PHY.
+    uint32_t timeout = 100;
+    while (!(e1000e_read(e1000eDevice, E1000E_REG_MDIC) & E1000E_PHY_READY)) {
+        if (!timeout) {
+            kprintf("E1000E: PHY read timeout!\n");
+            break;
+        }
+        sleep(1);
+        timeout--;
+    }
+    return e1000e_read(e1000eDevice, E1000E_REG_MDIC);
+}
+
+void e1000e_reset(e1000e_t *e1000eDevice) {
+    // Reset card.
+    e1000e_write(e1000eDevice, E1000E_REG_CTRL, e1000e_read(e1000eDevice, E1000E_REG_CTRL) | (1 << 26) | (1 << 31));
+    sleep(20);
 }
 
 bool e1000e_init(pci_device_t *pciDevice) {
@@ -108,33 +126,28 @@ bool e1000e_init(pci_device_t *pciDevice) {
     e1000e_t *e1000eDevice = (e1000e_t*)kheap_alloc(sizeof(e1000e_t));
 
     e1000eDevice->BasePointer = paging_device_alloc(pciDevice->BaseAddresses[0].BaseAddress, pciDevice->BaseAddresses[0].BaseAddress + 0x1F000);
-
-    
-
-    kprintf("E1000E: Matched %s!\n", e1000eDevices[idIndex].DeviceString);
+        kprintf("E1000E: Matched %s!\n", e1000eDevices[idIndex].DeviceString);
     kprintf("El000e: pci cmd 0x%X\n", pci_config_read_word(pciDevice, PCI_REG_COMMAND));
 
     // REset.
-    uint32_t *bdd = (uint32_t*)(e1000eDevice->BasePointer + 0x00);
-    *bdd |= (1 << 2);
-    while (*bdd & (1 << 19));
-    *(uint32_t*)(e1000eDevice->BasePointer + 0xD8) = 0xFFFFFFFF;
-    *(uint32_t*)(e1000eDevice->BasePointer + 0x100) = 0;
-    *(uint32_t*)(e1000eDevice->BasePointer + 0x400) = 0x8;
+   // uint32_t *bdd = (uint32_t*)(e1000eDevice->BasePointer + 0x00);
+  //  *bdd |= (1 << 2);
+  //  while (*bdd & (1 << 19));
+  //  *(uint32_t*)(e1000eDevice->BasePointer + 0xD8) = 0xFFFFFFFF;
+  //  *(uint32_t*)(e1000eDevice->BasePointer + 0x100) = 0;
+ //   *(uint32_t*)(e1000eDevice->BasePointer + 0x400) = 0x8;
     kprintf("E1000e: Status: 0x%X\n", *(uint32_t*)(e1000eDevice->BasePointer + 0x08));
     sleep(1000);
 
     //while (*(uint32_t*)(buffer + 0x05B54) & 0x40);
     kprintf("reseting...\n");
+    e1000e_reset(e1000eDevice);
 
    // uint32_t rese = *bdd | (1 << 26) | (1 << 31);
-    // Reset card.
-    e1000e_write(e1000eDevice, 0x00, e1000e_read(e1000eDevice, 0x00) | (1 << 26) | (1 << 31));
-  //  *bdd = rese;
-    sleep(20);
+    
 
     kprintf("E1000e: Status: 0x%X\n", *(uint32_t*)(e1000eDevice->BasePointer + 0x08));
-    kprintf("e1000e control 0x%X\n", *bdd);
+  //  kprintf("e1000e control 0x%X\n", *bdd);
     *(uint32_t*)(e1000eDevice->BasePointer + 0xD8) = 0xFFFFFFFF;
 
   //  *(uint32_t*)(e1000eDevice->BasePointer + 0x20) = 0x8210000;
@@ -147,5 +160,28 @@ bool e1000e_init(pci_device_t *pciDevice) {
     kprintf("E1000E: PHY ID1: 0x%X\n", e1000e_phy_read(e1000eDevice, 0x2) & 0xFFFF);
     kprintf("E1000E: PHY ID2: 0x%X\n", e1000e_phy_read(e1000eDevice, 0x3) & 0xFFFF);
 
-    while(true);
+    void *flash = paging_device_alloc(pciDevice->BaseAddresses[1].BaseAddress, pciDevice->BaseAddresses[1].BaseAddress + 0x1F000);
+   // uint32_t eee = flash[0];
+   // uint32_t eef = flash[1];
+   // kprintf("mac 0x%X\n", eee);
+   uint32_t ven = *(volatile uint32_t*)((uintptr_t)flash + 0x04);
+   uint32_t vend = *(volatile uint32_t*)((uintptr_t)flash + 0x16);
+
+   
+
+    uint16_t mac0 = *(volatile uint32_t*)((uint16_t*)flash + 0x00);
+    uint16_t mac1 = *(volatile uint32_t*)((uint16_t*)flash + 0x01);
+    uint16_t mac2 = *(volatile uint32_t*)((uint16_t*)flash + 0x02);
+
+   uint16_t venid = *(volatile uint32_t*)((uint16_t*)flash + 0x0D);
+
+    uint32_t macMem1 = e1000e_read(e1000eDevice, 0x5400);
+    uint32_t macMem2 = e1000e_read(e1000eDevice, 0x5404);
+
+    kprintf("E1000E: Mac from flash: %X:%X:%X:%X:%X:%X\n", mac0 & 0xFF, (mac0 >> 8) & 0xFF, mac1 & 0xFF, (mac1 >> 8) & 0xFF, mac2 & 0xFF, (mac2 >> 8) & 0xFF);
+    kprintf("E1000E: Mac from register: %X:%X:%X:%X:%X:%X\n", macMem1 & 0xFF, (macMem1 >> 8) & 0xFF, (macMem1 >> 16) & 0xFF, (macMem1 >> 24) & 0xFF, macMem2 & 0xFF, (macMem2 >> 8) & 0xFF);
+
+    kprintf("sleeping for 10 seconds...\n");
+    sleep(10000);
+    //while(true);
 }
