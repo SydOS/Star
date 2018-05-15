@@ -30,6 +30,7 @@
 #include <driver/nics/rtl8139.h>
 
 #include <driver/pci.h>
+#include <driver/pci_classes.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/irqs.h>
@@ -115,7 +116,8 @@ static bool rtl8139_callback(pci_device_t *dev) {
 
 bool rtl8139_init(pci_device_t *pciDevice) {
     // Is this actually a NIC?
-    if (!(pciDevice->Class == 0x02 && pciDevice->Subclass == 0)) {
+    if (!(pciDevice->Class == PCI_CLASS_NETWORK && 
+        pciDevice->Subclass == PCI_SUBCLASS_NETWORK_ETHERNET)) {
         return false;
     }
 
