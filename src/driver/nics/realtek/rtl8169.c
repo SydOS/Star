@@ -46,6 +46,11 @@ bool rtl8169_init(pci_device_t *pciDevice) {
 
     int BaseAddress = pciDevice->BaseAddresses[0].BaseAddress;
 
+    outb(BaseAddress + 0x37, 0x10);
+    kprintf("\e[35mRTL8169: Sent reset bit to RTL8169");
+    while(inb(BaseAddress + 0x37) & 0x10){}
+    kprintf("RTL8169: Reset completed");
+
     kprintf("RTL8169: MAC address: ");
     for (int i = 0; i < 6; i++) {
         kprintf("%2X", inb(BaseAddress+i));
