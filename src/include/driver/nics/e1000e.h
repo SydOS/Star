@@ -26,6 +26,7 @@
 #define E1000E_H
 
 #include <main.h>
+#include <kernel/lock.h>
 #include <driver/pci.h>
 
 #define E1000E_VENDOR_ID                0x8086
@@ -181,7 +182,23 @@
 #define E1000E_REG_LSECRXOK     0x04360
 
 
+// Status bits.
+#define E1000E_STATUS_FD        (1 << 0)  // Full-duplex.
+#define E1000E_STATUS_LU        (1 << 1)  // Link established.
+#define E1000E_STATUS_TXOFF     (1 << 4)  // Transmission Paused.
+#define E1000E_STATUS_PHYPWR    (1 << 5)  // PHY power state.
+#define E1000E_STATUS_MRCB      (1 << 8)  // Master Read Completions Blocked.
+#define E1000E_STATUS_INIT_DONE (1 << 9)  // LAN Init Done.
+#define E1000E_STATUS_PHYRA     (1 << 10) // PHY Reset Asserted.
+#define E1000E_STATUS_MASTER_EN (1 << 19) // Master Enable Status.
+#define E1000E_STATUS_CLK_CNT14 (1 << 31) // Clock Control 1/4.
 
+#define E1000E_STATUS_SPEED_10      0
+#define E1000E_STATUS_SPEED_100     (1 << 6)
+#define E1000E_STATUS_SPEED_1000    (1 << 7)
+#define E1000E_STATUS_SPEED_1000_2  ((1 << 6) | (1 << 7))
+
+// Receive Control Register bits.
 #define E1000E_RCTL_EN          (1 << 1)
 #define E1000E_RCTL_SBP         (1 << 2)
 #define E1000E_RCTL_UPE         (1 << 3)
@@ -204,12 +221,39 @@
 #define E1000E_RCTL_BSIZE_512       (1 << 17)
 #define E1000E_RCTL_BSIZE_256       ((1 << 16) | (1 << 17))
 
+// Transmit Control Register bits.
+#define E1000E_TCTL_EN          (1 << 1)  // Transmit Enable.
+#define E1000E_TCTL_PSP         (1 << 3)  // Pad Short Packets.
+#define E1000E_TCTL_CT_SHIFT    4         // Collision Threshold.
+#define E1000E_TCTL_COLD_SHIFT  12        // Collision Distance.
+#define E1000E_TCTL_SWXOFF      (1 << 22) // Software XOFF Transmission.
+#define E1000E_TCTL_RTLC        (1 << 24) // Re-transmit on Late Collision.
+
+// Interrupt bits.
+#define E1000E_INT_TXDW         (1 << 0)  // Transmit Descriptor Written Back Interrupt.
+#define E1000E_INT_TXQE         (1 << 1)  // Transmit Queue Empty Interrupt.
+#define E1000E_INT_LSC          (1 << 2)  // Link Status Change Interrupt.
+#define E1000E_INT_RXDMT0       (1 << 4)  // Receive Descriptor Minimum Threshold Hit Interrupt.
+#define E1000E_INT_DSW          (1 << 5)  // Block software write accesses.
+#define E1000E_INT_RXO          (1 << 6)  // Receiver Overrun Interrupt.
+#define E1000E_INT_RXT0         (1 << 7)  // Receiver Timer Interrupt.
+#define E1000E_INT_MDAC         (1 << 9)  // MDI/O Access Complete Interrupt.
+#define E1000E_INT_PHYINT       (1 << 12) // PHY interrupt.
+#define E1000E_INT_LSECPN       (1 << 14) // LinkSec packet number interrupt.
+#define E1000E_INT_TXD_LOW      (1 << 15) // Transmit Descriptor Low Threshold Hit.
+#define E1000E_INT_SRPD         (1 << 16) // Small Receive Packet Detect Interrupt.
+#define E1000E_INT_ACK          (1 << 17) // Receive ACK Frame Detect Interrupt.
+#define E1000E_INT_MNG          (1 << 18) // Manageability Event interrupt.
+#define E1000E_INT_EPRST        (1 << 20) // ME reset event.
+#define E1000E_INT_ASSERTED     (1 << 31) // Interrupt Asserted.
+
 
 
 
 #define E1000E_PHY_READY                (1 << 28)
 
 
+// Receive descriptor.
 typedef struct {
     uint64_t BufferAddress;
     uint16_t Length;
@@ -221,13 +265,44 @@ typedef struct {
     uint16_t VlanTag;
 } __attribute__((packed)) e1000e_receive_desc_t;
 
+#define E1000E_RECEIVE_DESC_COUNT       64
+#define E1000E_RECEIVE_DESC_POOL_SIZE   (E1000E_RECEIVE_DESC_COUNT * sizeof(e1000e_receive_desc_t))
+
+// Transmit descriptor.
+typedef struct {
+    uint64_t BufferAddress;
+    uint16_t Length;
+    uint8_t ChecksumOffsetStart;
+    uint8_t Command;
+    uint8_t Status;
+    uint8_t Reserved;
+    uint16_t Special;
+} __attribute__((packed)) e1000e_transmit_desc_t;
+
+#define E1000E_TRANSMIT_DESC_COUNT       16
+#define E1000E_TRANSMIT_DESC_POOL_SIZE   (E1000E_TRANSMIT_DESC_COUNT * sizeof(e1000e_transmit_desc_t))
+
+#define E1000E_TRANSMIT_CMD_EOP     (1 << 0) // End Of Packet.
+#define E1000E_TRANSMIT_CMD_IFCS    (1 << 1) // Insert FCS.
+#define E1000E_TRANSMIT_CMD_IC      (1 << 2) // Insert Checksum.
+#define E1000E_TRANSMIT_CMD_RS      (1 << 3) // Report Status.
+#define E1000E_TRANSMIT_CMD_VLE     (1 << 6) // VLAN Packet Enable.
+#define E1000E_TRANSMIT_CMD_IDE     (1 << 7) // Interrupt Delay Enable.
+
 typedef struct {
     void *BasePointer;
     uint8_t MacAddress[6];
 
     uint64_t DescPage;
+    void *DescPtr;
 
+    e1000e_receive_desc_t *ReceiveDescs;
+    e1000e_transmit_desc_t *TransmitDescs;
 
+    void *TransmitBuffers[E1000E_TRANSMIT_DESC_COUNT];
+
+    lock_t TransmitIndexLock;
+    uint8_t CurrentTransmitDesc;
 } e1000e_t;
 
 extern bool e1000e_init(pci_device_t *pciDevice);
