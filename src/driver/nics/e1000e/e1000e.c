@@ -42,6 +42,8 @@ typedef struct {
 } e1000e_product_id_t;
 
 static const e1000e_product_id_t e1000eDevices[] = {
+    { 0x100E, ""},
+
     { 0x105E, "PRO 1000 PT" },
 
     // Intel 82566 PHYs.
@@ -116,13 +118,12 @@ static bool e1000e_send_bytes(e1000e_t *e1000eDevice, const void *data, uint16_t
     e1000eDevice->CurrentTransmitDesc = (e1000eDevice->CurrentTransmitDesc + 1) % E1000E_TRANSMIT_DESC_COUNT;
 
     // Fill descriptor.
-    memset(e1000eDevice->TransmitDescs + descIndex, 0, sizeof(e1000e_transmit_desc_t));
+    //memset(e1000eDevice->TransmitDescs + descIndex, 0, sizeof(e1000e_transmit_desc_t));
     e1000eDevice->TransmitDescs[descIndex].Length = length;
     e1000eDevice->TransmitDescs[descIndex].Command = E1000E_TRANSMIT_CMD_EOP | E1000E_TRANSMIT_CMD_IFCS | E1000E_TRANSMIT_CMD_RS;
     memcpy(e1000eDevice->TransmitBuffers[descIndex], data, length);
 
     // Send packet.
-    kprintf("E1000E: sending!\n");
     e1000eDevice->TransmitDescs[descIndex].Status = 0;
     e1000e_write(e1000eDevice, E1000E_REG_TDT0, e1000eDevice->CurrentTransmitDesc);
     spinlock_release(&e1000eDevice->TransmitIndexLock);
@@ -131,6 +132,7 @@ static bool e1000e_send_bytes(e1000e_t *e1000eDevice, const void *data, uint16_t
         sleep(1000);
         kprintf("status 0x%X\n", e1000eDevice->TransmitDescs[descIndex].Status);
     }
+    kprintf("E1000E: sent 0x%X\n", e1000eDevice->TransmitDescs[descIndex].Status);
     return true;
 }
 
@@ -229,6 +231,9 @@ bool e1000e_init(pci_device_t *pciDevice) {
     kprintf("E1000E: MAC address: %2X:%2X:%2X:%2X:%2X:%2X\n", e1000eDevice->MacAddress[0], e1000eDevice->MacAddress[1],
         e1000eDevice->MacAddress[2], e1000eDevice->MacAddress[3], e1000eDevice->MacAddress[4], e1000eDevice->MacAddress[5]);
 
+    for (uint16_t i = 0; i < 0x80; i++)
+        e1000e_write(e1000eDevice, 0x5200 + i * 4, 0);
+
     kprintf("E1000e: Status: 0x%X\n", *(uint32_t*)(e1000eDevice->BasePointer + 0x08));
     e1000e_write(e1000eDevice, E1000E_REG_IMS, 0xFFFFFFFF);
 
@@ -274,20 +279,22 @@ bool e1000e_init(pci_device_t *pciDevice) {
     e1000e_write(e1000eDevice, E1000E_REG_RCTL, E1000E_RCTL_EN | E1000E_RCTL_SBP | E1000E_RCTL_UPE | E1000E_RCTL_MPE | E1000E_RCTL_RDMTS_HALF | E1000E_RCTL_BAM | E1000E_RCTL_SECRC | E1000E_RCTL_BSIZE_256 | E1000E_RCTL_BSEX);
 
     // Enable the transmit function of the card.
-  //  e1000e_write(e1000eDevice, E1000E_REG_TCTL, E1000E_TCTL_EN | E1000E_TCTL_PSP | (15 << E1000E_TCTL_CT_SHIFT) | (64 << E1000E_TCTL_COLD_SHIFT) || E1000E_TCTL_RTLC);
+    //e1000e_write(e1000eDevice, E1000E_REG_TCTL, E1000E_TCTL_EN | E1000E_TCTL_PSP | (15 << E1000E_TCTL_CT_SHIFT) | (64 << E1000E_TCTL_COLD_SHIFT) || E1000E_TCTL_RTLC);
     e1000e_write(e1000eDevice, E1000E_REG_TCTL, 0b0110000000000111111000011111010);
     e1000e_write(e1000eDevice, E1000E_REG_TIPG, 0x0060200A);
+
+kprintf("E1000E: control 0x%X\n", e1000e_read(e1000eDevice, E1000E_REG_CTRL));
 
     kprintf("sleeping for 10 seconds...\n");
     sleep(10000);
 
-    uint8_t data[16];
-    data[0] = 0xB4;
-    data[1] = 0xB6;
-    data[2] = 0x76;
-    data[3] = 0x7A;
-    data[4] = 0x0E;
-    data[5] = 0xD6;
+    uint8_t data[100];
+    data[0] = 0xFF;
+    data[1] = 0xFF;
+    data[2] = 0xFF;
+    data[3] = 0xFF;
+    data[4] = 0xFF;
+    data[5] = 0xFF;
     data[6] = 0x12;
     data[7] = 0x34;
     data[8] = 0x56;
@@ -298,7 +305,7 @@ bool e1000e_init(pci_device_t *pciDevice) {
     data[13] = 0xFF;
 
      kprintf("E1000E: sending!\n");
-    e1000e_send_bytes(e1000eDevice, data, 16);
+    e1000e_send_bytes(e1000eDevice, data, 100);
     kprintf("E1000E: packet sent!\n");
     //while(true);
 }
