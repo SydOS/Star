@@ -28,15 +28,22 @@
 #include <main.h>
 
 typedef struct net_device_t {
+    // Relationship to other devices in linked list.
     struct net_device_t *Next;
     struct net_device_t *Prev;
 
+    // Driver object and friendly name.
     void *Device;
     char *Name;
 
+    // Function pointers.
+    bool (*Reset)(struct net_device_t *netDevice);
+    bool (*Send)(struct net_device_t *netDevice, void *data, uint16_t length);
 } net_device_t;
 
+// Linked list of networking devices.
 extern net_device_t *NetDevices;
+
 extern void net_device_register(net_device_t *netDevice);
 extern void net_device_print_devices(void);
 

@@ -115,6 +115,10 @@ static bool rtl8139_callback(pci_device_t *dev) {
     return true;
 }
 
+static bool rtl8139_net_send(net_device_t *netDevice, void *data, uint16_t length) {
+    rtl8139_send_bytes((rtl8139_t*)netDevice->Device, data, length);
+}
+
 bool rtl8139_init(pci_device_t *pciDevice) {
     // Is this actually a NIC?
     if (!(pciDevice->Class == PCI_CLASS_NETWORK && 
@@ -217,6 +221,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     memset(netDevice, 0, sizeof(net_device_t));
     netDevice->Device = rtlDevice;
     netDevice->Name = "RTL8139";
+    netDevice->Send = rtl8139_net_send;
 
     // Register network device.
     net_device_register(netDevice);
