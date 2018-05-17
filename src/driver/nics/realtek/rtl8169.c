@@ -25,6 +25,9 @@
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
+#include <string.h>
+
+#include <kernel/memory/kheap.h>
 
 #include <driver/pci.h>
 #include <driver/nics/net_device.h>
