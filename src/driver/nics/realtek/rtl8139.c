@@ -31,6 +31,7 @@
 
 #include <driver/pci.h>
 #include <driver/pci_classes.h>
+#include <driver/nics/net_device.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/irqs.h>
@@ -210,6 +211,15 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     kprintf("RTL8139: Media status: 0x%X\n", inb(rtlDevice->BaseAddress + 0x58));
     kprintf("RTL8139: Mode status: 0x%X\n", inw(rtlDevice->BaseAddress + 0x64));
     kprintf("RTL8139: CR: 0x%X\n", inb(rtlDevice->BaseAddress + 0x37));
+
+    // Create network device.
+    net_device_t *netDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
+    memset(netDevice, 0, sizeof(net_device_t));
+    netDevice->Device = rtlDevice;
+    netDevice->Name = "RTL8139";
+
+    // Register network device.
+    net_device_register(netDevice);
 
     // Return true, we have handled the PCI device passed to us
     return true;

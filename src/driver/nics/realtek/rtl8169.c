@@ -27,7 +27,7 @@
 #include <kprint.h>
 
 #include <driver/pci.h>
-
+#include <driver/nics/net_device.h>
 
 bool rtl8169_init(pci_device_t *pciDevice) {
     // Is this actually a NIC?
@@ -47,9 +47,9 @@ bool rtl8169_init(pci_device_t *pciDevice) {
     int BaseAddress = pciDevice->BaseAddresses[0].BaseAddress;
 
     outb(BaseAddress + 0x37, 0x10);
-    kprintf("\e[35mRTL8169: Sent reset bit to RTL8169");
+    kprintf("\e[35mRTL8169: Sent reset bit to RTL8169.\n");
     while(inb(BaseAddress + 0x37) & 0x10){}
-    kprintf("RTL8169: Reset completed");
+    kprintf("RTL8169: Reset completed.\n");
 
     kprintf("RTL8169: MAC address: ");
     for (int i = 0; i < 6; i++) {
@@ -58,6 +58,15 @@ bool rtl8169_init(pci_device_t *pciDevice) {
             kprintf(":");
         }
     }
+    kprintf("\n");
+
+    // Create network device.
+    net_device_t *netDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
+    memset(netDevice, 0, sizeof(net_device_t));
+    netDevice->Name = "RTL8169";
+
+    // Register network device.
+    net_device_register(netDevice);
 
     // Return true, we have handled the PCI device passed to us
     return true;

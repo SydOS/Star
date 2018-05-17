@@ -34,6 +34,8 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/irqs.h>
 
+#include <driver/nics/net_device.h>
+
 #include <kernel/memory/paging.h>
 
 typedef struct {
@@ -165,23 +167,27 @@ static bool e1000e_callback(pci_device_t *pciDevice) {
         return false;
 
     kprintf("E1000E: IRQ raised (0x%X)!\n", intReg);
-    if (intReg & E1000E_INT_LSC) {
-        kprintf("E1000E: Link change!\n");
-        kprintf("E1000E: RTCL: 0x%X\n", e1000e_read((e1000e_t*)pciDevice->DriverObject, E1000E_REG_RCTL));
 
+    // Link change.
+    if (intReg & E1000E_INT_LSC) {
         // Get status register.
         uint32_t status = e1000e_read((e1000e_t*)pciDevice->DriverObject, E1000E_REG_STATUS);
         if (status & E1000E_STATUS_LU) {
-            char *speed = "10 Mbps";
-            if ((status & E1000E_STATUS_SPEED_1000_2) || (status & E1000E_STATUS_SPEED_1000))
-                speed = "1000 Mbps";
-            else if (status & E1000E_STATUS_SPEED_100)
+            char *speed = "10 Mbps";    
+            if (status & E1000E_STATUS_SPEED_100)
                 speed = "100 Mbps";
+            else if (status & E1000E_STATUS_SPEED_1000)
+                speed = "1000 Mbps";
             kprintf("E1000E: Link connected at %s, %s-duplex.\n", speed, status & E1000E_STATUS_FD ? "full" : "half");
         }
         else {
             kprintf("E1000E: Link disconnected.\n");
         }
+    }
+    
+    // Packet received.
+    if (intReg & E1000E_INT_RXT0) {
+
     }
 
     // Clear interrupt bits.
@@ -245,8 +251,11 @@ bool e1000e_init(pci_device_t *pciDevice) {
     // Initialize receive descriptors.
     e1000eDevice->ReceiveDescs = (e1000e_receive_desc_t*)e1000eDevice->DescPtr;
     kprintf("E1000E: Initializing %u receive descriptors at 0x%p...\n", E1000E_RECEIVE_DESC_COUNT, e1000eDevice->ReceiveDescs);
-    for (uint8_t rxDesc = 0; rxDesc < E1000E_RECEIVE_DESC_COUNT; rxDesc++)
-        e1000eDevice->ReceiveDescs[rxDesc].BufferAddress = pmm_pop_frame();
+    for (uint8_t rxDesc = 0; rxDesc < E1000E_RECEIVE_DESC_COUNT; rxDesc++) {
+        uint64_t page = pmm_pop_frame();
+        e1000eDevice->ReceiveDescs[rxDesc].BufferAddress = page;
+        e1000eDevice->ReceiveBuffers[rxDesc] = paging_device_alloc(page, page);
+    }
 
     // Set location and size of receive descriptor buffer.
     e1000e_write(e1000eDevice, E1000E_REG_RDBAL0, (uint32_t)(e1000eDevice->DescPage & 0xFFFFFFFF));
@@ -289,23 +298,33 @@ kprintf("E1000E: control 0x%X\n", e1000e_read(e1000eDevice, E1000E_REG_CTRL));
     sleep(10000);
 
     uint8_t data[100];
-    data[0] = 0xFF;
-    data[1] = 0xFF;
-    data[2] = 0xFF;
-    data[3] = 0xFF;
-    data[4] = 0xFF;
-    data[5] = 0xFF;
-    data[6] = 0x12;
-    data[7] = 0x34;
-    data[8] = 0x56;
-    data[9] = 0x78;
-    data[10] = 0x9A;
-    data[11] = 0x9A;
+    data[0] = 0x3C;
+    data[1] = 0x07;
+    data[2] = 0x71;
+    data[3] = 0xA3;
+    data[4] = 0x7E;
+    data[5] = 0x10;
+    data[6] = e1000eDevice->MacAddress[0];
+    data[7] = e1000eDevice->MacAddress[1];
+    data[8] = e1000eDevice->MacAddress[2];
+    data[9] = e1000eDevice->MacAddress[3];
+    data[10] = e1000eDevice->MacAddress[4];
+    data[11] = e1000eDevice->MacAddress[5];
     data[12] = 0xFF;
     data[13] = 0xFF;
 
      kprintf("E1000E: sending!\n");
     e1000e_send_bytes(e1000eDevice, data, 100);
     kprintf("E1000E: packet sent!\n");
+
+    // Create network device.
+    net_device_t *netDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
+    memset(netDevice, 0, sizeof(net_device_t));
+    netDevice->Device = e1000eDevice;
+    netDevice->Name = e1000eDevices[idIndex].DeviceString;
+
+    // Register network device.
+    net_device_register(netDevice);
+
     //while(true);
 }

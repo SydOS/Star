@@ -46,6 +46,7 @@
 #include <libs/keyboard.h>
 #include <driver/rtc.h>
 #include <kernel/multitasking/syscalls.h>
+#include <driver/nics/net_device.h>
 
 #include <driver/usb/devices/usb_device.h>
 
@@ -293,6 +294,9 @@ void kernel_late() {
 				// Move to next device.
 				usbDevice = usbDevice->Next;
 			}
+		}
+		else if (strcmp(buffer, "lsnet") == 0) {
+			net_device_print_devices();
 		}
 	}
 }

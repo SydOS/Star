@@ -299,6 +299,7 @@ typedef struct {
     e1000e_receive_desc_t *ReceiveDescs;
     e1000e_transmit_desc_t *TransmitDescs;
 
+    void *ReceiveBuffers[E1000E_RECEIVE_DESC_COUNT];
     void *TransmitBuffers[E1000E_TRANSMIT_DESC_COUNT];
 
     lock_t TransmitIndexLock;
