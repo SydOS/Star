@@ -298,5 +298,8 @@ void kernel_late() {
 		else if (strcmp(buffer, "lsnet") == 0) {
 			net_device_print_devices();
 		}
+		else if (strcmp(buffer, "free") == 0) {
+			kprintf("Free page count: %u\n", pmm_frames_available_long());
+		}
 	}
 }
