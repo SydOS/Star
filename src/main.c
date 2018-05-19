@@ -49,7 +49,12 @@
 
 #include <driver/usb/devices/usb_device.h>
 
+#include <kernel/networking/networking.h>
+
 #include <acpi.h>
+
+#include <driver/fs/fat.h>
+#include <driver/storage/storage.h>
 
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
@@ -179,6 +184,9 @@ void kernel_late() {
 	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
+	// Initialize networking.
+	networking_init();
+
 	// Print logo.
 	kprintf("\n\e[94m");
 	kprintf("   _____           _  ____   _____ \n");
@@ -189,7 +197,7 @@ void kernel_late() {
 	kprintf(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
 	kprintf("          __/ |                    \n");
 	kprintf("         |___/                     \n");
-	kprintf("\e[36mCopyright (c) Sydney Erickson 2017 - 2018\e[0m\n\n");
+	kprintf("\e[36mCopyright (c) Sydney Erickson, John Davis 2017 - 2018\e[0m\n\n");
 
     // Ring serial terminals.
 	kprintf("\a");
@@ -248,6 +256,10 @@ void kernel_late() {
 
 		else if (strcmp(buffer, "uptime") == 0)
 			kprintf("Current uptime: %i milliseconds.\n", timer_ticks());
+		else if (strcmp(buffer, "floppy") == 0) {
+				// Mount? floppy drive.
+			fat_init(storageDevices);
+		}
 
 		else if (strcmp(buffer, "corp") == 0)
 			kprintf("Hacking CorpNewt's computer and installing SydOS.....\n");
@@ -286,6 +298,12 @@ void kernel_late() {
 				// Move to next device.
 				usbDevice = usbDevice->Next;
 			}
+		}
+		else if (strcmp(buffer, "lsnet") == 0) {
+			networking_print_devices();
+		}
+		else if (strcmp(buffer, "free") == 0) {
+			kprintf("Free page count: %u\n", pmm_frames_available_long());
 		}
 	}
 }

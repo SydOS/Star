@@ -1,5 +1,5 @@
 /*
- * File: floppy_data.c
+ * File: arp.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,20 +22,23 @@
  * SOFTWARE.
  */
 
+#ifndef NETWORKING_ARP_H
+#define NETWORKING_ARP_H
+
 #include <main.h>
-#include <tools.h>
-#include <io.h>
-#include <kprint.h>
-#include <string.h>
-#include <math.h>
-#include <driver/storage/floppy.h>
 
-#include <kernel/memory/pmm.h>
-#include <kernel/memory/paging.h>
-#include <kernel/memory/kheap.h>
+typedef struct {
+	uint16_t HardwareType;
+	uint16_t ProtocolType;
+	uint8_t HardwareSize;
+	uint8_t ProtocolSize;
+	uint16_t Opcode;
+	uint8_t SenderMAC[6];
+	uint8_t SenderIP[4];
+	uint8_t TargetMAC[6];
+	uint8_t TargetIP[4];
+} __attribute__((packed)) arp_frame_t;
 
+extern arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP);
 
-extern bool floppy_wait_for_irq(uint16_t timeout);
-
-
-
+#endif

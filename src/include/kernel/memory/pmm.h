@@ -38,7 +38,7 @@ typedef uintptr_t page_t;
 
 #define PMM_NO_OF_DMA_FRAMES	64
 
-struct mem_info {
+typedef struct {
 	// Multiboot header.
 	multiboot_info_t *mbootInfo;
 
@@ -61,34 +61,28 @@ struct mem_info {
 	uintptr_t dmaPageFrameFirst;
 	uintptr_t dmaPageFrameLast;
 
-#ifndef X86_64
-	// Page frame stack (PAE).
-    uintptr_t pageFrameStackPaeStart;
-    uintptr_t pageFrameStackPaeEnd;
-#endif
+	// 64-bit page frame stack.
+    uintptr_t pageFrameStackLongStart;
+    uintptr_t pageFrameStackLongEnd;
 
-	// Page frame stack.
+	// 32-bit page frame stack.
     uintptr_t pageFrameStackStart;
     uintptr_t pageFrameStackEnd;
 	// * End of reserved kernel addresses *
-};
-typedef struct mem_info mem_info_t;
+} mem_info_t;
 extern mem_info_t memInfo;
 
 extern bool pmm_dma_get_free_frame(uintptr_t *frameOut);
 extern void pmm_dma_set_frame(uintptr_t frame, bool status);
 extern uintptr_t pmm_dma_get_phys(uintptr_t frame);
 extern uintptr_t pmm_dma_get_virtual(uintptr_t frame);
-extern uint32_t pmm_frames_available();
-extern uint64_t pmm_pop_frame();
+extern uint32_t pmm_frames_available(void);
+extern uint64_t pmm_pop_frame(void);
 extern void pmm_push_frame(uint64_t frame);
 
-#ifndef X86_64 // PAE does not apply to the 64-bit kernel.
-extern uint32_t pmm_frames_available_pae();
-extern uint32_t pmm_pop_frame_nonpae();
-#endif
+extern uint32_t pmm_frames_available_long(void);
+extern uint32_t pmm_pop_frame_nonlong(void);
 
-
-extern void pmm_init();
+extern void pmm_init(void);
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * File: floppy_data.c
+ * File: bcm440x.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,20 +22,17 @@
  * SOFTWARE.
  */
 
+#ifndef BCM440X_H
+#define BCM440X_H
+
 #include <main.h>
-#include <tools.h>
-#include <io.h>
-#include <kprint.h>
-#include <string.h>
-#include <math.h>
-#include <driver/storage/floppy.h>
+#include <driver/pci.h>
 
-#include <kernel/memory/pmm.h>
-#include <kernel/memory/paging.h>
-#include <kernel/memory/kheap.h>
+#define BCM440X_VENDOR_ID               0x14E4
+#define BCM440X_DEVICE_ID_BCM4401_AX    0x4401
+#define BCM440X_DEVICE_ID_BCM4402_AX    0x4402
+#define BCM440X_DEVICE_ID_BCM4401_B0    0x170C
 
+extern bool bcm440x_init(pci_device_t *pciDevice);
 
-extern bool floppy_wait_for_irq(uint16_t timeout);
-
-
-
+#endif

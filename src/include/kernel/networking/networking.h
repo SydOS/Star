@@ -1,5 +1,5 @@
 /*
- * File: storage.h
+ * File: networking.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,25 +22,51 @@
  * SOFTWARE.
  */
 
-#ifndef STORAGE_H
-#define STORAGE_H
+#ifndef NETWORKING_H
+#define NETWORKING_H
 
 #include <main.h>
+#include <kernel/lock.h>
 
-typedef struct storage_device_t {
-    struct storage_device_t *Next;
-    struct storage_device_t *Prev;
+typedef struct net_packet_t {
+    // Next packet in linked list, or NULL for last packet.
+    struct net_packet_t *Next;
 
+    // The actual packet.
+    void *PacketData;
+    uint16_t PacketLength;
+} net_packet_t;
+
+typedef struct net_device_t {
+    // Relationship to other devices in linked list.
+    struct net_device_t *Next;
+    struct net_device_t *Prev;
+
+    // Driver object and friendly name.
     void *Device;
+    uint8_t *MacAddress;
+    char *Name;
 
-    bool (*Read)(struct storage_device_t *storageDevice, uint64_t startByte, uint8_t *outBuffer, uint32_t length);
-    void (*Write)(struct storage_device_t *storageDevice, uint64_t startByte, uint32_t count, const uint8_t *data);
-    uint64_t (*GetSize)(struct storage_device_t *storageDevice);
+    // Function pointers.
+    bool (*Reset)(struct net_device_t *netDevice);
+    bool (*Send)(struct net_device_t *netDevice, void *data, uint16_t length);
 
-    bool (*ReadBlocks)(struct storage_device_t *storageDevice, uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length);
-} storage_device_t;
+    // Current and last packet in reception queue.
+    net_packet_t *CurrentRxPacket;
+    net_packet_t *LastRxPacket;
 
-extern storage_device_t *storageDevices;
-extern void storage_register(storage_device_t *device);
+    // Lock.
+    lock_t CurrentRxPacketLock;
+} net_device_t;
+
+// Linked list of networking devices.
+extern net_device_t *NetDevices;
+
+extern void networking_handle_packet(net_device_t *netDevice, void *data, uint16_t length);
+
+extern void networking_register_device(net_device_t *netDevice);
+extern void networking_print_devices(void);
+
+extern void networking_init(void);
 
 #endif

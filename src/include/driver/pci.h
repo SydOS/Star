@@ -83,6 +83,8 @@
 
 #define PCI_BAR_PREFETCHABLE		0x8
 
+#define PCI_CMD_BUSMASTER           0x04
+
 typedef struct {
     bool PortMapped;
     bool AddressIs64bits;
@@ -147,6 +149,8 @@ extern uint8_t pci_config_read_byte(pci_device_t *pciDevice, uint8_t reg);
 extern void pci_config_write_dword(pci_device_t *pciDevice, uint8_t reg, uint32_t value);
 extern void pci_config_write_word(pci_device_t *pciDevice, uint8_t reg, uint16_t value);
 extern void pci_config_write_byte(pci_device_t *pciDevice, uint8_t reg, uint8_t value);
+
+extern void pci_enable_busmaster(pci_device_t *pciDevice);
 
 extern void pci_init(void);
 

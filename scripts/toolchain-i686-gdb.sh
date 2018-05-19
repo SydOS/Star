@@ -14,4 +14,4 @@ function download_compile {
 }
 
 set -e
-download_compile https://www.nasm.us/pub/nasm/releasebuilds/2.13.03/nasm-2.13.03.tar.gz nasm-2.13.03 ""
+download_compile https://ftp.gnu.org/gnu/gdb/gdb-8.1.tar.gz gdb-8.1 "--target=i686-elf"

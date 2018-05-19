@@ -81,7 +81,7 @@ uint8_t pci_config_read_byte(pci_device_t *pciDevice, uint8_t reg) {
 void pci_config_write_dword(pci_device_t *pciDevice, uint8_t reg, uint32_t value) {
     // Build address.
     uint32_t address = PCI_PORT_ENABLE_BIT | ((uint32_t)pciDevice->Bus << 16)
-        | ((uint32_t)pciDevice->Device << 11) | ((uint32_t)pciDevice->Function << 8) | (reg << 2);
+        | ((uint32_t)pciDevice->Device << 11) | ((uint32_t)pciDevice->Function << 8) | (reg & 0xFC);
 
     // Send address to PCI system.
     outl(PCI_PORT_ADDRESS, address);
@@ -112,13 +112,18 @@ void pci_config_write_byte(pci_device_t *pciDevice, uint8_t reg, uint8_t value) 
     pci_config_write_word(pciDevice, reg, newValue);
 }
 
+void pci_enable_busmaster(pci_device_t *pciDevice) {
+    // Set busmaster bit.
+    pci_config_write_word(pciDevice, PCI_REG_COMMAND, pci_config_read_word(pciDevice, PCI_REG_COMMAND) | PCI_CMD_BUSMASTER);
+}
+
 /**
  * Print the description for a PCI device
  * @param dev PCIDevice struct with PCI device info
  */
 void pci_print_info(pci_device_t *pciDevice) {
     // Print base info
-    kprintf("\e[94mPCI device: %X:%X (%X:%X) | Class %X Sub %X | Bus %d Device %d Function %d\n", 
+    kprintf("\e[94mPCI device: %4X:%4X (%4X:%4X) | Class %X Sub %X | Bus %d Device %d Function %d\n", 
         pciDevice->VendorId, pciDevice->DeviceId, pciDevice->SubVendorId, pciDevice->SubDeviceId, pciDevice->Class, pciDevice->Subclass, pciDevice->Bus, 
         pciDevice->Device, pciDevice->Function);
     
@@ -128,7 +133,7 @@ void pci_print_info(pci_device_t *pciDevice) {
     // Print base addresses.
     for (uint8_t i = 0; i < PCI_BAR_COUNT; i++)
         if (pciDevice->BaseAddresses[i].BaseAddress)
-            kprintf("  - BAR%u: 0x%X (%s)\n", i + 1, pciDevice->BaseAddresses[i].BaseAddress, pciDevice->BaseAddresses[i].PortMapped ? "port-mapped" : "memory-mapped");
+            kprintf("  - BAR%u: 0x%X (%s)\n", i, pciDevice->BaseAddresses[i].BaseAddress, pciDevice->BaseAddresses[i].PortMapped ? "port-mapped" : "memory-mapped");
 
     // Interrupt info
     if(pciDevice->InterruptNo != 0) { 

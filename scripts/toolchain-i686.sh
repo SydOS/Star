@@ -1,14 +1,14 @@
 export GMP_VERSION=6.1.2
-export MPFR_VERSION=3.1.6
-export MPC_VERSION=1.0.3
-export ISL_VERSION=0.18
+export MPFR_VERSION=4.0.1
+export MPC_VERSION=1.1.0
+export ISL_VERSION=0.19
 export CLOOG_VERSION=0.18.4
 export BINUTILS_VERSION=2.30
-export GCC_VERSION=7.3.0
+export GCC_VERSION=8.1.0
 
 export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr
-export CLOOG_MIRROR_BASE=https://syd.sh/stuff
+export CLOOG_MIRROR_BASE=https://www.bastoul.net/cloog/pages/download
 
 export PATH=$HOME/tools:$PATH
 

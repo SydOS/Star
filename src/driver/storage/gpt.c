@@ -1,5 +1,5 @@
 /*
- * File: floppy_data.c
+ * File: gpt.c
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -24,18 +24,11 @@
 
 #include <main.h>
 #include <tools.h>
-#include <io.h>
 #include <kprint.h>
-#include <string.h>
-#include <math.h>
-#include <driver/storage/floppy.h>
+#include <driver/storage/gpt.h>
 
-#include <kernel/memory/pmm.h>
-#include <kernel/memory/paging.h>
-#include <kernel/memory/kheap.h>
+#include <driver/storage/storage.h>
 
+bool gpt_init(storage_device_t *storageDevice) {
 
-extern bool floppy_wait_for_irq(uint16_t timeout);
-
-
-
+}
