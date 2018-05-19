@@ -1,5 +1,6 @@
 #include <main.h>
 #include <string.h>
+#include <kprint.h>
 
 #include <kernel/memory/kheap.h>
 
