@@ -246,7 +246,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
         destMAC[x] = 0xFF;
     }
 
-    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, rtlDevice->MacAddress, strlen(testString), strlen(testString), &testString, &frameSize);
+    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, rtlDevice->MacAddress, strlen(testString), strlen(testString), testString, &frameSize);
     dumphex(frame, frameSize);
     rtl8139_send_bytes(rtlDevice, &frame, frameSize);
     kprintf("RTL8139: SENT TEST PACKET\n");
