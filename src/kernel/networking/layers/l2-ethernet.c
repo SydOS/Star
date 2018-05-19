@@ -13,6 +13,9 @@ ethernet_frame_t* l2_ethernet_create_frame(uint8_t* MACDest, uint8_t* MACSrc,
 	// TODO: Check if payload exceeds 1500 bytes
 	// Write the size of our frame to FrameSize pointer
 	*FrameSize = sizeof(ethernet_frame_t) + payloadSize;
+	if (*FrameSize < 60) {
+		*FrameSize = 60;
+	}
 	kprintf("L2Eth: frame size of 0x%X calculated, (Eth frame 0x%X | payloadSize 0x%X)\n", *FrameSize, sizeof(ethernet_frame_t), payloadSize);
 
 	// Allocate the RAM for our new Ethernet frame to live in
