@@ -38,6 +38,37 @@
 
 #include <kernel/memory/paging.h>
 
+#include <kernel/networking/layers/l2-ethernet.h>
+
+void dumphex(const void* data, size_t size) {
+    char ascii[17];
+    size_t i, j;
+    ascii[16] = '\0';
+    for (i = 0; i < size; ++i) {
+        kprintf("%02X ", ((unsigned char*)data)[i]);
+        if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+            ascii[i % 16] = ((unsigned char*)data)[i];
+        } else {
+            ascii[i % 16] = '.';
+        }
+        if ((i+1) % 8 == 0 || i+1 == size) {
+            kprintf(" ");
+            if ((i+1) % 16 == 0) {
+                kprintf("|  %s \n", ascii);
+            } else if (i+1 == size) {
+                ascii[(i+1) % 16] = '\0';
+                if ((i+1) % 16 <= 8) {
+                    kprintf(" ");
+                }
+                for (j = (i+1) % 16; j < 16; ++j) {
+                    kprintf("   ");
+                }
+                kprintf("|  %s \n", ascii);
+            }
+        }
+    }
+}
+
 static inline void rtl8139_writeb(rtl8139_t *rtlDevice, uint16_t reg, uint8_t value) {
     outb(rtlDevice->BaseAddress + reg, value);
 }
@@ -208,8 +239,18 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     kprintf("RTL8139: Configured TX buffers.\n");
 
     // Just send some garbage to prove it works in Wireshark.
-    uint8_t ddd[54];
-    rtl8139_send_bytes(rtlDevice, ddd, 54);
+    uint8_t destMAC[8];
+    char* testString = "This is a test packet to make sure our packet sending works!";
+    uint16_t frameSize;
+    for (int x = 0; x < 6; x++) {
+        destMAC[x] = 0xFF;
+    }
+
+    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, rtlDevice->MacAddress, strlen(testString), strlen(testString), &testString, &frameSize);
+    dumphex(frame, frameSize);
+    rtl8139_send_bytes(rtlDevice, &frame, frameSize);
+    kprintf("RTL8139: SENT TEST PACKET\n");
+    kheap_free(frame);
 
     // Ask for media status of RTL8139
     kprintf("RTL8139: Media status: 0x%X\n", inb(rtlDevice->BaseAddress + 0x58));
