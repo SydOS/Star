@@ -28,6 +28,8 @@
 #include <main.h>
 #include <kernel/lock.h>
 
+#define NET_MAC_LENGTH  6
+
 typedef struct net_packet_t {
     // Next packet in linked list, or NULL for last packet.
     struct net_packet_t *Next;

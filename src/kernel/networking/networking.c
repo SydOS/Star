@@ -140,7 +140,7 @@ void networking_register_device(net_device_t *netDevice) {
     // Just send some garbage to prove it works in Wireshark.
     uint8_t destMAC[8];
     uint16_t frameSize;
-    for (int x = 0; x < 6; x++) {
+    for (int x = 0; x < NET_MAC_LENGTH; x++) {
         destMAC[x] = 0xFF;
     }
     uint8_t targetIP[4];

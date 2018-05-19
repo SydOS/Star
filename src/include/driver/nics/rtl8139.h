@@ -119,7 +119,7 @@ typedef struct {
 typedef struct {
     pci_device_t *PciDevice;
     uint32_t BaseAddress;
-    uint8_t MacAddress[6];
+    uint8_t MacAddress[NET_MAC_LENGTH];
 
     uintptr_t DmaFrame;
     uint8_t *RxBuffer;

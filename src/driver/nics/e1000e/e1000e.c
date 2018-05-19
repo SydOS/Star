@@ -297,34 +297,14 @@ kprintf("E1000E: control 0x%X\n", e1000e_read(e1000eDevice, E1000E_REG_CTRL));
     kprintf("sleeping for 10 seconds...\n");
     sleep(10000);
 
-    uint8_t data[100];
-    data[0] = 0x3C;
-    data[1] = 0x07;
-    data[2] = 0x71;
-    data[3] = 0xA3;
-    data[4] = 0x7E;
-    data[5] = 0x10;
-    data[6] = e1000eDevice->MacAddress[0];
-    data[7] = e1000eDevice->MacAddress[1];
-    data[8] = e1000eDevice->MacAddress[2];
-    data[9] = e1000eDevice->MacAddress[3];
-    data[10] = e1000eDevice->MacAddress[4];
-    data[11] = e1000eDevice->MacAddress[5];
-    data[12] = 0xFF;
-    data[13] = 0xFF;
-
-     kprintf("E1000E: sending!\n");
-    e1000e_send_bytes(e1000eDevice, data, 100);
-    kprintf("E1000E: packet sent!\n");
-
     // Create network device.
-    net_device_t *netDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
-    memset(netDevice, 0, sizeof(net_device_t));
-    netDevice->Device = e1000eDevice;
-    netDevice->Name = e1000eDevices[idIndex].DeviceString;
+    e1000eDevice->NetDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
+    memset(e1000eDevice->NetDevice, 0, sizeof(net_device_t));
+    e1000eDevice->NetDevice->Device = e1000eDevice;
+    e1000eDevice->NetDevice->MacAddress = e1000eDevice->MacAddress;
+    e1000eDevice->NetDevice->Name = e1000eDevices[idIndex].DeviceString;
 
     // Register network device.
-   // net_device_register(netDevice);
-
-    //while(true);
+    networking_register_device(e1000eDevice->NetDevice);
+    return true;
 }

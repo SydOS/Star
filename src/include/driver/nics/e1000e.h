@@ -28,6 +28,7 @@
 #include <main.h>
 #include <kernel/lock.h>
 #include <driver/pci.h>
+#include <kernel/networking/networking.h>
 
 #define E1000E_VENDOR_ID                0x8086
 
@@ -291,7 +292,7 @@ typedef struct {
 
 typedef struct {
     void *BasePointer;
-    uint8_t MacAddress[6];
+    uint8_t MacAddress[NET_MAC_LENGTH];
 
     uint64_t DescPage;
     void *DescPtr;
@@ -304,6 +305,9 @@ typedef struct {
 
     lock_t TransmitIndexLock;
     uint8_t CurrentTransmitDesc;
+
+    // Network stack object.
+    net_device_t *NetDevice;
 } e1000e_t;
 
 extern bool e1000e_init(pci_device_t *pciDevice);

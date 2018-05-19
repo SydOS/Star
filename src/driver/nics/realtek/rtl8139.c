@@ -246,7 +246,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER3, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer3));
     kprintf("RTL8139: Configured TX buffers.\n");
 
-    // Ask for media status of RTL8139
+    // Ask for media status of RTL8139.
     kprintf("RTL8139: Media status: 0x%X\n", inb(rtlDevice->BaseAddress + 0x58));
     kprintf("RTL8139: Mode status: 0x%X\n", inw(rtlDevice->BaseAddress + 0x64));
     kprintf("RTL8139: CR: 0x%X\n", inb(rtlDevice->BaseAddress + 0x37));
@@ -262,6 +262,6 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     // Register network device.
     networking_register_device(rtlDevice->NetDevice);
 
-    // Return true, we have handled the PCI device passed to us
+    // Return true, we have handled the PCI device passed to us.
     return true;
 }
