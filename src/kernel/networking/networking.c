@@ -27,10 +27,45 @@
 #include <string.h>
 #include <kernel/networking/networking.h>
 
+#include <kernel/lock.h>
 #include <kernel/memory/kheap.h>
+#include <kernel/tasking.h>
+
+#include <kernel/networking/layers/l2-ethernet.h>
+#include <kernel/networking/protocols/arp.h>
 
 // Network device linked list.
 net_device_t *NetDevices = NULL;
+
+
+void dumphex(const void* data, size_t size) {
+    char ascii[17];
+    size_t i, j;
+    ascii[16] = '\0';
+    for (i = 0; i < size; ++i) {
+        kprintf("%02X ", ((unsigned char*)data)[i]);
+        if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+            ascii[i % 16] = ((unsigned char*)data)[i];
+        } else {
+            ascii[i % 16] = '.';
+        }
+        if ((i+1) % 8 == 0 || i+1 == size) {
+            kprintf(" ");
+            if ((i+1) % 16 == 0) {
+                kprintf("|  %s \n", ascii);
+            } else if (i+1 == size) {
+                ascii[(i+1) % 16] = '\0';
+                if ((i+1) % 16 <= 8) {
+                    kprintf(" ");
+                }
+                for (j = (i+1) % 16; j < 16; ++j) {
+                    kprintf("   ");
+                }
+                kprintf("|  %s \n", ascii);
+            }
+        }
+    }
+}
 
 void networking_handle_packet(net_device_t *netDevice, void *data, uint16_t length) {
     // Create packet.
@@ -41,6 +76,9 @@ void networking_handle_packet(net_device_t *netDevice, void *data, uint16_t leng
     packet->PacketData = data;
     packet->PacketLength = length;
 
+    // Lock this code.
+    spinlock_lock(&netDevice->CurrentRxPacketLock);
+
     // Add packet to end of queue.
     if (netDevice->LastRxPacket != NULL)
         netDevice->LastRxPacket->Next = packet;
@@ -49,6 +87,35 @@ void networking_handle_packet(net_device_t *netDevice, void *data, uint16_t leng
     // If there is no packet currently being processed, make this one the current.
     if (netDevice->CurrentRxPacket == NULL)
         netDevice->CurrentRxPacket = packet;
+
+    // Release lock.
+    spinlock_release(&netDevice->CurrentRxPacketLock);
+}
+
+static void networking_packet_process_thread(net_device_t *netDevice) {
+    while (true) {
+        // Wait until we have a packet ready.
+        while (netDevice->CurrentRxPacket == NULL);
+
+        // Process packet here.
+       // kprintf("process\n");
+
+        // Lock this code.
+        spinlock_lock(&netDevice->CurrentRxPacketLock);
+        
+        // Move to next packet.
+        net_packet_t *currPacket = netDevice->CurrentRxPacket;
+        netDevice->CurrentRxPacket = netDevice->CurrentRxPacket->Next;
+        if (netDevice->CurrentRxPacket == NULL)
+            netDevice->LastRxPacket = NULL;
+
+        // Release lock.
+        spinlock_release(&netDevice->CurrentRxPacketLock);
+
+        // Free packet.
+        kheap_free(currPacket->PacketData);
+        kheap_free(currPacket);
+    }
 }
 
 void networking_register_device(net_device_t *netDevice) {
@@ -66,7 +133,29 @@ void networking_register_device(net_device_t *netDevice) {
     }
     kprintf("NET: Registered device %s!\n", netDevice->Name != NULL ? netDevice->Name : "unknown");
 
+    // Start up packet reception thread.
+    tasking_thread_schedule_proc(tasking_thread_create_kernel("net_worker", networking_packet_process_thread, (uintptr_t)netDevice, 0, 0), 0);
+
     // This is where our test packet stuff will be for now.
+    // Just send some garbage to prove it works in Wireshark.
+    uint8_t destMAC[8];
+    uint16_t frameSize;
+    for (int x = 0; x < 6; x++) {
+        destMAC[x] = 0xFF;
+    }
+    uint8_t targetIP[4];
+    targetIP[0] = 192;
+    targetIP[1] = 168;
+    targetIP[2] = 137;
+    targetIP[3] = 1;
+
+    dumphex(arp_request(netDevice->MacAddress, targetIP), sizeof(arp_frame_t));
+    kprintf("\n\n\n");
+    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t)-1, arp_request(netDevice->MacAddress, targetIP), &frameSize);
+    dumphex(frame, frameSize);
+    netDevice->Send(netDevice, frame, frameSize);
+    kprintf("NET: SENT TEST PACKET\n");
+    kheap_free(frame);
 }
 
 void networking_print_devices(void) {

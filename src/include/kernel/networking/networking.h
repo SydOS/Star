@@ -26,6 +26,7 @@
 #define NETWORKING_H
 
 #include <main.h>
+#include <kernel/lock.h>
 
 typedef struct net_packet_t {
     // Next packet in linked list, or NULL for last packet.
@@ -43,6 +44,7 @@ typedef struct net_device_t {
 
     // Driver object and friendly name.
     void *Device;
+    uint8_t *MacAddress;
     char *Name;
 
     // Function pointers.
@@ -52,6 +54,9 @@ typedef struct net_device_t {
     // Current and last packet in reception queue.
     net_packet_t *CurrentRxPacket;
     net_packet_t *LastRxPacket;
+
+    // Lock.
+    lock_t CurrentRxPacketLock;
 } net_device_t;
 
 // Linked list of networking devices.

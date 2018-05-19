@@ -38,37 +38,6 @@
 #include <kernel/memory/paging.h>
 
 #include <kernel/networking/networking.h>
-#include <kernel/networking/layers/l2-ethernet.h>
-#include <kernel/networking/protocols/arp.h>
-
-void dumphex(const void* data, size_t size) {
-    char ascii[17];
-    size_t i, j;
-    ascii[16] = '\0';
-    for (i = 0; i < size; ++i) {
-        kprintf("%02X ", ((unsigned char*)data)[i]);
-        if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
-            ascii[i % 16] = ((unsigned char*)data)[i];
-        } else {
-            ascii[i % 16] = '.';
-        }
-        if ((i+1) % 8 == 0 || i+1 == size) {
-            kprintf(" ");
-            if ((i+1) % 16 == 0) {
-                kprintf("|  %s \n", ascii);
-            } else if (i+1 == size) {
-                ascii[(i+1) % 16] = '\0';
-                if ((i+1) % 16 <= 8) {
-                    kprintf(" ");
-                }
-                for (j = (i+1) % 16; j < 16; ++j) {
-                    kprintf("   ");
-                }
-                kprintf("|  %s \n", ascii);
-            }
-        }
-    }
-}
 
 static inline void rtl8139_writeb(rtl8139_t *rtlDevice, uint16_t reg, uint8_t value) {
     outb(rtlDevice->BaseAddress + reg, value);
@@ -194,15 +163,12 @@ static bool rtl8139_net_send(net_device_t *netDevice, void *data, uint16_t lengt
 
 bool rtl8139_init(pci_device_t *pciDevice) {
     // Is this actually a NIC?
-    if (!(pciDevice->Class == PCI_CLASS_NETWORK && 
-        pciDevice->Subclass == PCI_SUBCLASS_NETWORK_ETHERNET)) {
+    if (!(pciDevice->Class == PCI_CLASS_NETWORK && pciDevice->Subclass == PCI_SUBCLASS_NETWORK_ETHERNET))
         return false;
-    }
 
     // Is the PCI device an RTL8139?
-    if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8139)) {
+    if (!(pciDevice->VendorId == 0x10EC && pciDevice->DeviceId == 0x8139))
         return false;
-    }
 
     // Allocate RTL8139 struct.
     rtl8139_t *rtlDevice = (rtl8139_t*)kheap_alloc(sizeof(rtl8139_t));
@@ -280,26 +246,6 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     rtl8139_writel(rtlDevice, RTL8139_REG_TX_BUFFER3, (uint32_t)pmm_dma_get_phys((uintptr_t)rtlDevice->TxBuffer3));
     kprintf("RTL8139: Configured TX buffers.\n");
 
-    // Just send some garbage to prove it works in Wireshark.
-    uint8_t destMAC[8];
-    uint16_t frameSize;
-    for (int x = 0; x < 6; x++) {
-        destMAC[x] = 0xFF;
-    }
-    uint8_t targetIP[4];
-    targetIP[0] = 192;
-    targetIP[1] = 168;
-    targetIP[2] = 137;
-    targetIP[3] = 1;
-
-    dumphex(arp_request(rtlDevice->MacAddress, targetIP), sizeof(arp_frame_t));
-    kprintf("\n\n\n");
-    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, rtlDevice->MacAddress, 0x0806, sizeof(arp_frame_t)-1, arp_request(rtlDevice->MacAddress, targetIP), &frameSize);
-    dumphex(frame, frameSize);
-    rtl8139_send_bytes(rtlDevice, frame, frameSize);
-    kprintf("RTL8139: SENT TEST PACKET\n");
-    kheap_free(frame);
-
     // Ask for media status of RTL8139
     kprintf("RTL8139: Media status: 0x%X\n", inb(rtlDevice->BaseAddress + 0x58));
     kprintf("RTL8139: Mode status: 0x%X\n", inw(rtlDevice->BaseAddress + 0x64));
@@ -309,6 +255,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     rtlDevice->NetDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
     memset(rtlDevice->NetDevice, 0, sizeof(net_device_t));
     rtlDevice->NetDevice->Device = rtlDevice;
+    rtlDevice->NetDevice->MacAddress = rtlDevice->MacAddress;
     rtlDevice->NetDevice->Name = "RTL8139";
     rtlDevice->NetDevice->Send = rtl8139_net_send;
 
