@@ -57,6 +57,8 @@ typedef struct net_device_t {
 // Linked list of networking devices.
 extern net_device_t *NetDevices;
 
+extern void networking_handle_packet(net_device_t *netDevice, void *data, uint16_t length);
+
 extern void networking_register_device(net_device_t *netDevice);
 extern void networking_print_devices(void);
 

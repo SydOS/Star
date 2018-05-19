@@ -1,18 +1,18 @@
 /*
  * File: rtl8139.h
- * 
+ *
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -27,6 +27,7 @@
 
 #include <main.h>
 #include <driver/pci.h>
+#include <kernel/networking/networking.h>
 
 // Registers
 #define RTL8139_REG_IDR0    0x00
@@ -48,6 +49,8 @@
 
 #define RTL8139_REG_ERSR    0x36
 #define RTL8139_REG_CMD     0x37
+#define RTL8139_REG_CAPR    0x38
+#define RTL8139_REG_CBR     0x3A
 #define RTL8139_REG_IMR     0x3C
 #define RTL8139_REG_ISR     0x3E
 #define RTL8139_REG_TCR     0x40
@@ -73,17 +76,20 @@
 #define RTL8139_INT_SERR    (1 << 15) // System error.
 
 // RCR bits.
-#define RTL8139_RCR_BUFFER_LENGTH_8K     0x0
-#define RTL8139_RCR_BUFFER_LENGTH_16K    0x1
-#define RTL8139_RCR_BUFFER_LENGTH_32K    0x2
-#define RTL8139_RCR_BUFFER_LENGTH_64K    0x3
+#define RTL8139_RCR_ACCEPT_ALL_PACKETS  (1 << 0)
+#define RTL8139_RCR_ACCPET_PHYS_MATCH   (1 << 1)
+#define RTL8139_RCR_ACCEPT_MULTICAST    (1 << 2)
+#define RTL8139_RCR_ACCEPT_BROADCAST    (1 << 3)
+#define RTL8139_RCR_ACCEPT_RUNT         (1 << 4)
+#define RTL8139_RCR_ACCEPT_ERROR        (1 << 5)
+#define RTL8139_RCR_WRAP                (1 << 7)
 
-#define RTL8139_RCR_ACCEPT_ALL_PACKETS  0x01
-#define RTL8139_RCR_ACCPET_PHYS_MATCH   0x02
-#define RTL8139_RCR_ACCEPT_MULTICAST    0x04
-#define RTL8139_RCR_ACCEPT_RUNT         0x10
-#define RTL8139_RCR_ACCEPT_ERROR        0x20
-#define RTL8139_RCR_WRAP                0x80
+#define RTL8139_RCR_BUFFER_LENGTH_8K    0
+#define RTL8139_RCR_BUFFER_LENGTH_16K   (1 << 11)
+#define RTL8139_RCR_BUFFER_LENGTH_32K   (1 << 12)
+#define RTL8139_RCR_BUFFER_LENGTH_64K   ((1 << 11) | (1 << 12))
+
+#define RTL8139_RX_READ_POINTER_MASK    3
 
 // Packet header.
 typedef struct {
@@ -124,10 +130,13 @@ typedef struct {
     uint8_t CurrentTxBuffer;
     uint16_t CurrentRxPointer;
 
-    bool UsesEeprom;  
+    bool UsesEeprom;
+
+    // Network stack object.
+    net_device_t *NetDevice;
 } rtl8139_t;
 
-extern bool rtl8139_send_bytes(rtl8139_t *rtlDevice, const void *data, uint32_t length);
+extern bool rtl8139_send_bytes(rtl8139_t *rtlDevice, const void *data, uint16_t length);
 extern bool rtl8139_init(pci_device_t *pciDevice);
 
 #endif

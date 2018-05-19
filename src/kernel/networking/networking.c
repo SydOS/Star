@@ -24,13 +24,31 @@
 
 #include <main.h>
 #include <kprint.h>
+#include <string.h>
 #include <kernel/networking/networking.h>
+
+#include <kernel/memory/kheap.h>
 
 // Network device linked list.
 net_device_t *NetDevices = NULL;
 
 void networking_handle_packet(net_device_t *netDevice, void *data, uint16_t length) {
+    // Create packet.
+    net_packet_t *packet = (net_packet_t*)kheap_alloc(sizeof(net_packet_t));
+    memset(packet, 0, sizeof(net_packet_t));
 
+    // Set packet properties.
+    packet->PacketData = data;
+    packet->PacketLength = length;
+
+    // Add packet to end of queue.
+    if (netDevice->LastRxPacket != NULL)
+        netDevice->LastRxPacket->Next = packet;
+    netDevice->LastRxPacket = packet;
+
+    // If there is no packet currently being processed, make this one the current.
+    if (netDevice->CurrentRxPacket == NULL)
+        netDevice->CurrentRxPacket = packet;
 }
 
 void networking_register_device(net_device_t *netDevice) {

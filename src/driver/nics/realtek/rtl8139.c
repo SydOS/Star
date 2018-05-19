@@ -94,7 +94,36 @@ static inline uint32_t rtl8139_readl(rtl8139_t *rtlDevice, uint16_t reg) {
     return inl(rtlDevice->BaseAddress + reg);
 }
 
-bool rtl8139_send_bytes(rtl8139_t *rtlDevice, const void *data, uint32_t length) {
+static void rtl8139_receive_bytes(rtl8139_t *rtlDevice) {
+    // Get pointer to packet header and pointer to packet data.
+    rtl8139_rx_packet_header_t *packetHeader = (rtl8139_rx_packet_header_t*)(rtlDevice->RxBuffer + rtlDevice->CurrentRxPointer);
+    void *packetData = (void*)((uintptr_t)packetHeader + sizeof(rtl8139_rx_packet_header_t));
+
+    kprintf("CBR: %u\n", rtl8139_readw(rtlDevice, RTL8139_REG_CBR));
+    // Ensure there even is a networking stack attached to this device.
+    if (rtlDevice->NetDevice != NULL) {
+        // Copy packet data.
+        void *packetCopy = kheap_alloc(packetHeader->Length);
+        memcpy(packetCopy, packetData, packetHeader->Length);
+
+        // Send packet to the networking stack.
+        networking_handle_packet(rtlDevice->NetDevice, packetCopy, packetHeader->Length);
+    }
+
+    // Move receive pointer past this packet.
+    rtlDevice->CurrentRxPointer = (rtlDevice->CurrentRxPointer + packetHeader->Length
+        + sizeof(rtl8139_rx_packet_header_t) + RTL8139_RX_READ_POINTER_MASK) & ~RTL8139_RX_READ_POINTER_MASK;
+
+    // If pointer is beyond our buffer space, bring it back around.
+    if (rtlDevice->CurrentRxPointer >= RTL8139_RX_BUFFER_SIZE)
+        rtlDevice->CurrentRxPointer -= RTL8139_RX_BUFFER_SIZE;
+
+    // Send pointer to card.
+    kprintf("CAPR: %u\n", rtlDevice->CurrentRxPointer);
+    rtl8139_writew(rtlDevice, RTL8139_REG_CAPR, rtlDevice->CurrentRxPointer - 16);
+}
+
+bool rtl8139_send_bytes(rtl8139_t *rtlDevice, const void *data, uint16_t length) {
     // Ensure length is under 2KB.
     if (length > RTL8139_TX_BUFFER_SIZE)
         return false;
@@ -145,16 +174,8 @@ static bool rtl8139_callback(pci_device_t *dev) {
     kprintf("RTL8139: Current interrupt bits: 0x%X\n", isrStatus);
 
     // Did we receive a packet?
-    if (isrStatus & RTL8139_INT_ROK) {
-        // Get packet and pointer to packet data.
-        rtl8139_rx_packet_header_t *packetHeader = (rtl8139_rx_packet_header_t*)(rtlDevice->RxBuffer + rtlDevice->CurrentRxPointer);
-        uint8_t *packetData = (uint8_t*)((uintptr_t)packetHeader + sizeof(rtl8139_rx_packet_header_t));
-
-        kprintf("RTL8139: Packet data:");
-        for (uint16_t i = 0; i < packetHeader->Length; i++)
-            kprintf(" %2X", packetData[i]);
-        kprintf("\n");
-    }
+    if (isrStatus & RTL8139_INT_ROK)
+        rtl8139_receive_bytes(rtlDevice);
 
     outw(rtlDevice->BaseAddress + 0x3E, 0xFFFF);
     return true;
@@ -241,8 +262,8 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     kprintf("RTL8139: Transmitted RX buffer location to card.\n");
 
     // Configure RX buffer.
-    rtl8139_writel(rtlDevice, RTL8139_REG_RCR, RTL8139_RCR_ACCEPT_ALL_PACKETS | RTL8139_RCR_ACCPET_PHYS_MATCH
-        | RTL8139_RCR_ACCEPT_MULTICAST | RTL8139_RCR_ACCEPT_RUNT | RTL8139_RCR_ACCEPT_ERROR | RTL8139_RCR_WRAP | RTL8139_RCR_BUFFER_LENGTH_32K);
+    rtl8139_writel(rtlDevice, RTL8139_REG_RCR, RTL8139_RCR_ACCEPT_ALL_PACKETS | RTL8139_RCR_ACCPET_PHYS_MATCH | RTL8139_RCR_ACCEPT_MULTICAST
+        | RTL8139_RCR_ACCEPT_BROADCAST | RTL8139_RCR_ACCEPT_RUNT | RTL8139_RCR_ACCEPT_ERROR | RTL8139_RCR_WRAP | RTL8139_RCR_BUFFER_LENGTH_32K);
     kprintf("RTL8139: Configured RX buffer.\n");
 
     // Configure TX buffers.
@@ -278,14 +299,14 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     kprintf("RTL8139: CR: 0x%X\n", inb(rtlDevice->BaseAddress + 0x37));
 
     // Create network device.
-    net_device_t *netDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
-    memset(netDevice, 0, sizeof(net_device_t));
-    netDevice->Device = rtlDevice;
-    netDevice->Name = "RTL8139";
-    netDevice->Send = rtl8139_net_send;
+    rtlDevice->NetDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
+    memset(rtlDevice->NetDevice, 0, sizeof(net_device_t));
+    rtlDevice->NetDevice->Device = rtlDevice;
+    rtlDevice->NetDevice->Name = "RTL8139";
+    rtlDevice->NetDevice->Send = rtl8139_net_send;
 
     // Register network device.
-    networking_register_device(netDevice);
+    networking_register_device(rtlDevice->NetDevice);
 
     // Return true, we have handled the PCI device passed to us
     return true;
