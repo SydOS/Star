@@ -46,9 +46,10 @@
 #include <libs/keyboard.h>
 #include <driver/rtc.h>
 #include <kernel/multitasking/syscalls.h>
-#include <driver/nics/net_device.h>
 
 #include <driver/usb/devices/usb_device.h>
+
+#include <kernel/networking/networking.h>
 
 #include <acpi.h>
 
@@ -183,6 +184,9 @@ void kernel_late() {
 	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
+	// Initialize networking.
+	networking_init();
+
 	// Print logo.
 	kprintf("\n\e[94m");
 	kprintf("   _____           _  ____   _____ \n");
@@ -296,7 +300,7 @@ void kernel_late() {
 			}
 		}
 		else if (strcmp(buffer, "lsnet") == 0) {
-			net_device_print_devices();
+			networking_print_devices();
 		}
 		else if (strcmp(buffer, "free") == 0) {
 			kprintf("Free page count: %u\n", pmm_frames_available_long());

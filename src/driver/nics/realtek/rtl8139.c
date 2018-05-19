@@ -31,13 +31,13 @@
 
 #include <driver/pci.h>
 #include <driver/pci_classes.h>
-#include <driver/nics/net_device.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/irqs.h>
 
 #include <kernel/memory/paging.h>
 
+#include <kernel/networking/networking.h>
 #include <kernel/networking/layers/l2-ethernet.h>
 #include <kernel/networking/protocols/arp.h>
 
@@ -138,12 +138,25 @@ bool rtl8139_send_bytes(rtl8139_t *rtlDevice, const void *data, uint32_t length)
 static bool rtl8139_callback(pci_device_t *dev) {
     // If no interrupts were raised by the card, don't handle it.
     rtl8139_t *rtlDevice = (rtl8139_t*)dev->DriverObject;
-    if (inw(rtlDevice->BaseAddress + 0x3E) == 0)
+    uint16_t isrStatus = inw(rtlDevice->BaseAddress + RTL8139_REG_ISR);
+    if (isrStatus == 0)
         return false;
 
-    kprintf("RTL8139: Current interrupt bits: 0x%X\n", inw(rtlDevice->BaseAddress + 0x3E));
+    kprintf("RTL8139: Current interrupt bits: 0x%X\n", isrStatus);
+
+    // Did we receive a packet?
+    if (isrStatus & RTL8139_INT_ROK) {
+        // Get packet and pointer to packet data.
+        rtl8139_rx_packet_header_t *packetHeader = (rtl8139_rx_packet_header_t*)(rtlDevice->RxBuffer + rtlDevice->CurrentRxPointer);
+        uint8_t *packetData = (uint8_t*)((uintptr_t)packetHeader + sizeof(rtl8139_rx_packet_header_t));
+
+        kprintf("RTL8139: Packet data:");
+        for (uint16_t i = 0; i < packetHeader->Length; i++)
+            kprintf(" %2X", packetData[i]);
+        kprintf("\n");
+    }
+
     outw(rtlDevice->BaseAddress + 0x3E, 0xFFFF);
-    kprintf("RTL8139: Cleared interrupt\n");
     return true;
 }
 
@@ -248,7 +261,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     uint8_t targetIP[4];
     targetIP[0] = 192;
     targetIP[1] = 168;
-    targetIP[2] = 1;
+    targetIP[2] = 137;
     targetIP[3] = 1;
 
     dumphex(arp_request(rtlDevice->MacAddress, targetIP), sizeof(arp_frame_t));
@@ -272,7 +285,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
     netDevice->Send = rtl8139_net_send;
 
     // Register network device.
-    net_device_register(netDevice);
+    networking_register_device(netDevice);
 
     // Return true, we have handled the PCI device passed to us
     return true;

@@ -1,5 +1,5 @@
 /*
- * File: net_device.c
+ * File: networking.c
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -24,12 +24,16 @@
 
 #include <main.h>
 #include <kprint.h>
-#include <driver/nics/net_device.h>
+#include <kernel/networking/networking.h>
 
 // Network device linked list.
 net_device_t *NetDevices = NULL;
 
-void net_device_register(net_device_t *netDevice) {
+void networking_handle_packet(net_device_t *netDevice, void *data, uint16_t length) {
+
+}
+
+void networking_register_device(net_device_t *netDevice) {
     // If there aren't any devices at all, add as first device.
     if (NetDevices == NULL) {
         NetDevices = netDevice;
@@ -43,9 +47,11 @@ void net_device_register(net_device_t *netDevice) {
         NetDevices->Prev = netDevice;
     }
     kprintf("NET: Registered device %s!\n", netDevice->Name != NULL ? netDevice->Name : "unknown");
+
+    // This is where our test packet stuff will be for now.
 }
 
-void net_device_print_devices(void) {
+void networking_print_devices(void) {
     net_device_t *netDevice = NetDevices;
     net_device_t *firstDevice = NetDevices;
     kprintf("NET: List of networking devices:\n");
@@ -57,4 +63,10 @@ void net_device_print_devices(void) {
         if (netDevice == firstDevice)
             break;
     }
+}
+
+void networking_init(void) {
+    net_device_t *netDevice = NetDevices;
+
+
 }

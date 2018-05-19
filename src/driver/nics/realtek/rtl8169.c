@@ -30,7 +30,7 @@
 #include <kernel/memory/kheap.h>
 
 #include <driver/pci.h>
-#include <driver/nics/net_device.h>
+#include <kernel/networking/networking.h>
 
 bool rtl8169_init(pci_device_t *pciDevice) {
     // Is this actually a NIC?
@@ -69,7 +69,7 @@ bool rtl8169_init(pci_device_t *pciDevice) {
     netDevice->Name = "RTL8169";
 
     // Register network device.
-    net_device_register(netDevice);
+   // net_device_register(netDevice);
 
     // Return true, we have handled the PCI device passed to us
     return true;

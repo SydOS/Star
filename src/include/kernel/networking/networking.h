@@ -1,5 +1,5 @@
 /*
- * File: net_device.h
+ * File: networking.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,10 +22,19 @@
  * SOFTWARE.
  */
 
-#ifndef NET_DEVICE_H
-#define NET_DEVICE_H
+#ifndef NETWORKING_H
+#define NETWORKING_H
 
 #include <main.h>
+
+typedef struct net_packet_t {
+    // Next packet in linked list, or NULL for last packet.
+    struct net_packet_t *Next;
+
+    // The actual packet.
+    void *PacketData;
+    uint16_t PacketLength;
+} net_packet_t;
 
 typedef struct net_device_t {
     // Relationship to other devices in linked list.
@@ -39,12 +48,18 @@ typedef struct net_device_t {
     // Function pointers.
     bool (*Reset)(struct net_device_t *netDevice);
     bool (*Send)(struct net_device_t *netDevice, void *data, uint16_t length);
+
+    // Current and last packet in reception queue.
+    net_packet_t *CurrentRxPacket;
+    net_packet_t *LastRxPacket;
 } net_device_t;
 
 // Linked list of networking devices.
 extern net_device_t *NetDevices;
 
-extern void net_device_register(net_device_t *netDevice);
-extern void net_device_print_devices(void);
+extern void networking_register_device(net_device_t *netDevice);
+extern void networking_print_devices(void);
+
+extern void networking_init(void);
 
 #endif

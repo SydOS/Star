@@ -34,7 +34,7 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/irqs.h>
 
-#include <driver/nics/net_device.h>
+#include <kernel/networking/networking.h>
 
 #include <kernel/memory/paging.h>
 
@@ -324,7 +324,7 @@ kprintf("E1000E: control 0x%X\n", e1000e_read(e1000eDevice, E1000E_REG_CTRL));
     netDevice->Name = e1000eDevices[idIndex].DeviceString;
 
     // Register network device.
-    net_device_register(netDevice);
+   // net_device_register(netDevice);
 
     //while(true);
 }
