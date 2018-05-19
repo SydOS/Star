@@ -95,32 +95,39 @@ static inline uint32_t rtl8139_readl(rtl8139_t *rtlDevice, uint16_t reg) {
 }
 
 static void rtl8139_receive_bytes(rtl8139_t *rtlDevice) {
-    // Get pointer to packet header and pointer to packet data.
-    rtl8139_rx_packet_header_t *packetHeader = (rtl8139_rx_packet_header_t*)(rtlDevice->RxBuffer + rtlDevice->CurrentRxPointer);
-    void *packetData = (void*)((uintptr_t)packetHeader + sizeof(rtl8139_rx_packet_header_t));
+    // Get the current buffer address and determine max.
+    uint16_t cbr = rtl8139_readw(rtlDevice, RTL8139_REG_CBR);
+    uint16_t bufferLimit = (cbr < rtlDevice->CurrentRxPointer) ? RTL8139_RX_BUFFER_SIZE : cbr;
 
-    kprintf("CBR: %u\n", rtl8139_readw(rtlDevice, RTL8139_REG_CBR));
-    // Ensure there even is a networking stack attached to this device.
-    if (rtlDevice->NetDevice != NULL) {
-        // Copy packet data.
-        void *packetCopy = kheap_alloc(packetHeader->Length);
-        memcpy(packetCopy, packetData, packetHeader->Length);
+    // Read in all available packets in buffer.
+    while (rtlDevice->CurrentRxPointer < bufferLimit) {
+        // Get pointer to packet header and pointer to packet data.
+        rtl8139_rx_packet_header_t *packetHeader = (rtl8139_rx_packet_header_t*)(rtlDevice->RxBuffer + rtlDevice->CurrentRxPointer);
+        void *packetData = (void*)((uintptr_t)packetHeader + sizeof(rtl8139_rx_packet_header_t));
 
-        // Send packet to the networking stack.
-        networking_handle_packet(rtlDevice->NetDevice, packetCopy, packetHeader->Length);
+        // Ensure there even is a networking stack attached to this device.
+        if (rtlDevice->NetDevice != NULL) {
+            // Copy packet data.
+            void *packetCopy = kheap_alloc(packetHeader->Length);
+            memcpy(packetCopy, packetData, packetHeader->Length);
+
+            // Send packet to the networking stack.
+            networking_handle_packet(rtlDevice->NetDevice, packetCopy, packetHeader->Length);
+        }
+
+        // Move receive pointer past this packet.
+        rtlDevice->CurrentRxPointer += (packetHeader->Length
+            + sizeof(rtl8139_rx_packet_header_t) + RTL8139_RX_READ_POINTER_MASK) & ~RTL8139_RX_READ_POINTER_MASK;
+
+        // If pointer is beyond our buffer space, bring it back around.
+        if (rtlDevice->CurrentRxPointer >= RTL8139_RX_BUFFER_SIZE) {
+            rtlDevice->CurrentRxPointer -= RTL8139_RX_BUFFER_SIZE;
+            bufferLimit = cbr;
+        }
+
+        // Update read pointer on card.
+        rtl8139_writew(rtlDevice, RTL8139_REG_CAPR, rtlDevice->CurrentRxPointer - 16);
     }
-
-    // Move receive pointer past this packet.
-    rtlDevice->CurrentRxPointer = (rtlDevice->CurrentRxPointer + packetHeader->Length
-        + sizeof(rtl8139_rx_packet_header_t) + RTL8139_RX_READ_POINTER_MASK) & ~RTL8139_RX_READ_POINTER_MASK;
-
-    // If pointer is beyond our buffer space, bring it back around.
-    if (rtlDevice->CurrentRxPointer >= RTL8139_RX_BUFFER_SIZE)
-        rtlDevice->CurrentRxPointer -= RTL8139_RX_BUFFER_SIZE;
-
-    // Send pointer to card.
-    kprintf("CAPR: %u\n", rtlDevice->CurrentRxPointer);
-    rtl8139_writew(rtlDevice, RTL8139_REG_CAPR, rtlDevice->CurrentRxPointer - 16);
 }
 
 bool rtl8139_send_bytes(rtl8139_t *rtlDevice, const void *data, uint16_t length) {
@@ -242,7 +249,7 @@ bool rtl8139_init(pci_device_t *pciDevice) {
         panic("RTL8139: Unable to get DMA frame!\n");
     memset((void*)rtlDevice->DmaFrame, 0, PAGE_SIZE_64K);
     rtlDevice->RxBuffer = (uint8_t*)rtlDevice->DmaFrame;
-    rtlDevice->TxBuffer0 = (uint8_t*)((uintptr_t)rtlDevice->RxBuffer + RTL8139_RX_BUFFER_SIZE);
+    rtlDevice->TxBuffer0 = (uint8_t*)((uintptr_t)rtlDevice->RxBuffer + RTL8139_RX_BUFFER_SIZE_ACTUAL);
     rtlDevice->TxBuffer1 = (uint8_t*)((uintptr_t)rtlDevice->TxBuffer0 + RTL8139_TX_BUFFER_SIZE);
     rtlDevice->TxBuffer2 = (uint8_t*)((uintptr_t)rtlDevice->TxBuffer1 + RTL8139_TX_BUFFER_SIZE);
     rtlDevice->TxBuffer3 = (uint8_t*)((uintptr_t)rtlDevice->TxBuffer2 + RTL8139_TX_BUFFER_SIZE);

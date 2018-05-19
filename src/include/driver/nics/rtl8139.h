@@ -109,7 +109,8 @@ typedef struct {
 } __attribute__((packed)) rtl8139_rx_packet_header_t;
 
 // RX buffer is 32KB + 16 bytes + 1500 bytes.
-#define RTL8139_RX_BUFFER_SIZE      (0x8000 + 16 + 1500)
+#define RTL8139_RX_BUFFER_SIZE          0x8000
+#define RTL8139_RX_BUFFER_SIZE_ACTUAL   (RTL8139_RX_BUFFER_SIZE + 16 + 1500)
 
 // TX buffers are 2048 bytes each.
 #define RTL8139_TX_BUFFER_SIZE      0x800
