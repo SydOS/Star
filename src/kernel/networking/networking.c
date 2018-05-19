@@ -151,7 +151,7 @@ void networking_register_device(net_device_t *netDevice) {
 
     dumphex(arp_request(netDevice->MacAddress, targetIP), sizeof(arp_frame_t));
     kprintf("\n\n\n");
-    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t)-1, arp_request(netDevice->MacAddress, targetIP), &frameSize);
+    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arp_request(netDevice->MacAddress, targetIP), &frameSize);
     dumphex(frame, frameSize);
     netDevice->Send(netDevice, frame, frameSize);
     kprintf("NET: SENT TEST PACKET\n");

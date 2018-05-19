@@ -31,7 +31,7 @@ typedef struct {
 	uint16_t HardwareType;
 	uint16_t ProtocolType;
 	uint8_t HardwareSize;
-	uint16_t ProtocolSize;
+	uint8_t ProtocolSize;
 	uint16_t Opcode;
 	uint8_t SenderMAC[6];
 	uint8_t SenderIP[4];
