@@ -39,6 +39,7 @@
 #include <kernel/memory/paging.h>
 
 #include <kernel/networking/layers/l2-ethernet.h>
+#include <kernel/networking/protocols/arp.h>
 
 void dumphex(const void* data, size_t size) {
     char ascii[17];
@@ -240,13 +241,19 @@ bool rtl8139_init(pci_device_t *pciDevice) {
 
     // Just send some garbage to prove it works in Wireshark.
     uint8_t destMAC[8];
-    char* testString = "This is a test packet to make sure our packet sending works!";
     uint16_t frameSize;
     for (int x = 0; x < 6; x++) {
         destMAC[x] = 0xFF;
     }
+    uint8_t targetIP[4];
+    targetIP[0] = 192;
+    targetIP[1] = 168;
+    targetIP[2] = 1;
+    targetIP[3] = 1;
 
-    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, rtlDevice->MacAddress, strlen(testString), strlen(testString), testString, &frameSize);
+    dumphex(arp_request(rtlDevice->MacAddress, targetIP), sizeof(arp_frame_t));
+    kprintf("\n\n\n");
+    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, rtlDevice->MacAddress, 0x0806, sizeof(arp_frame_t)-1, arp_request(rtlDevice->MacAddress, targetIP), &frameSize);
     dumphex(frame, frameSize);
     rtl8139_send_bytes(rtlDevice, frame, frameSize);
     kprintf("RTL8139: SENT TEST PACKET\n");
