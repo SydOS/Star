@@ -30,7 +30,7 @@ ethernet_frame_t* l2_ethernet_create_frame(uint8_t* MACDest, uint8_t* MACSrc,
 	kprintf("L2Eth: copied source MAC address to 0x%X\n", &frame->MACSrc);
 
 	// Copy Ethertype
-	frame->Ethertype = Ethertype;
+	frame->Ethertype = (Ethertype << 8) | (Ethertype >> 8);
 	kprintf("L2Eth: set Ethertype to 0x%X\n", Ethertype);
 
 	// Copy payload data to end of header
