@@ -146,11 +146,6 @@ static void e1000e_receive_bytes(e1000e_t *e1000eDevice) {
         if (processPackets)
             // Send packet to the networking stack.
             networking_handle_packet(e1000eDevice->NetDevice, packetData, packetLength);
-
-        // Move to next descriptor.
-        uint8_t oldDescIndex = e1000eDevice->CurrentRxDesc;
-        e1000eDevice->CurrentRxDesc = (e1000eDevice->CurrentRxDesc + 1) % E1000E_RECEIVE_DESC_COUNT;
-        e1000e_write(e1000eDevice, E1000E_REG_RDT0, oldDescIndex);
     }
 }
 
