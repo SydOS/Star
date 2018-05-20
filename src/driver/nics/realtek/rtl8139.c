@@ -158,7 +158,7 @@ static bool rtl8139_callback(pci_device_t *dev) {
 }
 
 static bool rtl8139_net_send(net_device_t *netDevice, void *data, uint16_t length) {
-    rtl8139_send_bytes((rtl8139_t*)netDevice->Device, data, length);
+    return rtl8139_send_bytes((rtl8139_t*)netDevice->Device, data, length);
 }
 
 bool rtl8139_init(pci_device_t *pciDevice) {

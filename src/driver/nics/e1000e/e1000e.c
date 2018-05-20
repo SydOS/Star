@@ -26,6 +26,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <tools.h>
+#include <string.h>
 #include <kernel/lock.h>
 #include <driver/nics/e1000e.h>
 
@@ -109,26 +110,69 @@ static inline uint32_t e1000e_phy_read(e1000e_t *e1000eDevice, uint16_t reg) {
     return e1000e_read(e1000eDevice, E1000E_REG_MDIC);
 }
 
+static void e1000e_receive_bytes(e1000e_t *e1000eDevice) {
+    bool processPackets = e1000eDevice->NetDevice != NULL;
+
+    // Handle all packets that have been received.
+    while (e1000eDevice->ReceiveDescs[e1000eDevice->CurrentRxDesc].Status & E1000E_RECEIVE_STS_DD) {
+        // Create buffer for packet.
+        uint16_t packetLength = 0;
+        uint8_t *packetData = NULL;
+        uint8_t descStatus = 0;
+        
+        // Get all pieces of packet.
+        do {
+            // Ensure there even is a networking stack attached to this device.
+            if (processPackets) {
+                // Get data from descriptor.
+                uint16_t offset = packetLength;
+                packetLength += e1000eDevice->ReceiveDescs[e1000eDevice->CurrentRxDesc].Length;
+                packetData = (uint8_t*)kheap_realloc(packetData, packetLength);
+                memcpy(packetData + offset, e1000eDevice->ReceiveBuffers[e1000eDevice->CurrentRxDesc], e1000eDevice->ReceiveDescs[e1000eDevice->CurrentRxDesc].Length);
+            }   
+
+            // Mark descriptor as unused.
+            descStatus = e1000eDevice->ReceiveDescs[e1000eDevice->CurrentRxDesc].Status;
+            e1000eDevice->ReceiveDescs[e1000eDevice->CurrentRxDesc].Status = 0;
+
+            // Move to next descriptor.
+            uint8_t descIndex = e1000eDevice->CurrentRxDesc;
+            e1000eDevice->CurrentRxDesc = (e1000eDevice->CurrentRxDesc + 1) % E1000E_RECEIVE_DESC_COUNT;
+            e1000e_write(e1000eDevice, E1000E_REG_RDT0, descIndex);
+        } while (!(descStatus & E1000E_RECEIVE_STS_EOP));
+
+        // Ensure there even is a networking stack attached to this device.
+        kprintf("E1000E: current index: %u\n", e1000eDevice->CurrentRxDesc);
+        if (processPackets)
+            // Send packet to the networking stack.
+            networking_handle_packet(e1000eDevice->NetDevice, packetData, packetLength);
+
+        // Move to next descriptor.
+        uint8_t oldDescIndex = e1000eDevice->CurrentRxDesc;
+        e1000eDevice->CurrentRxDesc = (e1000eDevice->CurrentRxDesc + 1) % E1000E_RECEIVE_DESC_COUNT;
+        e1000e_write(e1000eDevice, E1000E_REG_RDT0, oldDescIndex);
+    }
+}
+
 static bool e1000e_send_bytes(e1000e_t *e1000eDevice, const void *data, uint16_t length) {
     // For now if a packet is bigger than 4KB, reject.
     if (length > PAGE_SIZE_4K)
         return false;
 
     // Get index.
-    spinlock_lock(&e1000eDevice->TransmitIndexLock);
-    uint8_t descIndex = e1000eDevice->CurrentTransmitDesc;
-    e1000eDevice->CurrentTransmitDesc = (e1000eDevice->CurrentTransmitDesc + 1) % E1000E_TRANSMIT_DESC_COUNT;
+    spinlock_lock(&e1000eDevice->TxIndexLock);
+    uint8_t descIndex = e1000eDevice->CurrentTxDesc;
+    e1000eDevice->CurrentTxDesc = (e1000eDevice->CurrentTxDesc + 1) % E1000E_TRANSMIT_DESC_COUNT;
 
     // Fill descriptor.
-    //memset(e1000eDevice->TransmitDescs + descIndex, 0, sizeof(e1000e_transmit_desc_t));
     e1000eDevice->TransmitDescs[descIndex].Length = length;
     e1000eDevice->TransmitDescs[descIndex].Command = E1000E_TRANSMIT_CMD_EOP | E1000E_TRANSMIT_CMD_IFCS | E1000E_TRANSMIT_CMD_RS;
     memcpy(e1000eDevice->TransmitBuffers[descIndex], data, length);
 
     // Send packet.
     e1000eDevice->TransmitDescs[descIndex].Status = 0;
-    e1000e_write(e1000eDevice, E1000E_REG_TDT0, e1000eDevice->CurrentTransmitDesc);
-    spinlock_release(&e1000eDevice->TransmitIndexLock);
+    e1000e_write(e1000eDevice, E1000E_REG_TDT0, e1000eDevice->CurrentTxDesc);
+    spinlock_release(&e1000eDevice->TxIndexLock);
 
     while (!(e1000eDevice->TransmitDescs[descIndex].Status & 0xFF)) {
         sleep(1000);
@@ -187,12 +231,16 @@ static bool e1000e_callback(pci_device_t *pciDevice) {
     
     // Packet received.
     if (intReg & E1000E_INT_RXT0) {
-
+        e1000e_receive_bytes((e1000e_t*)pciDevice->DriverObject);
     }
 
     // Clear interrupt bits.
     e1000e_write((e1000e_t*)pciDevice->DriverObject, E1000E_REG_ICR, -1);
     return true;
+}
+
+static bool e1000e_net_send(net_device_t *netDevice, void *data, uint16_t length) {
+    return e1000e_send_bytes((e1000e_t*)netDevice->Device, data, length);
 }
 
 bool e1000e_init(pci_device_t *pciDevice) {
@@ -303,6 +351,7 @@ kprintf("E1000E: control 0x%X\n", e1000e_read(e1000eDevice, E1000E_REG_CTRL));
     e1000eDevice->NetDevice->Device = e1000eDevice;
     e1000eDevice->NetDevice->MacAddress = e1000eDevice->MacAddress;
     e1000eDevice->NetDevice->Name = e1000eDevices[idIndex].DeviceString;
+    e1000eDevice->NetDevice->Send = e1000e_net_send;
 
     // Register network device.
     networking_register_device(e1000eDevice->NetDevice);

@@ -269,6 +269,14 @@ typedef struct {
 #define E1000E_RECEIVE_DESC_COUNT       64
 #define E1000E_RECEIVE_DESC_POOL_SIZE   (E1000E_RECEIVE_DESC_COUNT * sizeof(e1000e_receive_desc_t))
 
+#define E1000E_RECEIVE_STS_DD       (1 << 0) // Descriptor done.
+#define E1000E_RECEIVE_STS_EOP      (1 << 1) // End of packet.
+#define E1000E_RECEIVE_STS_VP       (1 << 3) // VLAN packet.
+#define E1000E_RECEIVE_STS_UDPCS    (1 << 4) // UDP checksum calculated.
+#define E1000E_RECEIVE_STS_TCPCS    (1 << 5) // TCP checksum calculated.
+#define E1000E_RECEIVE_STS_IPCS     (1 << 6) // IPv4 checksum calculated.
+#define E1000E_RECEIVE_STS_PIF      (1 << 7) // Passed in exaact filter.
+
 // Transmit descriptor.
 typedef struct {
     uint64_t BufferAddress;
@@ -303,8 +311,9 @@ typedef struct {
     void *ReceiveBuffers[E1000E_RECEIVE_DESC_COUNT];
     void *TransmitBuffers[E1000E_TRANSMIT_DESC_COUNT];
 
-    lock_t TransmitIndexLock;
-    uint8_t CurrentTransmitDesc;
+    lock_t TxIndexLock;
+    uint8_t CurrentRxDesc;
+    uint8_t CurrentTxDesc;
 
     // Network stack object.
     net_device_t *NetDevice;
