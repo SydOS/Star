@@ -98,7 +98,7 @@ static void networking_packet_process_thread(net_device_t *netDevice) {
         while (netDevice->CurrentRxPacket == NULL);
 
         // Process packet here.
-       // kprintf("process\n");
+        kprintf("process\n");
 
         // Lock this code.
         spinlock_lock(&netDevice->CurrentRxPacketLock);
@@ -143,11 +143,11 @@ void networking_register_device(net_device_t *netDevice) {
     for (int x = 0; x < NET_MAC_LENGTH; x++) {
         destMAC[x] = 0xFF;
     }
-    uint8_t targetIP[4];
+    uint8_t targetIP[NET_IPV4_LENGTH];
     targetIP[0] = 192;
     targetIP[1] = 168;
-    targetIP[2] = 137;
-    targetIP[3] = 1;
+    targetIP[2] = 168;
+    targetIP[3] = 20;
 
     arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
     dumphex(arpFrame, sizeof(arp_frame_t));

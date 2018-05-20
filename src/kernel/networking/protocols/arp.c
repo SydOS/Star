@@ -48,7 +48,7 @@ arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP) {
 	frame->ProtocolSize = 4;
 	frame->Opcode = swap_uint16(1);
 	memcpy((frame->SenderMAC), SenderMAC, NET_MAC_LENGTH);
-	for (int x = 0; x < 4; x++)
+	for (int x = 0; x < NET_IPV4_LENGTH; x++)
         frame->SenderIP[x] = 0x00;
     for (int x = 0; x < NET_MAC_LENGTH; x++)
         frame->TargetMAC[x] = 0x00;

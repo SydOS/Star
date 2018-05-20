@@ -29,6 +29,7 @@
 #include <kernel/lock.h>
 
 #define NET_MAC_LENGTH  6
+#define NET_IPV4_LENGTH 4
 
 typedef struct net_packet_t {
     // Next packet in linked list, or NULL for last packet.
@@ -59,6 +60,9 @@ typedef struct net_device_t {
 
     // Lock.
     lock_t CurrentRxPacketLock;
+
+    // IP addressing.
+    uint8_t IPv4Address[NET_IPV4_LENGTH];
 } net_device_t;
 
 // Linked list of networking devices.
