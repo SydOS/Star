@@ -42,46 +42,50 @@
 typedef struct {
     uint16_t DeviceId;
     char *DeviceString;
+    uint8_t Type;
 } e1000e_product_id_t;
 
 static const e1000e_product_id_t e1000eDevices[] = {
-    { 0x100E, ""},
+    { 0x100E, "", E1000E_TYPE_E1000 },
 
-    { 0x105E, "PRO 1000 PT" },
+    { 0x101e, "82540EP", E1000E_TYPE_E1000 },
+
+    { 0x105E, "PRO 1000 PT", E1000E_TYPE_E1000 },
+    { 0x107C, "PRO/1000 GT", E1000E_TYPE_E1000 },
 
     // Intel 82566 PHYs.
-    { 0x10BD, "82566DM" },
-    { 0x294C, "82566DC" },
+    { 0x10BD, "82566DM", E1000E_TYPE_E1000E },
+    { 0x294C, "82566DC", E1000E_TYPE_E1000E },
 
     // Intel 82567 PHYs.
-    { 0x1501, "82567V-3" },
-    { 0x10E5, "82567LM-4" },
-    { 0x10F5, "82567LM" },
-    { 0x10BF, "82567LF" },
-    { 0x10CB, "82567V" },
-    { 0x10CC, "82567LM-2" },
-    { 0x10CD, "82567LF-2" },
-    { 0x10CE, "82567V-2" },
-    { 0x10DE, "82567LM-3" },
-    { 0x10DF, "82567LF-3" },
+    { 0x1501, "82567V-3", E1000E_TYPE_E1000E },
+    { 0x10E5, "82567LM-4", E1000E_TYPE_E1000E },
+    { 0x10F5, "82567LM", E1000E_TYPE_E1000E },
+    { 0x10BF, "82567LF", E1000E_TYPE_E1000E },
+    { 0x10CB, "82567V", E1000E_TYPE_E1000E },
+    { 0x10CC, "82567LM-2", E1000E_TYPE_E1000E },
+    { 0x10CD, "82567LF-2", E1000E_TYPE_E1000E },
+    { 0x10CE, "82567V-2", E1000E_TYPE_E1000E },
+    { 0x10DE, "82567LM-3", E1000E_TYPE_E1000E },
+    { 0x10DF, "82567LF-3", E1000E_TYPE_E1000E },
 
     // Intel 82574 PHY.
-    { 0x10D3, "82574" },
+    { 0x10D3, "82574", E1000E_TYPE_E1000E },
 
     // Intel 82577 PHYs.
-    { 0x10EA, "82577" },
-    { 0x10EB, "82577" },
+    { 0x10EA, "82577", E1000E_TYPE_E1000E },
+    { 0x10EB, "82577", E1000E_TYPE_E1000E },
 
     // Intel 82579 PHYs.
-    { 0x1502, "82579LM" },
-    { 0x1503, "82579V" },
+    { 0x1502, "82579LM", E1000E_TYPE_E1000E },
+    { 0x1503, "82579V", E1000E_TYPE_E1000E },
 
     // Intel i217 PHYs.
-    { 0x153A, "I217-LM" },
-    { 0x153B, "I217-V" },
+    { 0x153A, "I217-LM", E1000E_TYPE_E1000E },
+    { 0x153B, "I217-V", E1000E_TYPE_E1000E },
 
     // Null.
-    { 0xFFFF, "" }
+    { 0xFFFF, "", 0 }
 };
 
 static inline uint32_t e1000e_read(e1000e_t *e1000eDevice, uint16_t reg) {
@@ -193,8 +197,23 @@ static void e1000e_get_mac_addr(e1000e_t *e1000eDevice) {
 
 void e1000e_reset(e1000e_t *e1000eDevice) {
     // Reset card.
-    e1000e_write(e1000eDevice, E1000E_REG_CTRL, e1000e_read(e1000eDevice, E1000E_REG_CTRL) | (1 << 26) | (1 << 31));
+    e1000e_write(e1000eDevice, E1000E_REG_CTRL, e1000e_read(e1000eDevice, E1000E_REG_CTRL) | E1000_CTRL_SWRST | E1000_CTRL_PHY_RESET);
     sleep(20);
+    kprintf("E1000E: control 0x%X\n", e1000e_read(e1000eDevice, E1000E_REG_CTRL));
+
+    // Clear out multicast table.
+    for (uint8_t i = 0; i < 128; i++)
+        e1000e_write(e1000eDevice, E1000E_REG_MTA + i, 0);
+
+    // If e1000, additional stuff.
+    if (e1000eDevice->Type == E1000E_TYPE_E1000) {
+        e1000e_write(e1000eDevice, E1000E_REG_CTRL, e1000e_read(e1000eDevice, E1000E_REG_CTRL) | E1000_CTRL_ASDE | E1000_CTRL_SLU);
+        e1000e_write(e1000eDevice, E1000E_REG_CTRL, e1000e_read(e1000eDevice, E1000E_REG_CTRL) & ~(E1000_CTRL_LRST | E1000_CTRL_PHY_RESET | E1000_CTRL_ILOS));
+        e1000e_write(e1000eDevice, 0x28, 0);
+        e1000e_write(e1000eDevice, 0x2C, 0);
+        e1000e_write(e1000eDevice, 0x30, 0);
+        e1000e_write(e1000eDevice, 0x170, 0);
+    }
 }
 
 static bool e1000e_callback(pci_device_t *pciDevice) {
@@ -255,11 +274,16 @@ bool e1000e_init(pci_device_t *pciDevice) {
     e1000e_t *e1000eDevice = (e1000e_t*)kheap_alloc(sizeof(e1000e_t));
     memset(e1000eDevice, 0, sizeof(e1000e_t));
     e1000eDevice->BasePointer = paging_device_alloc(pciDevice->BaseAddresses[0].BaseAddress, pciDevice->BaseAddresses[0].BaseAddress + 0x1F000);
+    e1000eDevice->Type = e1000eDevices[idIndex].Type;
     kprintf("E1000E: Matched %s!\n", e1000eDevices[idIndex].DeviceString);
     
     // Register driver object and IRQ handler with PCI device object.
     pciDevice->DriverObject = e1000eDevice;
     pciDevice->InterruptHandler = e1000e_callback;
+
+    // Enable PCI busmastering.
+    pci_enable_busmaster(pciDevice);
+    kprintf("E1000E: Enabled PCI busmastering\n");
 
     // REset.
    // uint32_t *bdd = (uint32_t*)(e1000eDevice->BasePointer + 0x00);
@@ -331,15 +355,20 @@ bool e1000e_init(pci_device_t *pciDevice) {
     e1000e_write(e1000eDevice, E1000E_REG_RCTL, E1000E_RCTL_EN | E1000E_RCTL_SBP | E1000E_RCTL_UPE | E1000E_RCTL_MPE | E1000E_RCTL_RDMTS_HALF | E1000E_RCTL_BAM | E1000E_RCTL_SECRC | E1000E_RCTL_BSIZE_256 | E1000E_RCTL_BSEX);
 
     // Enable the transmit function of the card.
-    //e1000e_write(e1000eDevice, E1000E_REG_TCTL, E1000E_TCTL_EN | E1000E_TCTL_PSP | (15 << E1000E_TCTL_CT_SHIFT) | (64 << E1000E_TCTL_COLD_SHIFT) || E1000E_TCTL_RTLC);
-    e1000e_write(e1000eDevice, E1000E_REG_TCTL, 0b0110000000000111111000011111010);
+    //e1000e_write(e1000eDevice, E1000E_REG_TCTL, e1000e_read(e1000eDevice, E1000E_REG_TCTL) | E1000E_TCTL_EN | E1000E_TCTL_PSP);
+    uint32_t transmitReg = E1000E_TCTL_EN | E1000E_TCTL_PSP | (0xF << E1000E_TCTL_CT_SHIFT) | (0x3F << E1000E_TCTL_COLD_SHIFT);
+    if (e1000eDevice->Type = E1000E_TYPE_E1000E)
+        transmitReg |= E1000E_TCTL_RESERVED | (1 << 29);
+    e1000e_write(e1000eDevice, E1000E_REG_TCTL, transmitReg);
+
+   // e1000e_write(e1000eDevice, E1000E_REG_TCTL, E1000E_TCTL_EN | E1000E_TCTL_PSP | (15 << E1000E_TCTL_CT_SHIFT) | (63 << E1000E_TCTL_COLD_SHIFT) | E1000E_TCTL_RTLC);
+    //e1000e_write(e1000eDevice, E1000E_REG_TCTL, 0b0110000000000111111000011111010);
     e1000e_write(e1000eDevice, E1000E_REG_TIPG, 0x0060200A);
 
 kprintf("E1000E: control 0x%X\n", e1000e_read(e1000eDevice, E1000E_REG_CTRL));
 
-    kprintf("sleeping for 10 seconds...\n");
-    sleep(10000);
-
+    kprintf("Sleeping for 5 seconds...\n");
+    sleep(5000);
     // Create network device.
     e1000eDevice->NetDevice = (net_device_t*)kheap_alloc(sizeof(net_device_t));
     memset(e1000eDevice->NetDevice, 0, sizeof(net_device_t));

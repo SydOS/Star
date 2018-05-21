@@ -182,6 +182,16 @@
 #define E1000E_REG_LSECRXLATE   0x04350
 #define E1000E_REG_LSECRXOK     0x04360
 
+// Control bits.
+#define E1000E_CTRL_FD          (1 << 0)  // Full-duplex.
+#define E1000E_CTRL_MASTER_DIS  (1 << 2)  // Master disable.
+#define E1000_CTRL_LRST         (1 << 3)  // Link reset.
+#define E1000_CTRL_ASDE         (1 << 5)  // Auto speed detection enable.
+#define E1000_CTRL_SLU          (1 << 6)  // Set link up.
+#define E1000_CTRL_ILOS         (1 << 7)  // Invert loss of signal.
+#define E1000_CTRL_SWRST        (1 << 26) // Software reset.
+#define E1000_CTRL_VME          (1 << 30) // VLAN enable.
+#define E1000_CTRL_PHY_RESET    (1 << 31) // PHY reset.
 
 // Status bits.
 #define E1000E_STATUS_FD        (1 << 0)  // Full-duplex.
@@ -229,6 +239,7 @@
 #define E1000E_TCTL_COLD_SHIFT  12        // Collision Distance.
 #define E1000E_TCTL_SWXOFF      (1 << 22) // Software XOFF Transmission.
 #define E1000E_TCTL_RTLC        (1 << 24) // Re-transmit on Late Collision.
+#define E1000E_TCTL_RESERVED    (1 << 28) // Reserved bit.
 
 // Interrupt bits.
 #define E1000E_INT_TXDW         (1 << 0)  // Transmit Descriptor Written Back Interrupt.
@@ -301,6 +312,7 @@ typedef struct {
 typedef struct {
     void *BasePointer;
     uint8_t MacAddress[NET_MAC_LENGTH];
+    uint8_t Type;
 
     uint64_t DescPage;
     void *DescPtr;
@@ -318,6 +330,9 @@ typedef struct {
     // Network stack object.
     net_device_t *NetDevice;
 } e1000e_t;
+
+#define E1000E_TYPE_E1000   0
+#define E1000E_TYPE_E1000E  1 
 
 extern bool e1000e_init(pci_device_t *pciDevice);
 
