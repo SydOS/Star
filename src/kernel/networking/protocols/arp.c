@@ -24,15 +24,11 @@
 
 #include <main.h>
 #include <string.h>
+#include <byteswap.h>
 
 #include <kernel/memory/kheap.h>
 #include <kernel/networking/protocols/arp.h>
 #include <kernel/networking/networking.h>
-
-uint16_t swap_uint16( uint16_t val ) 
-{
-    return (val << 8) | (val >> 8 );
-}
 
 arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP) {
 	// Allocate memory for frame
