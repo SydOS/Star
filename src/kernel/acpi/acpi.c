@@ -260,6 +260,8 @@ void acpi_late_init() {
     kprintf("ACPI: LATE\n");
     ACPI_STATUS status=AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION);
      kprintf("ACPI: Status: %d\n", status);
+     if (status)
+        return;
 	status= AcpiInitializeObjects(ACPI_FULL_INITIALIZATION);
      kprintf("ACPI: Status: %d\n", status);
     status = AcpiInstallNotifyHandler(ACPI_ROOT_OBJECT, ACPI_SYSTEM_NOTIFY, acpi_event, NULL);
