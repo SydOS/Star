@@ -34,8 +34,8 @@ typedef struct {
     uint8_t ECN : 2;
     uint16_t TotalLength;
     uint16_t Identification;
-    uint8_t Flags : 2;
-    uint16_t FragmentationOffset : 14;
+    uint8_t Flags : 3;
+    uint16_t FragmentationOffset : 13;
     uint8_t TimeToLive;
     uint8_t Protocol;
     uint16_t HeaderChecksum;
