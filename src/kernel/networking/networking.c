@@ -32,6 +32,7 @@
 #include <kernel/tasking.h>
 
 #include <kernel/networking/layers/l2-ethernet.h>
+#include <kernel/networking/layers/l3-ipv4.h>
 #include <kernel/networking/protocols/arp.h>
 
 // Network device linked list.
@@ -146,8 +147,22 @@ void networking_register_device(net_device_t *netDevice) {
     uint8_t targetIP[NET_IPV4_LENGTH];
     targetIP[0] = 192;
     targetIP[1] = 168;
-    targetIP[2] = 168;
-    targetIP[3] = 20;
+    targetIP[2] = 1;
+    targetIP[3] = 1;
+
+    uint8_t sourceIP[NET_IPV4_LENGTH];
+    sourceIP[0] = 192;
+    sourceIP[1] = 168;
+    sourceIP[2] = 1;
+    sourceIP[3] = 128;
+
+    char* test = "Gold smells";
+    uint16_t ipv4FrameSize;
+
+    ipv4_frame_t *ipv4Frame = l3_ipv4_create_frame(sourceIP, targetIP, 1, strlen(test), test, &ipv4FrameSize);
+    dumphex(ipv4Frame, ipv4FrameSize);
+    kprintf("\n\n\n");
+    while(true);
 
     arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
     dumphex(arpFrame, sizeof(arp_frame_t));
