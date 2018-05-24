@@ -158,6 +158,14 @@ typedef struct {
     uint32_t Length;
 } __attribute__((packed)) fat_dir_entry_t;
 
+// FAT12.
+extern bool fat12_entry_read(fat12_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, uint32_t length);
+extern bool fat12_get_dir(fat12_t *fat, fat_dir_entry_t *directory, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount);
+extern bool fat12_get_root_dir(fat12_t *fat, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount);
+
+extern void fat12_print_dir(fat12_t *fat, fat_dir_entry_t *directoryEntries, uint32_t directoryEntriesCount, uint32_t level);
+
 extern bool fat_init(storage_device_t *storageDevice);
+
 
 #endif
