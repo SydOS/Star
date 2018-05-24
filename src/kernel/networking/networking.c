@@ -162,13 +162,10 @@ void networking_register_device(net_device_t *netDevice) {
     ipv4_frame_t *ipv4Frame = l3_ipv4_create_frame(sourceIP, targetIP, 1, strlen(test), test, &ipv4FrameSize);
     dumphex(ipv4Frame, ipv4FrameSize);
     kprintf("\n\n\n");
-    while(true);
+    kheap_free(ipv4Frame);
 
     arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
-    dumphex(arpFrame, sizeof(arp_frame_t));
-    kprintf("\n\n\n");
     ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, &frameSize);
-    dumphex(frame, frameSize);
     netDevice->Send(netDevice, frame, frameSize);
     kprintf("NET: SENT TEST PACKET\n");
     kheap_free(frame);
