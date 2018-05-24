@@ -42,17 +42,17 @@
 const pci_driver_t PciDrivers[] = {
     // Storage.
     //{ "AHCI controller", ahci_init }, // Disable for now.
-    //{ "ATA controller", ata_init },
+    { "ATA controller", ata_init },
 
     // USB.
     { "UHCI host controller", usb_uhci_init },
     { "OHCI host controller", usb_ohci_init },
 
     // Network adapters.
-    { "Realtek RTL8139 Ethernet", rtl8139_init },
-    { "Realtek RTL8169 Ethernet", rtl8169_init },
-    { "Broadcom BCM440x Ethernet", bcm440x_init },
-    { "Intel PCIe Ethernet", e1000e_init },
+    //{ "Realtek RTL8139 Ethernet", rtl8139_init },
+    //{ "Realtek RTL8169 Ethernet", rtl8169_init },
+    //{ "Broadcom BCM440x Ethernet", bcm440x_init },
+    //{ "Intel PCIe Ethernet", e1000e_init },
 
     // End driver.
     { "", NULL }
