@@ -41,7 +41,8 @@ ethernet_frame_t* l2_ethernet_create_frame(uint8_t* MACDest, uint8_t* MACSrc,
 	if (*FrameSize < 60) {
 		*FrameSize = 60;
 	}
-	kprintf("L2Eth: frame size of 0x%X calculated, (Eth frame 0x%X | payloadSize 0x%X)\n", *FrameSize, sizeof(ethernet_frame_t), payloadSize);
+	kprintf("L2Eth: frame size of 0x%X calculated, (Eth frame 0x%X | payloadSize 0x%X)\n", 
+			*FrameSize, sizeof(ethernet_frame_t), payloadSize);
 
 	// Allocate the RAM for our new Ethernet frame to live in
 	ethernet_frame_t *frame = (ethernet_frame_t*)kheap_alloc(*FrameSize);
