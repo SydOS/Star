@@ -26,6 +26,7 @@
 #define NETWORKING_ETHERNET_H
 
 #include <main.h>
+#include <kernel/networking/networking.h>
 
 typedef struct {
 	uint8_t MACDest[6];
