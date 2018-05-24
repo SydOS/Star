@@ -139,39 +139,20 @@ void networking_register_device(net_device_t *netDevice) {
     // Start up packet reception thread.
     tasking_thread_schedule_proc(tasking_thread_create_kernel("net_worker", networking_packet_process_thread, (uintptr_t)netDevice, 0, 0), 0);
 
-    // This is where our test packet stuff will be for now.
-    // Just send some garbage to prove it works in Wireshark.
-    uint8_t destMAC[8];
+    // Create some variables to prepare for our ARP request
     uint16_t frameSize;
-    for (int x = 0; x < NET_MAC_LENGTH; x++) {
-        destMAC[x] = 0xFF;
-    }
     uint8_t targetIP[NET_IPV4_LENGTH];
     targetIP[0] = 192;
     targetIP[1] = 168;
     targetIP[2] = 1;
     targetIP[3] = 1;
 
-    uint8_t sourceIP[NET_IPV4_LENGTH];
-    sourceIP[0] = 192;
-    sourceIP[1] = 168;
-    sourceIP[2] = 1;
-    sourceIP[3] = 128;
-
-    char* test = "Gold smells";
-    uint16_t ipv4FrameSize;
-
-    ipv4_frame_t *ipv4Frame = l3_ipv4_create_frame(sourceIP, targetIP, 1, strlen(test), test, &ipv4FrameSize);
-    dumphex(ipv4Frame, ipv4FrameSize);
-    kprintf("\n\n\n");
-    kheap_free(ipv4Frame);
-
-    arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
-    ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, &frameSize);
+    // Generate and send ARP request
+    ethernet_frame_t* frame = arp_create_packet(netDevice, targetIP, &frameSize);
     netDevice->Send(netDevice, frame, frameSize);
     kprintf("NET: SENT TEST PACKET\n");
+    dumphex(frame, frameSize);
     kheap_free(frame);
-    kheap_free(arpFrame);
 }
 
 void networking_print_devices(void) {

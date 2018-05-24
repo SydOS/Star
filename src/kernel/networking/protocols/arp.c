@@ -27,6 +27,7 @@
 #include <byteswap.h>
 
 #include <kernel/memory/kheap.h>
+#include <kernel/networking/layers/l2-ethernet.h>
 #include <kernel/networking/protocols/arp.h>
 #include <kernel/networking/networking.h>
 
@@ -51,4 +52,17 @@ arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP) {
     memcpy((frame->TargetIP), TargetIP, 4);
 
     return frame;
+}
+
+ethernet_frame_t* arp_create_packet(net_device_t* netDevice, uint8_t* targetIP, uint16_t *frameSize) {
+	// Generate global broadcast MAC
+	uint8_t destMAC[8];
+    for (int x = 0; x < NET_MAC_LENGTH; x++) {
+        destMAC[x] = 0xFF;
+    }
+
+	arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
+	ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, frameSize);
+	kheap_free(arpFrame);
+	return frame;
 }
