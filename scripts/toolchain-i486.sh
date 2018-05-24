@@ -1,5 +1,5 @@
 export BINUTILS_VERSION=2.30
-export GCC_VERSION=7.3.0
+export GCC_VERSION=8.1.0
 
 export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr

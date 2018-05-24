@@ -1,5 +1,5 @@
 /*
- * File: pci_driver.c
+ * File: arp.c
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -23,37 +23,32 @@
  */
 
 #include <main.h>
-#include <driver/pci.h>
+#include <string.h>
+#include <byteswap.h>
 
-#include <driver/storage/ahci/ahci.h>
-#include <driver/storage/ata/ata.h>
+#include <kernel/memory/kheap.h>
+#include <kernel/networking/protocols/arp.h>
+#include <kernel/networking/networking.h>
 
-#include <driver/usb/usb_uhci.h>
-#include <driver/usb/usb_ohci.h>
+arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP) {
+	// Allocate memory for frame
+	arp_frame_t *frame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
 
+	// Clear frame with 0s
+	memset(frame, 0, sizeof(arp_frame_t));
 
-#include <driver/nics/rtl8139.h>
-#include <driver/nics/rtl8169.h>
-#include <driver/nics/bcm440x.h>
-#include <driver/nics/e1000e.h>
+	// Fill out ARP frame details
+	frame->HardwareType = swap_uint16(1);
+	frame->ProtocolType = swap_uint16(0x0800);
+	frame->HardwareSize = 6;
+	frame->ProtocolSize = 4;
+	frame->Opcode = swap_uint16(1);
+	memcpy((frame->SenderMAC), SenderMAC, NET_MAC_LENGTH);
+	for (int x = 0; x < NET_IPV4_LENGTH; x++)
+        frame->SenderIP[x] = 0x00;
+    for (int x = 0; x < NET_MAC_LENGTH; x++)
+        frame->TargetMAC[x] = 0x00;
+    memcpy((frame->TargetIP), TargetIP, 4);
 
-// Array of PCI device drivers.
-// Driver init() function must return a bool and accept a pci_device_t* as the only parameter.
-const pci_driver_t PciDrivers[] = {
-    // Storage.
-    //{ "AHCI controller", ahci_init }, // Disable for now.
-    //{ "ATA controller", ata_init },
-
-    // USB.
-    { "UHCI host controller", usb_uhci_init },
-    { "OHCI host controller", usb_ohci_init },
-
-    // Network adapters.
-    { "Realtek RTL8139 Ethernet", rtl8139_init },
-    { "Realtek RTL8169 Ethernet", rtl8169_init },
-    { "Broadcom BCM440x Ethernet", bcm440x_init },
-    { "Intel PCIe Ethernet", e1000e_init },
-
-    // End driver.
-    { "", NULL }
-};
+    return frame;
+}

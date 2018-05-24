@@ -1,5 +1,5 @@
 /*
- * File: pci_driver.c
+ * File: byteswap.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -23,37 +23,6 @@
  */
 
 #include <main.h>
-#include <driver/pci.h>
 
-#include <driver/storage/ahci/ahci.h>
-#include <driver/storage/ata/ata.h>
-
-#include <driver/usb/usb_uhci.h>
-#include <driver/usb/usb_ohci.h>
-
-
-#include <driver/nics/rtl8139.h>
-#include <driver/nics/rtl8169.h>
-#include <driver/nics/bcm440x.h>
-#include <driver/nics/e1000e.h>
-
-// Array of PCI device drivers.
-// Driver init() function must return a bool and accept a pci_device_t* as the only parameter.
-const pci_driver_t PciDrivers[] = {
-    // Storage.
-    //{ "AHCI controller", ahci_init }, // Disable for now.
-    //{ "ATA controller", ata_init },
-
-    // USB.
-    { "UHCI host controller", usb_uhci_init },
-    { "OHCI host controller", usb_ohci_init },
-
-    // Network adapters.
-    { "Realtek RTL8139 Ethernet", rtl8139_init },
-    { "Realtek RTL8169 Ethernet", rtl8169_init },
-    { "Broadcom BCM440x Ethernet", bcm440x_init },
-    { "Intel PCIe Ethernet", e1000e_init },
-
-    // End driver.
-    { "", NULL }
-};
+extern uint8_t swap_uint8(uint8_t val);
+extern uint16_t swap_uint16(uint16_t val);

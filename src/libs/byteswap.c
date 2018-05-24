@@ -1,5 +1,5 @@
 /*
- * File: pci_driver.c
+ * File: byteswap.c
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -23,37 +23,37 @@
  */
 
 #include <main.h>
-#include <driver/pci.h>
 
-#include <driver/storage/ahci/ahci.h>
-#include <driver/storage/ata/ata.h>
+uint8_t swap_uint8(uint8_t val) {
+    return (val << 4) | (val >> 4);
+}
 
-#include <driver/usb/usb_uhci.h>
-#include <driver/usb/usb_ohci.h>
+uint16_t swap_uint16(uint16_t val) {
+    return (val << 8) | (val >> 8);
+}
 
+int16_t swap_int16(int16_t val) {
+    return (val << 8) | ((val >> 8) & 0xFF);
+}
 
-#include <driver/nics/rtl8139.h>
-#include <driver/nics/rtl8169.h>
-#include <driver/nics/bcm440x.h>
-#include <driver/nics/e1000e.h>
+uint32_t swap_uint32(uint32_t val) {
+    val = ((val << 8) & 0xFF00FF00 ) | ((val >> 8) & 0xFF00FF ); 
+    return (val << 16) | (val >> 16);
+}
 
-// Array of PCI device drivers.
-// Driver init() function must return a bool and accept a pci_device_t* as the only parameter.
-const pci_driver_t PciDrivers[] = {
-    // Storage.
-    //{ "AHCI controller", ahci_init }, // Disable for now.
-    //{ "ATA controller", ata_init },
+int32_t swap_int32(int32_t val) {
+    val = ((val << 8) & 0xFF00FF00) | ((val >> 8) & 0xFF00FF ); 
+    return (val << 16) | ((val >> 16) & 0xFFFF);
+}
 
-    // USB.
-    { "UHCI host controller", usb_uhci_init },
-    { "OHCI host controller", usb_ohci_init },
+int64_t swap_int64(int64_t val) {
+    val = ((val << 8) & 0xFF00FF00FF00FF00ULL ) | ((val >> 8) & 0x00FF00FF00FF00FFULL );
+    val = ((val << 16) & 0xFFFF0000FFFF0000ULL ) | ((val >> 16) & 0x0000FFFF0000FFFFULL );
+    return (val << 32) | ((val >> 32) & 0xFFFFFFFFULL);
+}
 
-    // Network adapters.
-    { "Realtek RTL8139 Ethernet", rtl8139_init },
-    { "Realtek RTL8169 Ethernet", rtl8169_init },
-    { "Broadcom BCM440x Ethernet", bcm440x_init },
-    { "Intel PCIe Ethernet", e1000e_init },
-
-    // End driver.
-    { "", NULL }
-};
+uint64_t swap_uint64(uint64_t val) {
+    val = ((val << 8) & 0xFF00FF00FF00FF00ULL ) | ((val >> 8) & 0x00FF00FF00FF00FFULL );
+    val = ((val << 16) & 0xFFFF0000FFFF0000ULL ) | ((val >> 16) & 0x0000FFFF0000FFFFULL );
+    return (val << 32) | (val >> 32);
+}
