@@ -39,4 +39,6 @@ extern ethernet_frame_t* l2_ethernet_create_frame(uint8_t* MACDest, uint8_t* MAC
 							  uint16_t Ethertype, uint16_t payloadSize, 
 							  void* payloadPointer,  uint16_t *FrameSize);
 
+extern ethernet_frame_t* l2_ethernet_handle_packet(net_packet_t *packet);
+
 #endif

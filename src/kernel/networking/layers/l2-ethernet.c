@@ -70,3 +70,8 @@ ethernet_frame_t* l2_ethernet_create_frame(uint8_t* MACDest, uint8_t* MACSrc,
 	// Return pointer to our new frame
 	return frame;
 }
+
+ethernet_frame_t* l2_ethernet_handle_packet(net_packet_t *packet) {
+	ethernet_frame_t *frame = (ethernet_frame_t*)packet->PacketData;
+	return frame;
+}
