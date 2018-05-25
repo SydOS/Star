@@ -29,7 +29,7 @@
 #include <string.h>
 #include <driver/storage/floppy.h>
 
-#include <driver/storage/storage.h>
+#include <kernel/storage/storage.h>
 #include <kernel/memory/pmm.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/kheap.h>

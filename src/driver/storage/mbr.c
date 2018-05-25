@@ -1,5 +1,5 @@
 /*
- * File: gpt.c
+ * File: mbr.c
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,13 +22,3 @@
  * SOFTWARE.
  */
 
-#include <main.h>
-#include <tools.h>
-#include <kprint.h>
-#include <driver/storage/gpt.h>
-
-#include <kernel/storage/storage.h>
-
-bool gpt_init(storage_device_t *storageDevice) {
-
-}

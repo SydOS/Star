@@ -30,8 +30,10 @@
 #include <driver/storage/ata/ata_commands.h>
 #include <kernel/interrupts/irqs.h>
 #include <kernel/memory/kheap.h>
-#include <driver/storage/storage.h>
+#include <kernel/storage/storage.h>
 #include <driver/pci.h>
+
+#include <driver/storage/mbr.h>
 
 #include <driver/storage/gpt.h>
 
@@ -511,17 +513,21 @@ bool ata_init(pci_device_t *pciDevice) {
     ata_reset_identify(&ataDevice->Primary);
     ata_reset_identify(&ataDevice->Secondary);
     kprintf("ATA: Initialized!\n");
-    return true;
+  //  return true;
 
 
     // ===== DEMO ======
     // Select masters on channels.
-  /*  kprintf("ATA: Selecting masters....\n");
+    kprintf("ATA: Selecting masters....\n");
     ata_select_device(&ataDevice->Primary, true);
     ata_select_device(&ataDevice->Secondary, true);
     uint8_t *data = (uint8_t*)kheap_alloc(ATA_SECTOR_SIZE_512);
 
-    // Wipe first sector of primary master.
+    // Read MBR.
+    mbr_t *mbr = (mbr_t*)kheap_alloc(sizeof(mbr_t));
+    int16_t status = ata_read_sector(&ataDevice->Primary, true, 0, mbr, 1);
+
+    /*// Wipe first sector of primary master.
     kprintf("ATA: Wiping sector 0 on pri master....\n");
     memset(data, 0, ATA_SECTOR_SIZE_512);
     int16_t status = ata_write_sector(&ataDevice->Primary, true, 0, data, 1);
@@ -543,4 +549,5 @@ bool ata_init(pci_device_t *pciDevice) {
     for (int i = 0; i < 25; i++)
         kprintf("%X ", data[i]);
     kprintf("\n\n");*/
+    return true;
 }

@@ -25,7 +25,7 @@
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
-#include <driver/storage/storage.h>
+#include <kernel/storage/storage.h>
 
 #include <kernel/memory/kheap.h>
 

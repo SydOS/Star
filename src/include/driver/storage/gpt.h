@@ -26,7 +26,7 @@
 #define GPT_H
 
 #include <main.h>
-#include <driver/storage/storage.h>
+#include <kernel/storage/storage.h>
 
 extern bool gpt_init(storage_device_t *storageDevice);
 

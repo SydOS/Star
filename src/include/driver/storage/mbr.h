@@ -1,5 +1,5 @@
 /*
- * File: gpt.c
+ * File: mbr.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,13 +22,44 @@
  * SOFTWARE.
  */
 
-#include <main.h>
-#include <tools.h>
-#include <kprint.h>
-#include <driver/storage/gpt.h>
+#ifndef MBR_H
+#define MBR_H
 
+#include <main.h>
 #include <kernel/storage/storage.h>
 
-bool gpt_init(storage_device_t *storageDevice) {
+typedef struct {
+    uint8_t Status;
+    uint8_t StartHead;
+    uint16_t StartCylinderSector;
+    uint8_t Type;
+    uint8_t EndHead;
+    uint16_t EndCylinderSector;
 
-}
+    uint32_t StartLba;
+    uint32_t CountLba;
+} __attribute__((packed)) mbr_entry_t;
+
+typedef struct {
+    uint8_t Bootstrap1[218];
+
+    uint16_t Zero1;
+    uint8_t OriginalDrive;
+    uint8_t Seconds;
+    uint8_t Minutes;
+    uint8_t Hours;
+
+    uint8_t Bootstrap2[216];
+
+    // Optional disk signature.
+    uint32_t Signature1;
+    uint16_t Signature2;
+
+    // Partition table.
+    mbr_entry_t Entries[4];
+
+    // Boot signature.
+    uint16_t BootSignature;
+} __attribute__((packed)) mbr_t;
+
+#endif

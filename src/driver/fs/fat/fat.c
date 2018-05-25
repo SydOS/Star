@@ -30,7 +30,7 @@
 #include <math.h>
 
 #include <driver/storage/floppy.h>
-#include <driver/storage/storage.h>
+#include <kernel/storage/storage.h>
 
 
 

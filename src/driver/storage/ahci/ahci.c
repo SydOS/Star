@@ -30,7 +30,7 @@
 
 #include <kernel/interrupts/irqs.h>
 #include <kernel/memory/kheap.h>
-#include <driver/storage/storage.h>
+#include <kernel/storage/storage.h>
 #include <kernel/memory/paging.h>
 #include <driver/pci.h>
 

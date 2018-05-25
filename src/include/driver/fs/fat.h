@@ -26,7 +26,7 @@
 #define FS_FAT_H
 
 #include <main.h>
-#include <driver/storage/storage.h>
+#include <kernel/storage/storage.h>
 
 #define FAT_DIRECTORY_ENTRY_SIZE    32
 

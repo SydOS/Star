@@ -26,12 +26,14 @@
 #define STORAGE_H
 
 #include <main.h>
+#include <kernel/storage/partition_map.h>
 
 typedef struct storage_device_t {
     struct storage_device_t *Next;
     struct storage_device_t *Prev;
 
     void *Device;
+    
 
     bool (*Read)(struct storage_device_t *storageDevice, uint64_t startByte, uint8_t *outBuffer, uint32_t length);
     void (*Write)(struct storage_device_t *storageDevice, uint64_t startByte, uint32_t count, const uint8_t *data);

@@ -1,5 +1,5 @@
 /*
- * File: gpt.c
+ * File: partition_map.c
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -23,12 +23,7 @@
  */
 
 #include <main.h>
-#include <tools.h>
+#include <io.h>
 #include <kprint.h>
-#include <driver/storage/gpt.h>
-
 #include <kernel/storage/storage.h>
 
-bool gpt_init(storage_device_t *storageDevice) {
-
-}

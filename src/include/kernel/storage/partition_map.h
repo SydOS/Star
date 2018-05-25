@@ -1,5 +1,5 @@
 /*
- * File: floppy_data.c
+ * File: partition_map.h
  * 
  * Copyright (c) 2017-2018 Sydney Erickson, John Davis
  * 
@@ -22,20 +22,20 @@
  * SOFTWARE.
  */
 
+#ifndef PARTITION_MAP_H
+#define PARTITION_MAP_H
+
 #include <main.h>
-#include <tools.h>
-#include <io.h>
-#include <kprint.h>
-#include <string.h>
-#include <math.h>
-#include <driver/storage/floppy.h>
 
-#include <kernel/memory/pmm.h>
-#include <kernel/memory/paging.h>
-#include <kernel/memory/kheap.h>
+typedef struct {
+    uint16_t FsType;
+    uint64_t LbaStart;
+    uint64_t LbaEnd;
+} partition_t;
 
+typedef struct {
+    uint16_t NumPartitions;
+    partition_t *Partitions;
+} partition_map_t;
 
-extern bool floppy_wait_for_irq(uint16_t timeout);
-
-
-
+#endif
