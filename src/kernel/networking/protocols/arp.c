@@ -76,7 +76,8 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 
 	// Check if we are waiting for an ARP reply and it is a reply
 	if (isWaitingForResponse == true && swap_uint16(inFrame->Opcode) == 2) { // TODO replace with #define for opcode.
-		responseFrame = (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t));
+		responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
+		memcpy(responseFrame, (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t)), sizeof(arp_frame_t));
 		isWaitingForResponse = false;
 	}
 }
