@@ -153,6 +153,8 @@ void networking_register_device(net_device_t *netDevice) {
     kprintf("NET: SENT TEST PACKET\n");
     dumphex(frame, frameSize);
     kheap_free(frame);
+
+    arp_frame_t* arpFrame = arp_get_mac_address(netDevice, targetIP);
 }
 
 void networking_print_devices(void) {

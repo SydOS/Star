@@ -41,5 +41,7 @@ typedef struct {
 
 extern arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP);
 extern ethernet_frame_t* arp_create_packet(net_device_t* netDevice, uint8_t* targetIP, uint16_t *frameSize);
+extern void arp_process_response(ethernet_frame_t* ethFrame);
+extern arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP);
 
 #endif

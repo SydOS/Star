@@ -66,3 +66,40 @@ ethernet_frame_t* arp_create_packet(net_device_t* netDevice, uint8_t* targetIP, 
 	kheap_free(arpFrame);
 	return frame;
 }
+
+bool isWaitingForResponse = false;
+arp_frame_t* responseFrame;
+
+void arp_process_response(ethernet_frame_t* ethFrame) {
+	// Generate temporary frame
+	arp_frame_t* inFrame = (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t));
+
+	// Check if we are waiting for an ARP reply and it is a reply
+	if (isWaitingForResponse == true && inFrame->Opcode == 2) {
+		responseFrame = (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t));
+	}
+}
+
+arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
+	// Generate global broadcast MAC
+	uint16_t frameSize;
+	uint8_t destMAC[8];
+    for (int x = 0; x < NET_MAC_LENGTH; x++) {
+        destMAC[x] = 0xFF;
+    }
+
+	// Generate and send ARP request
+	arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
+	ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, frameSize);
+	netDevice->Send(netDevice, frame, frameSize);
+	kheap_free(arpFrame);
+
+	// Wait for a reply
+	while (responseFrame->Opcode != 2);
+	kprintf("ARP: IP for %2X:%2X:%2X:%2X:%2X:%2X is %X:%X:%X:%X",
+	responseFrame->TargetMAC[0], responseFrame->TargetMAC[1], responseFrame->TargetMAC[2], responseFrame->TargetMAC[3], responseFrame->TargetMAC[4], responseFrame->TargetMAC[5],
+	responseFrame->TargetIP[0], responseFrame->TargetIP[1], responseFrame->TargetIP[2], responseFrame->TargetIP[3]);
+
+	// Return new frame
+	return responseFrame;
+}
