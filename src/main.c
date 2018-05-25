@@ -294,8 +294,8 @@ void kernel_late() {
 			kprintf("Beeping at %u hertz for %u ms...\n", hz, ms);
 			speaker_play_tone(hz, ms);
 		}
-		else if (strncmp(buffer, "arping ", 6) == 0) {
-			char* ipstr = buffer + 7;
+		else if (strncmp(buffer, "arpping ", 7) == 0) {
+			char* ipstr = buffer + 8;
 			
 			// Parse IPv4 string
 			uint8_t octets[4];
