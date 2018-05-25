@@ -28,6 +28,8 @@
 #include <main.h>
 #include <kernel/storage/storage.h>
 
+#define MBR_NO_OF_PARTITIONS    4
+
 typedef struct {
     uint8_t Status;
     uint8_t StartHead;
@@ -56,10 +58,12 @@ typedef struct {
     uint16_t Signature2;
 
     // Partition table.
-    mbr_entry_t Entries[4];
+    mbr_entry_t Entries[MBR_NO_OF_PARTITIONS];
 
     // Boot signature.
     uint16_t BootSignature;
 } __attribute__((packed)) mbr_t;
+
+extern bool mbr_init(storage_device_t *storageDevice);
 
 #endif

@@ -425,6 +425,10 @@ void ata_reset_identify(ata_channel_t *channel) {
     }*/
 }
 
+static bool ata_storage_read(storage_device_t *storageDevice, uint64_t startByte, uint8_t *outBuffer, uint32_t length) {
+    ata_read_sector((ata_channel_t*)storageDevice->Device, true, 0, outBuffer, 1);
+}
+
 bool ata_init(pci_device_t *pciDevice) {
     // Is the PCI device an ATA controller?
     if (!(pciDevice->Class == PCI_CLASS_MASS_STORAGE && pciDevice->Subclass == PCI_SUBCLASS_MASS_STORAGE_IDE))
@@ -523,9 +527,19 @@ bool ata_init(pci_device_t *pciDevice) {
     ata_select_device(&ataDevice->Secondary, true);
     uint8_t *data = (uint8_t*)kheap_alloc(ATA_SECTOR_SIZE_512);
 
+    // Register storage device.
+    storage_device_t *ataPriStorageDevice = (storage_device_t*)kheap_alloc(sizeof(storage_device_t));
+    memset(ataPriStorageDevice, 0, sizeof(storage_device_t));
+    ataPriStorageDevice->Device = &ataDevice->Primary;
+
+    ataPriStorageDevice->Read = ata_storage_read;
+   // floppyStorageDevice->ReadBlocks = floppy_storage_read_blocks;
+    //storage_register(floppyStorageDevice);
+
     // Read MBR.
-    mbr_t *mbr = (mbr_t*)kheap_alloc(sizeof(mbr_t));
-    int16_t status = ata_read_sector(&ataDevice->Primary, true, 0, mbr, 1);
+    mbr_init(ataPriStorageDevice);
+  //  mbr_t *mbr = (mbr_t*)kheap_alloc(sizeof(mbr_t));
+  //  int16_t status = ata_read_sector(&ataDevice->Primary, true, 0, mbr, 1);
 
     /*// Wipe first sector of primary master.
     kprintf("ATA: Wiping sector 0 on pri master....\n");

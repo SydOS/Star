@@ -22,3 +22,23 @@
  * SOFTWARE.
  */
 
+#include <main.h>
+#include <kprint.h>
+#include <driver/storage/mbr.h>
+#include <kernel/storage/storage.h>
+#include <kernel/memory/kheap.h>
+
+void mbr_print(mbr_t *mbr) {
+    kprintf("MBR: Disk signature: 0x%X\n", mbr->Signature1);
+    for (uint8_t i = 0; i < MBR_NO_OF_PARTITIONS; i++) {
+        kprintf("MBR:   PART%u: Start: %u | End: %u | Type: 0x%X\n", i + 1, mbr->Entries[i].StartLba, mbr->Entries[i].StartLba + mbr->Entries[i].CountLba, mbr->Entries[i].Type);
+    }
+}
+
+bool mbr_init(storage_device_t *storageDevice) {
+    // Get MBR.
+    mbr_t *mbr = (mbr_t*)kheap_alloc(sizeof(mbr_t));
+    storageDevice->Read(storageDevice, 0, mbr, sizeof(mbr_t));
+
+    mbr_print(mbr);
+}

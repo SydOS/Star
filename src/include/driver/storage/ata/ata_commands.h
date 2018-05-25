@@ -987,4 +987,6 @@ extern void ata_read_identify_words(ata_channel_t *channel, uint8_t *checksum, u
 
 extern int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t *outResult);
 
+extern int16_t ata_read_sector(ata_channel_t *channel, bool master, uint32_t startSectorLba, void *outData, uint8_t sectorCount);
+
 #endif
