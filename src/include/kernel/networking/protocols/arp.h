@@ -40,5 +40,6 @@ typedef struct {
 } __attribute__((packed)) arp_frame_t;
 
 extern arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP);
+extern ethernet_frame_t* arp_create_packet(net_device_t* netDevice, uint8_t* targetIP, uint16_t *frameSize);
 
 #endif
