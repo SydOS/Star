@@ -100,8 +100,13 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	uint64_t targetTick = timer_ticks() + 5000;
 	while (isWaitingForResponse) {
 		if (timer_ticks() >= targetTick) {
-			kprintf("ARP: request timeout");
-			return;
+			kprintf("ARP: request timeout\n");
+			// Allocate memory for frame
+			arp_frame_t *frame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
+
+			// Clear frame with 0s
+			memset(frame, 0, sizeof(arp_frame_t));
+			return frame;
 		}
 	}
 	
