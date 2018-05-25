@@ -80,7 +80,7 @@ ethernet_frame_t* l2_ethernet_create_frame(uint8_t* MACDest, uint8_t* MACSrc,
 ethernet_frame_t* l2_ethernet_handle_packet(net_packet_t *packet) {
 	ethernet_frame_t *frame = (ethernet_frame_t*)packet->PacketData;
 	frame->Ethertype = (frame->Ethertype << 8) | (frame->Ethertype >> 8);
-	kprintf("L2Eth: %x", frame->Ethertype);
+	//kprintf("L2Eth: %x", frame->Ethertype);
 	if(frame->Ethertype == 0x0806) {
 		arp_process_response(frame);
 	}

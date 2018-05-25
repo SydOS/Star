@@ -99,9 +99,9 @@ static void networking_packet_process_thread(net_device_t *netDevice) {
         while (netDevice->CurrentRxPacket == NULL);
 
         // Process packet here.
-        kprintf("process\n");
+        //kprintf("process\n");
         ethernet_frame_t *ethFrame = l2_ethernet_handle_packet(netDevice->CurrentRxPacket);
-        dumphex(ethFrame, netDevice->CurrentRxPacket->PacketLength);
+        //dumphex(ethFrame, netDevice->CurrentRxPacket->PacketLength);
 
         // Lock this code.
         spinlock_lock(&netDevice->CurrentRxPacketLock);
