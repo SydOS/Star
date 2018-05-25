@@ -280,14 +280,16 @@ void kernel_late() {
 					break;
 				}
 			}
-			uint32_t msLen = strlen(msStr);
 
-			uint32_t hz = 0;
-			uint32_t ms = 0;
-			for (uint16_t i = 0; i < hzLen; i++)
-				hz = hz * 10 + (hzStr[i] - '0');
-			for (uint16_t i = 0; i < msLen; i++)
-				ms = ms * 10 + (msStr[i] - '0');
+			// Get freq.
+			char *hzStrTmp = (char*)kheap_alloc(hzLen + 1);
+			strncpy(hzStrTmp, hzStr, hzLen);
+			hzStrTmp[hzLen] = '\0';
+			uint32_t hz = atoi(hzStrTmp);
+			kheap_free(hzStrTmp);
+
+			// Get duration.
+			uint32_t ms = atoi(msStr);
 
 			kprintf("Beeping at %u hertz for %u ms...\n", hz, ms);
 			speaker_play_tone(hz, ms);

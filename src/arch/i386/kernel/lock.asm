@@ -30,6 +30,9 @@ section .text
 
 global spinlock_lock
 spinlock_lock:
+    ; Get lock object.
+    mov eax, [esp+4]
+
     ; Get EFLAGS register.
     pushfd
     pop edx
@@ -39,15 +42,17 @@ spinlock_lock:
     ; Disable interrupts.
     cli
 
-    ; Get lock object.
-    mov eax, [esp+4]
-
 .loop:
     ; Attempt to lock object.
     lock bts dword [eax], 0
-    pause
-	jc .loop
+    jnc .locked
 
+    ; Renable interrupts if we didn't get the lock.
+    sti
+    pause
+	jmp .loop
+
+.locked:
     ; Save state of interrupts.
     and edx, 0x200
     mov [eax+4], edx
@@ -55,17 +60,15 @@ spinlock_lock:
 
 global spinlock_release
 spinlock_release:
-    ; Get lock object.
+    ; Get lock object and interrupt state.
     mov eax, [esp+4]
-
-
-
-    ; Enable interrupts if they were enabled before.
     mov edx, [eax+4]
+    cmp edx, 0
 
     ; Release lock.
     mov dword [eax], 0
-    cmp edx, 0
+    
+    ; Enable interrupts if they were enabled before.
     jz .spinlock_release_ret
     sti
 
