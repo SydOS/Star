@@ -27,6 +27,8 @@
 
 #include <main.h>
 
+#include <kernel/networking/layers/l2-ethernet.h>
+
 typedef struct {
 	uint16_t HardwareType;
 	uint16_t ProtocolType;
