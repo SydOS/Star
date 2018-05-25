@@ -75,30 +75,32 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 	arp_frame_t* inFrame = (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t));
 
 	// Check if we are waiting for an ARP reply and it is a reply
-	if (isWaitingForResponse == true && inFrame->Opcode == 2) {
+	if (isWaitingForResponse == true && swap_uint16(inFrame->Opcode) == 2) { // TODO replace with #define for opcode.
 		responseFrame = (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t));
+		isWaitingForResponse = false;
 	}
 }
 
 arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	// Generate global broadcast MAC
 	uint16_t frameSize;
-	uint8_t destMAC[8];
+	uint8_t destMAC[NET_MAC_LENGTH];
     for (int x = 0; x < NET_MAC_LENGTH; x++) {
         destMAC[x] = 0xFF;
     }
 
 	// Generate and send ARP request
 	arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
-	ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, frameSize);
+	ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, &frameSize);
+	isWaitingForResponse = true;
 	netDevice->Send(netDevice, frame, frameSize);
 	kheap_free(arpFrame);
 
 	// Wait for a reply
-	while (responseFrame->Opcode != 2);
-	kprintf("ARP: IP for %2X:%2X:%2X:%2X:%2X:%2X is %X:%X:%X:%X",
-	responseFrame->TargetMAC[0], responseFrame->TargetMAC[1], responseFrame->TargetMAC[2], responseFrame->TargetMAC[3], responseFrame->TargetMAC[4], responseFrame->TargetMAC[5],
-	responseFrame->TargetIP[0], responseFrame->TargetIP[1], responseFrame->TargetIP[2], responseFrame->TargetIP[3]);
+	while (isWaitingForResponse);
+	kprintf("ARP: IP for %2X:%2X:%2X:%2X:%2X:%2X is %u.%u.%u.%u\n",
+	responseFrame->SenderMAC[0], responseFrame->SenderMAC[1], responseFrame->SenderMAC[2], responseFrame->SenderMAC[3], responseFrame->SenderMAC[4], responseFrame->SenderMAC[5],
+	responseFrame->SenderIP[0], responseFrame->SenderIP[1], responseFrame->SenderIP[2], responseFrame->SenderIP[3]);
 
 	// Return new frame
 	return responseFrame;
