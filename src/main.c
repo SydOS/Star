@@ -50,6 +50,7 @@
 #include <driver/usb/devices/usb_device.h>
 
 #include <kernel/networking/networking.h>
+#include <kernel/networking/protocols/arp.h>
 
 #include <acpi.h>
 
@@ -286,6 +287,11 @@ void kernel_late() {
 
 			kprintf("Beeping at %u hertz for %u ms...\n", hz, ms);
 			speaker_play_tone(hz, ms);
+		}
+		else if (strncmp(buffer, "arping ", 6) == 0) {
+			char* ip = buffer + 7;
+			arp_frame_t* frame = arp_get_mac_address(&NetDevices[0], ip);
+			kheap_free(frame);
 		}
 		else if (strcmp(buffer, "lsusb") == 0) {
 			usb_device_t *usbDevice = StartUsbDevice;
