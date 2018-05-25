@@ -121,6 +121,10 @@ void kernel_main() {
 	panic("MAIN: Tasking failed to start!\n");
 }
 
+#define OCTETS 4
+#define DELIMINATOR '.'
+#define DIGIT_OFFSET 48
+
 void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
 	while (1) { 
 		kprintf("hmm(): %u seconds\n", timer_ticks() / 1000);
@@ -289,8 +293,30 @@ void kernel_late() {
 			speaker_play_tone(hz, ms);
 		}
 		else if (strncmp(buffer, "arping ", 6) == 0) {
-			char* ip = buffer + 7;
-			arp_frame_t* frame = arp_get_mac_address(&NetDevices[0], ip);
+			char* ipstr = buffer + 7;
+			
+			// Parse IPv4 string
+			uint8_t octets[4];
+			int array_len = strlen(ipstr);
+			int multiplier = 1;
+			int current_num = 0;
+			int octet_index = OCTETS - 1;
+			for (int index = array_len - 1; index >= 0 && octet_index >= 0; index--) {
+				if (ipstr[index] == DELIMINATOR) {
+					octets[octet_index] = current_num;
+					octet_index--;
+
+					multiplier = 1;
+					current_num = 0;
+				} else if (ipstr[index] >= DIGIT_OFFSET && ipstr[index] <= DIGIT_OFFSET+10) {
+					current_num += (ipstr[index] - DIGIT_OFFSET) * multiplier;
+					multiplier *= 10;
+				}
+			}
+			octets[octet_index] = current_num;
+
+			// ARP request it
+			arp_frame_t* frame = arp_get_mac_address(&NetDevices[0], octets);
 			kheap_free(frame);
 		}
 		else if (strcmp(buffer, "lsusb") == 0) {
