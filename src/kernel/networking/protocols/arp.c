@@ -97,7 +97,7 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	kheap_free(arpFrame);
 
 	// Wait for a reply
-	uint64_t targetTick = timer_ticks() + 5000;
+	uint64_t targetTick = timer_ticks() + 2000;
 	while (isWaitingForResponse) {
 		if (timer_ticks() >= targetTick) {
 			kprintf("ARP: request timeout\n");
