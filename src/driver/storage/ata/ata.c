@@ -133,13 +133,16 @@ uint16_t ata_read_data_word(uint16_t portCommand) {
     return inw(ATA_REG_DATA(portCommand));
 }
 
-void ata_read_data_pio(ata_channel_t *channel, void *outData, uint32_t size) {
+void ata_read_data_pio(ata_channel_t *channel, uint32_t size, void *outData, uint32_t length) {
     // Get pointer to word array.
     uint16_t *buffer = (uint16_t*)outData;
 
     // Read words from device.
-    for (uint32_t i = 0; i < size; i += 2)
-        buffer[i / 2] = inw(ATA_REG_DATA(channel->CommandPort));
+    for (uint32_t i = 0; i < size; i += 2) {
+        uint16_t value = inw(ATA_REG_DATA(channel->CommandPort));
+        if (i <= length)
+            buffer[i / 2] = value;
+    }
 }
 
 void ata_write_data_pio(ata_channel_t *channel, const void *data, uint32_t size) {
@@ -426,13 +429,14 @@ void ata_reset_identify(ata_channel_t *channel) {
 }
 
 static bool ata_storage_read(storage_device_t *storageDevice, uint64_t startByte, uint8_t *outBuffer, uint32_t length) {
-    ata_read_sector((ata_channel_t*)storageDevice->Device, true, 0, outBuffer, 1);
+    //ata_read_sector((ata_channel_t*)storageDevice->Device, true, 0, outBuffer, 1);
 }
 
-static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t partitionIndex, uint64_t startSector, uint8_t *outBuffer, uint32_t length) {
+static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t partitionIndex, uint64_t startSector, uint32_t sectorCount, uint8_t *outBuffer, uint32_t length) {
     // Get offset into partition.
-    startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
-    ata_read_sector((ata_channel_t*)storageDevice->Device, true, startSector, outBuffer, 1);
+    if (partitionIndex != PARTITION_NONE)
+        startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
+    ata_read_sector((ata_channel_t*)storageDevice->Device, true, startSector, sectorCount, outBuffer, length);
 }
 
 bool ata_init(pci_device_t *pciDevice) {

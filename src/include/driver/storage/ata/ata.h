@@ -150,6 +150,15 @@ typedef struct {
     bool Busy : 1;
 } __attribute__((packed)) ata_reg_status_t;
 
+extern int16_t ata_check_status(ata_channel_t *channel, bool master);
+extern void ata_read_data_pio(ata_channel_t *channel, uint32_t size, void *outData, uint32_t length);
+extern void ata_write_data_pio(ata_channel_t *channel, const void *data, uint32_t size);
+extern void ata_send_params(ata_channel_t *channel, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh);
+extern void ata_send_command(ata_channel_t *channel, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh, uint8_t command);
+extern void ata_set_lba_high(ata_channel_t *channel, uint8_t lbaHigh);
+extern void ata_select_device(ata_channel_t *channel, bool master);
+extern bool ata_wait_for_drq(ata_channel_t *channel);
+
 extern bool ata_init(pci_device_t *pciDevice);
 
 #endif

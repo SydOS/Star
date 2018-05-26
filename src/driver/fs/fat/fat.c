@@ -38,23 +38,39 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     // Get header in first sector.
     fat_header_t *fatHeader = (fat_header_t*)kheap_alloc(sizeof(fat_header_t));
     memset(fatHeader, 0, sizeof(fat_header_t));
-    storageDevice->ReadSectors(storageDevice, partitionIndex, 0, fatHeader, sizeof(fat_header_t));
+    storageDevice->ReadSectors(storageDevice, partitionIndex, 0, 1, fatHeader, sizeof(fat_header_t));
 
     // Get first sector of FAT.
     uint64_t fatVersion = 0;
-    storageDevice->ReadSectors(storageDevice, partitionIndex, fatHeader->BPB.ReservedSectorsCount, &fatVersion, sizeof(fatVersion));
+    storageDevice->ReadSectors(storageDevice, partitionIndex, fatHeader->BPB.ReservedSectorsCount, 1, &fatVersion, sizeof(fatVersion));
     uint8_t fatDriveType = fatVersion & 0xFF;
 
     // Determine signature.
-    if (fatVersion & FAT_VERSION_MASK_FAT16) {
+    if ((fatVersion & FAT_VERSION_MASK_FAT16) == FAT_VERSION_MASK_FAT16) {
         // FAT16.
+        fat16_t *fat16Volume = (fat16_t*)kheap_alloc(sizeof(fat16_t));
+        memset(fat16Volume, 0, sizeof(fat16_t));
+
+        // Populate fields.
+        fat16Volume->Device = storageDevice;
+        fat16Volume->Header = *fatHeader;
+        fat16Volume->TableStart = fat16Volume->Header.BPB.ReservedSectorsCount;
+        fat16Volume->TableLength = fat16Volume->Header.BPB.TableSize;
+        fat16Volume->RootDirectoryStart = fat16Volume->TableStart + (fat16Volume->Header.BPB.TableSize * fat16Volume->Header.BPB.TableCount);
+        fat16Volume->RootDirectoryLength = ((fat16Volume->Header.BPB.MaxRootDirectoryEntries * sizeof(fat_dir_entry_t)) + (fat16Volume->Header.BPB.BytesPerSector - 1)) / fat16Volume->Header.BPB.BytesPerSector;
+        fat16Volume->DataStart = fat16Volume->RootDirectoryStart + fat16Volume->RootDirectoryLength;
+        uint32_t totalSectors = fat16Volume->Header.BPB.TotalSectors == 0 ? fat16Volume->Header.BPB.TotalSectors32 : fat16Volume->Header.BPB.TotalSectors;
+        fat16Volume->DataLength = totalSectors - fat16Volume->DataStart;
+
+        // Print info.
+        fat16_print_info(fat16Volume);
     }
-    else if (fatVersion & FAT_VERSION_MASK_FAT12) {
+    else if ((fatVersion & FAT_VERSION_MASK_FAT12) == FAT_VERSION_MASK_FAT12) {
         // FAT12.
     }
 
     // Create FAT object.
-    fat12_t *fatVolume = (fat12_t*)kheap_alloc(sizeof(fat12_t));
+  /*  fat12_t *fatVolume = (fat12_t*)kheap_alloc(sizeof(fat12_t));
     memset(fatVolume, 0, sizeof(fat12_t));
 
     // Populate.
@@ -97,5 +113,5 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     fat12_print_dir(fatVolume, rootDirEntries, rootDirEntriesCount, 0);
     kheap_free(rootDirEntries);
     kheap_free(fatVolume->Table);
-    kheap_free(fatVolume);
+    kheap_free(fatVolume);*/
 }

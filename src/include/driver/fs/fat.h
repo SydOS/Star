@@ -195,6 +195,9 @@ extern bool fat12_get_root_dir(fat12_t *fat, fat_dir_entry_t **outDirEntries, ui
 
 extern void fat12_print_dir(fat12_t *fat, fat_dir_entry_t *directoryEntries, uint32_t directoryEntriesCount, uint32_t level);
 
+// FAT16.
+extern void fat16_print_info(fat16_t *fat16Volume);
+
 extern bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex);
 
 

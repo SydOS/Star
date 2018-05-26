@@ -238,7 +238,7 @@ int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t 
     return ata_check_status(channel, master);
 }
 
-int16_t ata_read_sector(ata_channel_t *channel, bool master, uint32_t startSectorLba, void *outData, uint8_t sectorCount) {
+int16_t ata_read_sector(ata_channel_t *channel, bool master, uint64_t startSectorLba, uint32_t sectorCount, void *outData, uint32_t length) {
     // Send READ SECTOR command.
     ata_set_lba_high(channel, (uint8_t)((startSectorLba >> 24) & 0x0F));
     ata_send_command(channel, sectorCount, (uint8_t)(startSectorLba & 0xFF),
@@ -249,7 +249,7 @@ int16_t ata_read_sector(ata_channel_t *channel, bool master, uint32_t startSecto
        return ata_check_status(channel, master);
 
     // Read data.
-    ata_read_data_pio(channel, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
+    ata_read_data_pio(channel, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512, outData, length);
     return ata_check_status(channel, master);
 }
 
@@ -271,7 +271,7 @@ int16_t ata_read_sector_ext(ata_channel_t *channel, bool master, uint64_t startS
        return ata_check_status(channel, master);
 
     // Read data.
-    ata_read_data_pio(channel, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
+    //ata_read_data_pio(channel, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
     return ata_check_status(channel, master);
 }
 
