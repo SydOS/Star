@@ -28,6 +28,8 @@
 #include <kernel/storage/storage.h>
 #include <kernel/memory/kheap.h>
 
+#include <driver/fs/fat.h>
+
 void mbr_print(mbr_t *mbr) {
     kprintf("MBR: Disk signature: 0x%X\n", mbr->Signature1);
     for (uint8_t i = 0; i < MBR_NO_OF_PARTITIONS; i++) {
@@ -40,5 +42,50 @@ bool mbr_init(storage_device_t *storageDevice) {
     mbr_t *mbr = (mbr_t*)kheap_alloc(sizeof(mbr_t));
     storageDevice->Read(storageDevice, 0, mbr, sizeof(mbr_t));
 
-    mbr_print(mbr);
+    // Get number of partitions.
+    uint16_t numPartitions = 0;
+    for (uint8_t i = 0; i < MBR_NO_OF_PARTITIONS; i++)
+        if (mbr->Entries[i].Type)
+            numPartitions++;
+
+    // Create parition map.
+    const size_t mapSize = sizeof(partition_map_t) + (sizeof(partition_t) * (numPartitions - 1));
+    storageDevice->PartitionMap = (partition_map_t*)kheap_alloc(sizeof(partition_map_t));
+    memset(storageDevice->PartitionMap, 0, sizeof(partition_map_t));
+    storageDevice->PartitionMap->Type = PARTITION_MAP_TYPE_MBR;
+
+    // Populate partitions.
+    storageDevice->PartitionMap->NumPartitions = 0;
+    uint32_t p = 0;
+    for (uint16_t i = 0; i < MBR_NO_OF_PARTITIONS; i++) {
+        if (!mbr->Entries[i].Type)
+            continue;
+
+        // Allocate space for partition.
+        storageDevice->PartitionMap->NumPartitions++;
+        storageDevice->PartitionMap->Partitions = (partition_t**)kheap_realloc(storageDevice->PartitionMap->Partitions, storageDevice->PartitionMap->NumPartitions * sizeof(partition_t*));
+        storageDevice->PartitionMap->Partitions[p] = (partition_t*)kheap_alloc(sizeof(partition_t));
+
+        // Determine LBA.
+        uint64_t lbaStart = mbr->Entries[i].StartLba;
+        uint64_t lbaEnd = mbr->Entries[i].StartLba + mbr->Entries[i].CountLba;
+
+        storageDevice->PartitionMap->Partitions[p]->LbaStart = lbaStart;
+        storageDevice->PartitionMap->Partitions[p]->LbaEnd = lbaEnd;
+
+        // Determine type.
+        if (mbr->Entries[i].Type == MBR_TYPE_FAT12_L32MB || mbr->Entries[i].Type == MBR_TYPE_FAT16 || mbr->Entries[i].Type == MBR_TYPE_FAT16B || mbr->Entries[i].Type == MBR_TYPE_FAT16_LBA)
+            storageDevice->PartitionMap->Partitions[p]->FsType = FILESYSTEM_TYPE_FAT;
+
+        // Move to next partition.
+        p++;
+    }  
+
+    // Print out map.
+    part_print_map(storageDevice->PartitionMap);
+
+    // Test FAT16.
+    if (storageDevice->PartitionMap->Partitions[0]->FsType == FILESYSTEM_TYPE_FAT) {
+        fat_init(storageDevice, 0);
+    }
 }

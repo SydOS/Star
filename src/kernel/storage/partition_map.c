@@ -26,4 +26,34 @@
 #include <io.h>
 #include <kprint.h>
 #include <kernel/storage/storage.h>
+#include <kernel/storage/partition_map.h>
 
+void part_print_map(partition_map_t *partMap) {
+    switch (partMap->Type) {
+        case PARTITION_MAP_TYPE_MBR:
+            kprintf("PARTMAP: Master Boot Record\n");
+            break;
+
+        case PARTITION_MAP_TYPE_GPT:
+            kprintf("PARTMAP: Master Boot Record\n");
+            break;
+
+        default:
+            kprintf("PARTMAP: Unknown\n");
+            break;
+    }
+    
+    for (uint8_t i = 0; i < partMap->NumPartitions; i++) {
+        char *fsType = "Unknown";
+        switch (partMap->Partitions[i]->FsType) {
+            case FILESYSTEM_TYPE_FAT:
+                fsType = "FAT12/FAT16";
+                break;
+
+            case FILESYSTEM_TYPE_FAT32:
+                fsType = "FAT32";
+                break;
+        }
+        kprintf("PARTMAP:   PART%u: Start: %u | End: %u | Type: %s\n", i + 1, partMap->Partitions[i]->LbaStart, partMap->Partitions[i]->LbaEnd, fsType);
+    }
+}

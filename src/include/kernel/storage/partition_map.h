@@ -27,6 +27,15 @@
 
 #include <main.h>
 
+#define PARTITION_MAP_TYPE_MBR  1
+#define PARTITION_MAP_TYPE_GPT  2
+
+#define FILESYSTEM_TYPE_UNKNOWN 0
+#define FILESYSTEM_TYPE_FAT     1
+#define FILESYSTEM_TYPE_FAT32   2
+
+#define PARTITION_NONE      0xFFFF
+
 typedef struct {
     uint16_t FsType;
     uint64_t LbaStart;
@@ -34,8 +43,11 @@ typedef struct {
 } partition_t;
 
 typedef struct {
+    uint8_t Type;
     uint16_t NumPartitions;
-    partition_t *Partitions;
+    partition_t **Partitions;
 } partition_map_t;
+
+extern void part_print_map(partition_map_t *partMap);
 
 #endif

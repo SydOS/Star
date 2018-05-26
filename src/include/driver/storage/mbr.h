@@ -30,6 +30,19 @@
 
 #define MBR_NO_OF_PARTITIONS    4
 
+#define MBR_TYPE_FREE           0x00
+#define MBR_TYPE_FAT12_L32MB    0x01
+#define MBR_TYPE_FAT16          0x04
+#define MBR_TYPE_EXTENDED       0x05
+#define MBR_TYPE_FAT16B         0x06
+#define MBR_TYPE_HPFS           0x07
+#define MBR_TYPE_NTFS           0x07
+#define MBR_TYPE_EXFAT          0x07
+#define MBR_TYPE_FAT32_CHS      0x0B
+#define MBR_TYPE_FAT32_LBA      0x0C
+#define MBR_TYPE_FAT16_LBA      0x0E
+#define MBR_TYPE_EXTENDED_LBA   0x0F
+
 typedef struct {
     uint8_t Status;
     uint8_t StartHead;

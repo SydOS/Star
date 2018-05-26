@@ -429,6 +429,12 @@ static bool ata_storage_read(storage_device_t *storageDevice, uint64_t startByte
     ata_read_sector((ata_channel_t*)storageDevice->Device, true, 0, outBuffer, 1);
 }
 
+static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t partitionIndex, uint64_t startSector, uint8_t *outBuffer, uint32_t length) {
+    // Get offset into partition.
+    startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
+    ata_read_sector((ata_channel_t*)storageDevice->Device, true, startSector, outBuffer, 1);
+}
+
 bool ata_init(pci_device_t *pciDevice) {
     // Is the PCI device an ATA controller?
     if (!(pciDevice->Class == PCI_CLASS_MASS_STORAGE && pciDevice->Subclass == PCI_SUBCLASS_MASS_STORAGE_IDE))
@@ -533,6 +539,7 @@ bool ata_init(pci_device_t *pciDevice) {
     ataPriStorageDevice->Device = &ataDevice->Primary;
 
     ataPriStorageDevice->Read = ata_storage_read;
+    ataPriStorageDevice->ReadSectors = ata_storage_read_sectors;
    // floppyStorageDevice->ReadBlocks = floppy_storage_read_blocks;
     //storage_register(floppyStorageDevice);
 

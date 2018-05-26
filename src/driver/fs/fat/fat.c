@@ -34,12 +34,24 @@
 
 
 
-bool fat_init(storage_device_t *storageDevice) {
-    // Get header.
-    fat12_header_t *fatHeader = (fat12_header_t*)kheap_alloc(sizeof(fat12_header_t));
-    memset(fatHeader, 0, sizeof(fat12_header_t));
+bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
+    // Get header in first sector.
+    fat_header_t *fatHeader = (fat_header_t*)kheap_alloc(sizeof(fat_header_t));
+    memset(fatHeader, 0, sizeof(fat_header_t));
+    storageDevice->ReadSectors(storageDevice, partitionIndex, 0, fatHeader, sizeof(fat_header_t));
 
-    storageDevice->Read(storageDevice, 0, fatHeader, sizeof(fat12_header_t));
+    // Get first sector of FAT.
+    uint64_t fatVersion = 0;
+    storageDevice->ReadSectors(storageDevice, partitionIndex, fatHeader->BPB.ReservedSectorsCount, &fatVersion, sizeof(fatVersion));
+    uint8_t fatDriveType = fatVersion & 0xFF;
+
+    // Determine signature.
+    if (fatVersion & FAT_VERSION_MASK_FAT16) {
+        // FAT16.
+    }
+    else if (fatVersion & FAT_VERSION_MASK_FAT12) {
+        // FAT12.
+    }
 
     // Create FAT object.
     fat12_t *fatVolume = (fat12_t*)kheap_alloc(sizeof(fat12_t));

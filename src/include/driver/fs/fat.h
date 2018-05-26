@@ -30,6 +30,9 @@
 
 #define FAT_DIRECTORY_ENTRY_SIZE    32
 
+#define FAT_VERSION_MASK_FAT12      0xFFFFF0
+#define FAT_VERSION_MASK_FAT16      0xFFFFFFF0
+
 typedef struct {
     // Jump instruction.
     uint8_t JumpInstruction[3];
@@ -99,19 +102,20 @@ typedef struct {
 
     // Type of FAT, should be used for display only.
     char FileSystemType[8];
-} __attribute__((packed)) fat12_header_t;
+} __attribute__((packed)) fat_header_t;
 
 typedef struct {
     uint16_t Cluster1 : 12;
     uint16_t Cluster2 : 12;
 } __attribute__((packed)) fat12_cluster_pair_t;
 
+// FAT12.
 typedef struct {
     // Underlying storage device.
     storage_device_t *Device;
 
     // Header area.
-    fat12_header_t Header;
+    fat_header_t Header;
 
     // FAT starting sector and length in sectors.
     uint32_t TableStart;
@@ -119,6 +123,7 @@ typedef struct {
 
     // FAT.
     fat12_cluster_pair_t *Table;
+    fat12_cluster_pair_t *TableSpare;
 
     // Root directory starting sector and length in sectors.
     uint32_t RootDirectoryStart;
@@ -128,6 +133,31 @@ typedef struct {
     uint32_t DataStart;
     uint32_t DataLength;
 } fat12_t;
+
+// FAT16.
+typedef struct {
+    // Underlying storage device.
+    storage_device_t *Device;
+
+    // Header area.
+    fat_header_t Header;
+
+    // FAT starting sector and length in sectors.
+    uint32_t TableStart;
+    uint32_t TableLength;
+
+    // FAT.
+    uint16_t *Table;
+    uint16_t *TableSpare;
+
+    // Root directory starting sector and length in sectors.
+    uint32_t RootDirectoryStart;
+    uint32_t RootDirectoryLength;
+
+    // Data area starting sector and length in sectors.
+    uint32_t DataStart;
+    uint32_t DataLength;
+} fat16_t;
 
 typedef struct {
     char FileName[11];
@@ -165,7 +195,7 @@ extern bool fat12_get_root_dir(fat12_t *fat, fat_dir_entry_t **outDirEntries, ui
 
 extern void fat12_print_dir(fat12_t *fat, fat_dir_entry_t *directoryEntries, uint32_t directoryEntriesCount, uint32_t level);
 
-extern bool fat_init(storage_device_t *storageDevice);
+extern bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex);
 
 
 #endif
