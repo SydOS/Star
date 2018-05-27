@@ -121,8 +121,16 @@ enum {
 
 #define ATA_PCI_BUSMASTER_STATUS_INTERRUPT  0x04
 
+struct ata_channel_t;
 
-// ATA driver structures.
+// ATA device.
+typedef struct {
+    struct ata_channel_t *Channel;
+    bool Master;
+    uint16_t BytesPerSector;
+} ata_device_t;
+
+// ATA channel.
 typedef struct {
     uint16_t CommandPort;
     uint16_t ControlPort;
@@ -133,12 +141,16 @@ typedef struct {
     uint16_t BusMasterCommandPort;
     uint16_t BusMasterStatusPort;
     uint16_t BusMasterPrdt;
+
+    ata_device_t *MasterDevice;
+    ata_device_t *SlaveDevice;
 } ata_channel_t;
 
+// ATA controller.
 typedef struct {
-    ata_channel_t Primary;
-    ata_channel_t Secondary;
-} ata_device_t;
+    ata_channel_t *Primary;
+    ata_channel_t *Secondary;
+} ata_controller_t;
 
 typedef struct {
     bool Error : 1;

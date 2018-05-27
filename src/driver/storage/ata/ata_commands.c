@@ -239,14 +239,14 @@ int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t 
     return ata_check_status(channel, master);
 }
 
-int16_t ata_read_sector(ata_channel_t *channel, bool master, uint64_t startSectorLba, void *outData, uint32_t length) {
+int16_t ata_read_sector(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length) {
     // Get sectors.
-    uint32_t sectorCount = DIVIDE_ROUND_UP(length, ATA_SECTOR_SIZE_512);
+    uint32_t sectorCount = DIVIDE_ROUND_UP(length, ataDevice->BytesPerSector);
 
     // If above 256 sectors, cap at 256 sectors.
     if (sectorCount > 256) {
         sectorCount = 0;
-        length = ATA_SECTOR_SIZE_512 * 256;
+        length = ataDevice->BytesPerSector * 256;
     }
     else if (sectorCount == 256) {
         // If 256 sectors, sector count is to be zero.
@@ -254,17 +254,17 @@ int16_t ata_read_sector(ata_channel_t *channel, bool master, uint64_t startSecto
     }
 
     // Send READ SECTOR command.
-    ata_set_lba_high(channel, (uint8_t)((startSectorLba >> 24) & 0x0F));
-    ata_send_command(channel, (uint8_t)sectorCount, (uint8_t)(startSectorLba & 0xFF),
+    ata_set_lba_high(ataDevice->Channel, (uint8_t)((startSectorLba >> 24) & 0x0F));
+    ata_send_command(ataDevice->Channel, (uint8_t)sectorCount, (uint8_t)(startSectorLba & 0xFF),
         (uint8_t)((startSectorLba >> 8) & 0xFF), (uint8_t)((startSectorLba >> 16) & 0xFF), ATA_CMD_READ_SECTOR);
 
     // Wait for device.
-    if (!ata_wait_for_drq(channel))
-       return ata_check_status(channel, master);
+    if (!ata_wait_for_drq(ataDevice->Channel))
+       return ata_check_status(ataDevice->Channel, ataDevice->Master);
 
     // Read data.
-    ata_read_data_pio(channel, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512, outData, length);
-    return ata_check_status(channel, master);
+    ata_read_data_pio(ataDevice->Channel, (sectorCount == 0 ? 256 : sectorCount) * ataDevice->BytesPerSector, outData, length);
+    return ata_check_status(ataDevice->Channel, ataDevice->Master);
 }
 
 int16_t ata_read_sector_ext(ata_channel_t *channel, bool master, uint64_t startSectorLba, void *outData, uint16_t sectorCount) {

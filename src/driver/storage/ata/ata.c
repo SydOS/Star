@@ -26,6 +26,7 @@
 #include <tools.h>
 #include <io.h>
 #include <kprint.h>
+#include <string.h>
 #include <driver/storage/ata/ata.h>
 #include <driver/storage/ata/ata_commands.h>
 #include <kernel/interrupts/irqs.h>
@@ -73,26 +74,26 @@ static bool ata_callback_pci(pci_device_t *device) {
     // Is the interrupt bit in the PCI status register set?
     if (pci_config_read_word(device, PCI_REG_STATUS) & ATA_PCI_STATUS_INTERRUPT) {
         kprintf("ATA: PCI interrupt raised!\n");
-        ata_device_t *ataDevice = (ata_device_t*)device->DriverObject;
+        ata_controller_t *ataController = (ata_controller_t*)device->DriverObject;
 
         // Is busmastering enabled on primary channel?
-        if (ataDevice->Primary.BusMasterCapable) {
+        if (ataController->Primary->BusMasterCapable) {
             // Check if interrupt bit is set.
-            if (inb(ataDevice->Primary.BusMasterStatusPort) & ATA_PCI_BUSMASTER_STATUS_INTERRUPT)
-                ataDevice->Primary.InterruptTriggered = true;
+            if (inb(ataController->Primary->BusMasterStatusPort) & ATA_PCI_BUSMASTER_STATUS_INTERRUPT)
+                ataController->Primary->InterruptTriggered = true;
 
             // Reset interrupt bit.
-            outb(ataDevice->Primary.BusMasterStatusPort, ATA_PCI_BUSMASTER_STATUS_INTERRUPT);
+            outb(ataController->Primary->BusMasterStatusPort, ATA_PCI_BUSMASTER_STATUS_INTERRUPT);
         }
 
         // Is busmastering enabled on secondary channel?
-        if (ataDevice->Secondary.BusMasterCapable) {
+        if (ataController->Secondary->BusMasterCapable) {
             // Check if interrupt bit is set.
-            if (inb(ataDevice->Secondary.BusMasterStatusPort) & ATA_PCI_BUSMASTER_STATUS_INTERRUPT)
-                ataDevice->Secondary.InterruptTriggered = true;
+            if (inb(ataController->Secondary->BusMasterStatusPort) & ATA_PCI_BUSMASTER_STATUS_INTERRUPT)
+                ataController->Secondary->InterruptTriggered = true;
 
             // Reset interrupt bit.
-            outb(ataDevice->Secondary.BusMasterStatusPort, ATA_PCI_BUSMASTER_STATUS_INTERRUPT);
+            outb(ataController->Secondary->BusMasterStatusPort, ATA_PCI_BUSMASTER_STATUS_INTERRUPT);
         }
 
         // Interrupt is handled.
@@ -436,96 +437,98 @@ static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t p
     // Get offset into partition.
     if (partitionIndex != PARTITION_NONE)
         startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
-    ata_read_sector((ata_channel_t*)storageDevice->Device, true, startSector, outBuffer, length);
+    ata_read_sector((ata_device_t*)storageDevice->Device, startSector, outBuffer, length);
 }
 
 bool ata_init(pci_device_t *pciDevice) {
     // Is the PCI device an ATA controller?
     if (!(pciDevice->Class == PCI_CLASS_MASS_STORAGE && pciDevice->Subclass == PCI_SUBCLASS_MASS_STORAGE_IDE))
         return false;
-
     kprintf("ATA: Initializing controller on PCI bus %u device %u function %u...\n", pciDevice->Bus, pciDevice->Device, pciDevice->Function);
 
-    // Create ATA device object.
-    ata_device_t *ataDevice = (ata_device_t*)kheap_alloc(sizeof(ata_device_t));
-    memset(ataDevice, 0, sizeof(ata_device_t));
-    pciDevice->DriverObject = ataDevice;
+    // Create ATA controller object.
+    ata_controller_t *ataController = (ata_controller_t*)kheap_alloc(sizeof(ata_controller_t));
+    ataController->Primary = (ata_channel_t*)kheap_alloc(sizeof(ata_channel_t));
+    memset(ataController->Primary, 0, sizeof(ata_channel_t));
+    ataController->Secondary = (ata_channel_t*)kheap_alloc(sizeof(ata_channel_t));
+    memset(ataController->Secondary, 0, sizeof(ata_channel_t));
+    pciDevice->DriverObject = ataController;
     pciDevice->InterruptHandler = ata_callback_pci;
 
     // Get contents of programming interface.
-    uint8_t pi = pci_config_read_byte(pciDevice, PCI_REG_PROG_IF);
+    uint8_t progIf = pci_config_read_byte(pciDevice, PCI_REG_PROG_IF);
 
     // Change into native mode if possible.
-    if (pi & ATA_PCI_PIF_PRI_SUPPORTS_NATIVE)
-        pi |= ATA_PCI_PIF_PRI_NATIVE_MODE;
-    if (pi & ATA_PCI_PIF_SEC_SUPPORTS_NATIVE)
-        pi |= ATA_PCI_PIF_SEC_NATIVE_MODE;
-    pci_config_write_byte(pciDevice, PCI_REG_PROG_IF, pi);
-    pi = pci_config_read_byte(pciDevice, PCI_REG_PROG_IF);
+    if (progIf & ATA_PCI_PIF_PRI_SUPPORTS_NATIVE)
+        progIf |= ATA_PCI_PIF_PRI_NATIVE_MODE;
+    if (progIf & ATA_PCI_PIF_SEC_SUPPORTS_NATIVE)
+        progIf |= ATA_PCI_PIF_SEC_NATIVE_MODE;
+    pci_config_write_byte(pciDevice, PCI_REG_PROG_IF, progIf);
+    progIf = pci_config_read_byte(pciDevice, PCI_REG_PROG_IF);
 
     // Get info.
-    kprintf("ATA: Primary channel mode: %s\n", pi & ATA_PCI_PIF_PRI_NATIVE_MODE ? "native" : "compatibility");
-    kprintf("ATA: Secondary channel mode: %s\n", pi & ATA_PCI_PIF_SEC_NATIVE_MODE ? "native" : "compatibility");
+    kprintf("ATA: Primary channel mode: %s\n", progIf & ATA_PCI_PIF_PRI_NATIVE_MODE ? "native" : "compatibility");
+    kprintf("ATA: Secondary channel mode: %s\n", progIf & ATA_PCI_PIF_SEC_NATIVE_MODE ? "native" : "compatibility");
 
     // Get primary channel ports.
-    if ((pi & ATA_PCI_PIF_PRI_NATIVE_MODE) && pciDevice->BaseAddresses[0].PortMapped && pciDevice->BaseAddresses[0].BaseAddress != 0
+    if ((progIf & ATA_PCI_PIF_PRI_NATIVE_MODE) && pciDevice->BaseAddresses[0].PortMapped && pciDevice->BaseAddresses[0].BaseAddress != 0
         && pciDevice->BaseAddresses[1].PortMapped && pciDevice->BaseAddresses[1].BaseAddress != 0) {
-        ataDevice->Primary.CommandPort = (uint16_t)(pciDevice->BaseAddresses[0].BaseAddress);
-        ataDevice->Primary.ControlPort = (uint16_t)(pciDevice->BaseAddresses[1].BaseAddress);
-        ataDevice->Primary.Interrupt = pciDevice->InterruptLine;
+        ataController->Primary->CommandPort = (uint16_t)(pciDevice->BaseAddresses[0].BaseAddress);
+        ataController->Primary->ControlPort = (uint16_t)(pciDevice->BaseAddresses[1].BaseAddress);
+        ataController->Primary->Interrupt = pciDevice->InterruptLine;
     }
     else {
         // Use default ISA ports.
-        ataDevice->Primary.CommandPort = ATA_PRI_COMMAND_PORT;
-        ataDevice->Primary.ControlPort = ATA_PRI_CONTROL_PORT;
-        ataDevice->Primary.Interrupt = IRQ_PRI_ATA;
-        isaPrimary = &ataDevice->Primary;
+        ataController->Primary->CommandPort = ATA_PRI_COMMAND_PORT;
+        ataController->Primary->ControlPort = ATA_PRI_CONTROL_PORT;
+        ataController->Primary->Interrupt = IRQ_PRI_ATA;
+        isaPrimary = ataController->Primary;
         irqs_install_handler(IRQ_PRI_ATA, ata_callback_isa);
     }
-    ataDevice->Primary.InterruptTriggered = false;
+    ataController->Primary->InterruptTriggered = false;
 
     // Get secondary channel ports.
-    if ((pi & ATA_PCI_PIF_SEC_NATIVE_MODE) && pciDevice->BaseAddresses[2].PortMapped && pciDevice->BaseAddresses[2].BaseAddress != 0
+    if ((progIf & ATA_PCI_PIF_SEC_NATIVE_MODE) && pciDevice->BaseAddresses[2].PortMapped && pciDevice->BaseAddresses[2].BaseAddress != 0
         && pciDevice->BaseAddresses[3].PortMapped && pciDevice->BaseAddresses[3].BaseAddress != 0) {
-        ataDevice->Secondary.CommandPort = (uint16_t)(pciDevice->BaseAddresses[2].BaseAddress);
-        ataDevice->Secondary.ControlPort = (uint16_t)(pciDevice->BaseAddresses[3].BaseAddress);
-        ataDevice->Secondary.Interrupt = pciDevice->InterruptLine;
+        ataController->Secondary->CommandPort = (uint16_t)(pciDevice->BaseAddresses[2].BaseAddress);
+        ataController->Secondary->ControlPort = (uint16_t)(pciDevice->BaseAddresses[3].BaseAddress);
+        ataController->Secondary->Interrupt = pciDevice->InterruptLine;
     }
     else {
         // Use default ISA ports.
-        ataDevice->Secondary.CommandPort = ATA_SEC_COMMAND_PORT;
-        ataDevice->Secondary.ControlPort = ATA_SEC_CONTROL_PORT;
-        ataDevice->Secondary.Interrupt = IRQ_SEC_ATA;
-        isaSecondary = &ataDevice->Secondary;
+        ataController->Secondary->CommandPort = ATA_SEC_COMMAND_PORT;
+        ataController->Secondary->ControlPort = ATA_SEC_CONTROL_PORT;
+        ataController->Secondary->Interrupt = IRQ_SEC_ATA;
+        isaSecondary = ataController->Secondary;
         irqs_install_handler(IRQ_SEC_ATA, ata_callback_isa);
     }
-    ataDevice->Secondary.InterruptTriggered = false;
+    ataController->Secondary->InterruptTriggered = false;
 
     // Print ports.
-    kprintf("ATA: Primary channel ports: 0x%X and 0x%X\n", ataDevice->Primary.CommandPort, ataDevice->Primary.ControlPort);
-    kprintf("ATA: Secondary channel ports: 0x%X and 0x%X\n", ataDevice->Secondary.CommandPort, ataDevice->Secondary.ControlPort);
-    kprintf("ATA: Primary channel IRQ: IRQ%u, Secondary: IRQ%u\n", ataDevice->Primary.Interrupt, ataDevice->Secondary.Interrupt);
+    kprintf("ATA: Primary channel ports: 0x%X and 0x%X\n", ataController->Primary->CommandPort, ataController->Primary->ControlPort);
+    kprintf("ATA: Secondary channel ports: 0x%X and 0x%X\n", ataController->Secondary->CommandPort, ataController->Secondary->ControlPort);
+    kprintf("ATA: Primary channel IRQ: IRQ%u, Secondary: IRQ%u\n", ataController->Primary->Interrupt, ataController->Secondary->Interrupt);
 
     // Get bus master info.
-    if ((pi & ATA_PCI_PIF_BUSMASTER) && pciDevice->BaseAddresses[4].PortMapped) {
+    if ((progIf & ATA_PCI_PIF_BUSMASTER) && pciDevice->BaseAddresses[4].PortMapped) {
         kprintf("ATA: Bus Master supported.\n");
-        ataDevice->Primary.BusMasterCapable = true;
-        ataDevice->Secondary.BusMasterCapable = true;
+        ataController->Primary->BusMasterCapable = true;
+        ataController->Secondary->BusMasterCapable = true;
 
         // Get busmaster ports.
         uint16_t busMasterBase = (uint16_t)(pciDevice->BaseAddresses[4].BaseAddress);
-        ataDevice->Primary.BusMasterCommandPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRICMD;
-        ataDevice->Primary.BusMasterStatusPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRISTATUS;
-        ataDevice->Primary.BusMasterPrdt = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRIPRDT;
-        ataDevice->Secondary.BusMasterCommandPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECCMD;
-        ataDevice->Secondary.BusMasterStatusPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECSTATUS;
-        ataDevice->Secondary.BusMasterPrdt = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECPRDT;
+        ataController->Primary->BusMasterCommandPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRICMD;
+        ataController->Primary->BusMasterStatusPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRISTATUS;
+        ataController->Primary->BusMasterPrdt = busMasterBase + ATA_PCI_BUSMASTER_PORT_PRIPRDT;
+        ataController->Secondary->BusMasterCommandPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECCMD;
+        ataController->Secondary->BusMasterStatusPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECSTATUS;
+        ataController->Secondary->BusMasterPrdt = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECPRDT;
     }
 
     // Reset and identify both channels.
     kprintf("ATA: Resetting channels...\n");
-    ata_reset_identify(&ataDevice->Primary);
-    ata_reset_identify(&ataDevice->Secondary);
+    ata_reset_identify(ataController->Primary);
+    ata_reset_identify(ataController->Secondary);
     kprintf("ATA: Initialized!\n");
   //  return true;
 
@@ -533,16 +536,22 @@ bool ata_init(pci_device_t *pciDevice) {
     // ===== DEMO ======
     // Select masters on channels.
     kprintf("ATA: Selecting masters....\n");
-    ata_select_device(&ataDevice->Primary, true);
-    ata_select_device(&ataDevice->Secondary, true);
+    ata_select_device(ataController->Primary, true);
+    ata_select_device(ataController->Secondary, true);
     uint8_t *data = (uint8_t*)kheap_alloc(ATA_SECTOR_SIZE_512);
+
+    // Temporary.
+    ataController->Primary->MasterDevice = (ata_device_t*)kheap_alloc(sizeof(ata_device_t));
+    ataController->Primary->MasterDevice->Channel = ataController->Primary;
+    ataController->Primary->MasterDevice->Master = true;
+    ataController->Primary->MasterDevice->BytesPerSector = ATA_SECTOR_SIZE_512;
 
     // Register storage device.
     storage_device_t *ataPriStorageDevice = (storage_device_t*)kheap_alloc(sizeof(storage_device_t));
     memset(ataPriStorageDevice, 0, sizeof(storage_device_t));
-    ataPriStorageDevice->Device = &ataDevice->Primary;
+    ataPriStorageDevice->Device = ataController->Primary->MasterDevice;
 
-    ataPriStorageDevice->Read = ata_storage_read;
+    //ataPriStorageDevice->Read = ata_storage_read;
     ataPriStorageDevice->ReadSectors = ata_storage_read_sectors;
    // floppyStorageDevice->ReadBlocks = floppy_storage_read_blocks;
     //storage_register(floppyStorageDevice);

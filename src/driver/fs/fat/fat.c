@@ -74,9 +74,9 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
         // Get root dir.
         fat_dir_entry_t *rootDirEntries;
         uint32_t rootDirEntriesCount = 0;
-        fat16_get_root_dir(fat16Volume, &rootDirEntries, &rootDirEntriesCount);
-        fat16_print_dir(fat16Volume, rootDirEntries, rootDirEntriesCount, 0);
-        kheap_free(rootDirEntries);
+       //fat16_get_root_dir(fat16Volume, &rootDirEntries, &rootDirEntriesCount);
+        //fat16_print_dir(fat16Volume, rootDirEntries, rootDirEntriesCount, 0);
+       // kheap_free(rootDirEntries);
         kheap_free(fat16Volume->Table);
         kheap_free(fat16Volume);
     }
