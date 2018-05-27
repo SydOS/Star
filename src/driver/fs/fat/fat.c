@@ -38,11 +38,11 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     // Get header in first sector.
     fat_header_t *fatHeader = (fat_header_t*)kheap_alloc(sizeof(fat_header_t));
     memset(fatHeader, 0, sizeof(fat_header_t));
-    storageDevice->ReadSectors(storageDevice, partitionIndex, 0, 1, fatHeader, sizeof(fat_header_t));
+    storageDevice->ReadSectors(storageDevice, partitionIndex, 0, fatHeader, sizeof(fat_header_t));
 
     // Get first sector of FAT.
     uint64_t fatVersion = 0;
-    storageDevice->ReadSectors(storageDevice, partitionIndex, fatHeader->BPB.ReservedSectorsCount, 1, &fatVersion, sizeof(fatVersion));
+    storageDevice->ReadSectors(storageDevice, partitionIndex, fatHeader->BPB.ReservedSectorsCount, &fatVersion, sizeof(fatVersion));
     uint8_t fatDriveType = fatVersion & 0xFF;
 
     // Determine signature.
@@ -64,6 +64,21 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
 
         // Print info.
         fat16_print_info(fat16Volume);
+
+        // Get the FATs.
+        uint32_t fat16ClustersLength = fat16Volume->TableLength * fat16Volume->Header.BPB.BytesPerSector;
+        fat16Volume->Table = (uint16_t*)kheap_alloc(fat16ClustersLength);
+        memset(fat16Volume->Table, 0, fat16ClustersLength);
+        storageDevice->ReadSectors(storageDevice, partitionIndex, fat16Volume->TableStart, fat16Volume->Table, fat16ClustersLength);
+
+        // Get root dir.
+        fat_dir_entry_t *rootDirEntries;
+        uint32_t rootDirEntriesCount = 0;
+        fat16_get_root_dir(fat16Volume, &rootDirEntries, &rootDirEntriesCount);
+        fat16_print_dir(fat16Volume, rootDirEntries, rootDirEntriesCount, 0);
+        kheap_free(rootDirEntries);
+        kheap_free(fat16Volume->Table);
+        kheap_free(fat16Volume);
     }
     else if ((fatVersion & FAT_VERSION_MASK_FAT12) == FAT_VERSION_MASK_FAT12) {
         // FAT12.

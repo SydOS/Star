@@ -432,11 +432,11 @@ static bool ata_storage_read(storage_device_t *storageDevice, uint64_t startByte
     //ata_read_sector((ata_channel_t*)storageDevice->Device, true, 0, outBuffer, 1);
 }
 
-static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t partitionIndex, uint64_t startSector, uint32_t sectorCount, uint8_t *outBuffer, uint32_t length) {
+static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t partitionIndex, uint64_t startSector, uint8_t *outBuffer, uint32_t length) {
     // Get offset into partition.
     if (partitionIndex != PARTITION_NONE)
         startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
-    ata_read_sector((ata_channel_t*)storageDevice->Device, true, startSector, sectorCount, outBuffer, length);
+    ata_read_sector((ata_channel_t*)storageDevice->Device, true, startSector, outBuffer, length);
 }
 
 bool ata_init(pci_device_t *pciDevice) {

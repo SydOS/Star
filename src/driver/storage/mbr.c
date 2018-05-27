@@ -40,7 +40,7 @@ void mbr_print(mbr_t *mbr) {
 bool mbr_init(storage_device_t *storageDevice) {
     // Get MBR.
     mbr_t *mbr = (mbr_t*)kheap_alloc(sizeof(mbr_t));
-    storageDevice->ReadSectors(storageDevice, PARTITION_NONE, 0, 1, mbr, sizeof(mbr_t));
+    storageDevice->ReadSectors(storageDevice, PARTITION_NONE, 0, mbr, sizeof(mbr_t));
 
     // Get number of partitions.
     uint16_t numPartitions = 0;

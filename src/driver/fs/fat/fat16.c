@@ -50,3 +50,19 @@ void fat16_print_info(fat16_t *fat16Volume) {
     kprintf("FAT:   Data start: sector %u | Length: %u sectors\n", fat16Volume->DataStart, fat16Volume->DataLength);
     kprintf("FAT:   Total sectors: %u\n", totalSectors);
 }
+
+/**
+ * Gets the total number of FAT12 clusters.
+ */
+static inline uint32_t fat16_get_num_clusters(fat16_t *fat, fat_dir_entry_t *entry) {
+    // Get clusters.
+    uint16_t cluster = entry->StartClusterLow;
+    uint32_t clusterCount = 0;
+    while (cluster >= 0x002 && cluster <= 0xFEF) {
+        // Get value of next cluster from FAT.
+        cluster = fat->Table[cluster / 2];
+        clusterCount++;
+    }
+
+    return clusterCount;
+}

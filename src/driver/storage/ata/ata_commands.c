@@ -24,6 +24,7 @@
 
 #include <main.h>
 #include <io.h>
+#include <math.h>
 #include <driver/storage/ata/ata.h>
 #include <driver/storage/ata/ata_commands.h>
 
@@ -238,10 +239,23 @@ int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t 
     return ata_check_status(channel, master);
 }
 
-int16_t ata_read_sector(ata_channel_t *channel, bool master, uint64_t startSectorLba, uint32_t sectorCount, void *outData, uint32_t length) {
+int16_t ata_read_sector(ata_channel_t *channel, bool master, uint64_t startSectorLba, void *outData, uint32_t length) {
+    // Get sectors.
+    uint32_t sectorCount = DIVIDE_ROUND_UP(length, ATA_SECTOR_SIZE_512);
+
+    // If above 256 sectors, cap at 256 sectors.
+    if (sectorCount > 256) {
+        sectorCount = 0;
+        length = ATA_SECTOR_SIZE_512 * 256;
+    }
+    else if (sectorCount == 256) {
+        // If 256 sectors, sector count is to be zero.
+        sectorCount = 0;
+    }
+
     // Send READ SECTOR command.
     ata_set_lba_high(channel, (uint8_t)((startSectorLba >> 24) & 0x0F));
-    ata_send_command(channel, sectorCount, (uint8_t)(startSectorLba & 0xFF),
+    ata_send_command(channel, (uint8_t)sectorCount, (uint8_t)(startSectorLba & 0xFF),
         (uint8_t)((startSectorLba >> 8) & 0xFF), (uint8_t)((startSectorLba >> 16) & 0xFF), ATA_CMD_READ_SECTOR);
 
     // Wait for device.
