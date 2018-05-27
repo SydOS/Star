@@ -32,6 +32,25 @@
 #include <driver/storage/floppy.h>
 #include <kernel/storage/storage.h>
 
+void fat12_print_info(fat12_t *fat12Volume) {
+    // Null terminate volume label and FS name.
+    char tempVolName[12];
+    strncpy(tempVolName, fat12Volume->Header.VolumeLabel, 11);
+    tempVolName[11] = '\0';
+    char fatType[9];
+    strncpy(fatType, fat12Volume->Header.FileSystemType, 8);
+    fatType[8] = '\0';
+
+    // Print info.
+    uint32_t totalSectors = fat12Volume->Header.BPB.TotalSectors == 0 ? fat12Volume->Header.BPB.TotalSectors32 : fat12Volume->Header.BPB.TotalSectors;
+    kprintf("FAT: Volume \"%s\" | %u bytes | %u bytes per cluster\n", tempVolName, totalSectors * fat12Volume->Header.BPB.BytesPerSector, fat12Volume->Header.BPB.BytesPerSector * fat12Volume->Header.BPB.SectorsPerCluster);
+    kprintf("FAT:   FAT type: %s | Serial number: 0x%X\n", fatType, fat12Volume->Header.SerialNumber);
+    kprintf("FAT:   FAT start: sector %u | Length: %u sectors\n", fat12Volume->TableStart, fat12Volume->TableLength);
+    kprintf("FAT:   Root Dir start: sector %u | Length: %u sectors\n", fat12Volume->RootDirectoryStart, fat12Volume->RootDirectoryLength);
+    kprintf("FAT:   Data start: sector %u | Length: %u sectors\n", fat12Volume->DataStart, fat12Volume->DataLength);
+    kprintf("FAT:   Total sectors: %u\n", totalSectors);
+}
+
 /**
  * Gets the next FAT12 cluster in the specified chain.
  * @clusters    The array of clusters to pull from.
@@ -83,7 +102,7 @@ bool fat12_entry_read(fat12_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, 
         uint16_t nextCluster = fat12_get_cluster(fat->Table, cluster);
 
         // Add cluster to block list.
-        blocks[offset] = (fat->DataStart + cluster - 2) * bytesPerCluster;
+        blocks[offset] = fat->DataStart + cluster - 2;
 
         offset++;
         cluster = nextCluster;
@@ -143,7 +162,7 @@ bool fat12_get_root_dir(fat12_t *fat, fat_dir_entry_t **outDirEntries, uint32_t 
     memset(rootDirEntries, 0, rootDirLength);
 
     // Read from storage.
-    bool result = fat->Device->Read(fat->Device, fat->RootDirectoryStart * fat->Header.BPB.BytesPerSector, rootDirEntries, rootDirLength);
+    bool result = fat->Device->ReadSectors(fat->Device, fat->PartitionIndex, fat->RootDirectoryStart, rootDirEntries, rootDirLength);
     if (!result) {
         kheap_free(rootDirEntries);
         return false;

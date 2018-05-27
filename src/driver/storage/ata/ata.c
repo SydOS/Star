@@ -438,6 +438,7 @@ static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t p
     if (partitionIndex != PARTITION_NONE)
         startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
     ata_read_sector((ata_device_t*)storageDevice->Device, startSector, outBuffer, length);
+    return true;
 }
 
 bool ata_init(pci_device_t *pciDevice) {

@@ -113,6 +113,7 @@ typedef struct {
 typedef struct {
     // Underlying storage device.
     storage_device_t *Device;
+    uint16_t PartitionIndex;
 
     // Header area.
     fat_header_t Header;
@@ -138,6 +139,7 @@ typedef struct {
 typedef struct {
     // Underlying storage device.
     storage_device_t *Device;
+    uint16_t PartitionIndex;
 
     // Header area.
     fat_header_t Header;
@@ -189,6 +191,7 @@ typedef struct {
 } __attribute__((packed)) fat_dir_entry_t;
 
 // FAT12.
+extern void fat12_print_info(fat12_t *fat12Volume);
 extern bool fat12_entry_read(fat12_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, uint32_t length);
 extern bool fat12_get_dir(fat12_t *fat, fat_dir_entry_t *directory, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount);
 extern bool fat12_get_root_dir(fat12_t *fat, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount);

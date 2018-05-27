@@ -27,6 +27,7 @@
 #include <io.h>
 #include <kprint.h>
 #include <string.h>
+#include <math.h>
 #include <driver/storage/floppy.h>
 
 #include <kernel/storage/storage.h>
@@ -488,7 +489,7 @@ bool floppy_read_blocks(floppy_drive_t *floppyDrive, const uint64_t *blocks, uin
 	uint16_t lastTrack = -1;
 	for (uint32_t block = 0; block < blockCount; block++) {
 		for (uint32_t sectorOffset = 0; sectorOffset < blockSize; sectorOffset++) {
-			uint32_t sectorLba = (blocks[block] / 512) + sectorOffset;
+			uint32_t sectorLba = blocks[block] + sectorOffset;
 
 			// Convert LBA to CHS.
 			uint16_t head = 0, track = 0, sector = 1;
@@ -522,12 +523,74 @@ bool floppy_read_blocks(floppy_drive_t *floppyDrive, const uint64_t *blocks, uin
 	return true;
 }
 
+bool floppy_read_sectors(floppy_drive_t *floppyDrive, uint32_t sectorLba, uint8_t *outBuffer, uint32_t length) {
+	// Ensure drive is valid.
+	if (floppyDrive->Number >= 4)
+		return false;
+
+	// Turn on motor.
+	floppy_motor_on(floppyDrive);
+
+	// Get each block.
+	uint32_t remainingLength = length;
+	uint32_t bufferOffset = 0;
+	uint16_t lastTrack = -1;
+
+	// Determine number of sectors.
+	uint32_t totalSectors = DIVIDE_ROUND_UP(length, 512); // TODO change.
+
+	for (uint32_t i = 0; i < totalSectors; i++) {
+		// Convert LBA to CHS.
+		uint16_t head = 0, track = 0, sector = 1;
+		floppy_lba_to_chs(sectorLba, &track, &head, &sector);
+
+		// Have we changed tracks?.
+		if (lastTrack != track) {
+			if (lastTrack != track && !floppy_seek(floppyDrive, track)) {
+				floppy_motor_off(floppyDrive);
+				return false;
+			}
+
+			// Get track.
+			lastTrack = track;
+			floppy_read_track(floppyDrive, track);
+		}
+
+		uint32_t size = remainingLength;
+		if (size > 512)
+			size = 512;
+
+		// Copy data.
+		uint32_t headOffset = head == 1 ? (18 * 512) : 0;
+		memcpy(outBuffer + bufferOffset, floppyDrive->DmaBuffer + ((sector - 1) * 512) + headOffset, size);
+
+		// Move to next sector.
+		sectorLba++;
+		remainingLength -= size;
+		bufferOffset += 512;
+	}
+
+
+	floppy_motor_off(floppyDrive);
+	return true;
+}
+
 static bool floppy_storage_read(storage_device_t *storageDevice, uint64_t startByte, uint8_t *outBuffer, uint32_t length) {
 	return floppy_read_blocks((floppy_drive_t*)storageDevice->Device, &startByte, 1, 1, outBuffer, length);
 }
 
 static bool floppy_storage_read_blocks(storage_device_t *storageDevice, const uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length) {
 	return floppy_read_blocks((floppy_drive_t*)storageDevice->Device, blocks, blockSize, blockCount, outBuffer, length);
+}
+
+static bool floppy_storage_read_sectors(storage_device_t *storageDevice, uint16_t partitionIndex, uint64_t startSector, uint8_t *outBuffer, uint32_t length) {
+
+
+	// Determine number 
+
+	floppy_read_sectors((floppy_drive_t*)storageDevice->Device, startSector, outBuffer, length);
+
+	//return floppy_read_blocks((floppy_drive_t*)storageDevice->Device, blocks, blockSize, blockCount, outBuffer, length);
 }
 
 static void floppy_drive_init(floppy_drive_t *floppyDrive) {
@@ -608,6 +671,7 @@ bool floppy_init(void) {
 
 		floppyStorageDevice->Read = floppy_storage_read;
 		floppyStorageDevice->ReadBlocks = floppy_storage_read_blocks;
+		floppyStorageDevice->ReadSectors = floppy_storage_read_sectors;
 		storage_register(floppyStorageDevice);
 	}
 
