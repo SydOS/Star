@@ -141,7 +141,7 @@ void ata_read_data_pio(ata_channel_t *channel, uint32_t size, void *outData, uin
     // Read words from device.
     for (uint32_t i = 0; i < size; i += 2) {
         uint16_t value = inw(ATA_REG_DATA(channel->CommandPort));
-        if (i <= length)
+        if (i < length)
             buffer[i / 2] = value;
     }
 }
@@ -285,7 +285,7 @@ bool ata_wait_for_drq(ata_channel_t *channel) {
 }
 
 static void ata_print_device_info(ata_identify_result_t info) {
-    kprintf("ATA:    Model: %s\n", info.model);
+    /*kprintf("ATA:    Model: %s\n", info.model);
     kprintf("ATA:    Firmware: %s\n", info.firmwareRevision);
     kprintf("ATA:    Serial: %s\n", info.serial);
     kprintf("ATA:    ATA versions:");
@@ -320,7 +320,7 @@ static void ata_print_device_info(ata_identify_result_t info) {
     }
     else {
         kprintf("ATA:    Type: PATA\n");
-    }
+    }*/
 }
 
 static void ata_print_device_packet_info(ata_identify_packet_result_t info) {

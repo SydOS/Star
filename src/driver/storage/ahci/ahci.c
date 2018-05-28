@@ -341,8 +341,8 @@ bool ahci_init(pci_device_t *pciDevice) {
     uint16_t *data2Ptr = (uint16_t*)paging_device_alloc(data2Page, data2Page);
     memset(data2Ptr, 0, 0x1000);
 
-    ata_identify_result_2_t* ata = (ata_identify_result_2_t*)dataPtr;
-    uint32_t fff = sizeof(ata_identify_result_2_t);
+    ata_identify_result_t* ata = (ata_identify_result_t*)dataPtr;
+    uint32_t fff = sizeof(ata_identify_result_t);
 
     ahci_port_cmd_stop(hddPort);
    /* hddPort->CommandList[0].CommandTableBaseAddress = cmdTablePage;
