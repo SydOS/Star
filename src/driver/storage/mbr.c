@@ -76,6 +76,8 @@ bool mbr_init(storage_device_t *storageDevice) {
         // Determine type.
         if (mbr->Entries[i].Type == MBR_TYPE_FAT12_L32MB || mbr->Entries[i].Type == MBR_TYPE_FAT16 || mbr->Entries[i].Type == MBR_TYPE_FAT16B || mbr->Entries[i].Type == MBR_TYPE_FAT16_LBA)
             storageDevice->PartitionMap->Partitions[p]->FsType = FILESYSTEM_TYPE_FAT;
+        else if (mbr->Entries[i].Type == MBR_TYPE_FAT32_CHS || mbr->Entries[i].Type == MBR_TYPE_FAT32_LBA)
+            storageDevice->PartitionMap->Partitions[p]->FsType = FILESYSTEM_TYPE_FAT32;
 
         // Move to next partition.
         p++;
@@ -85,7 +87,7 @@ bool mbr_init(storage_device_t *storageDevice) {
     part_print_map(storageDevice->PartitionMap);
 
     // Test FAT16.
-    if (storageDevice->PartitionMap->Partitions[0]->FsType == FILESYSTEM_TYPE_FAT) {
-        fat_init(storageDevice, 0);
+    if (storageDevice->PartitionMap->Partitions[2]->FsType == FILESYSTEM_TYPE_FAT32) {
+        fat_init(storageDevice, 2);
     }
 }

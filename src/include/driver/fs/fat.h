@@ -35,8 +35,8 @@
 
 #define FAT12_CLUSTERS_MAX          4084
 #define FAT16_CLUSTERS_MAX          65524
-#define FAT12_CLISTERS_RESERVED     2
-#define FAT16_CLISTERS_RESERVED     2
+#define FAT32_CLUSTERS_MAX          268435444
+#define FAT_CLUSTERS_RESERVED       2
 
 // FAT12 clusters.
 #define FAT12_CLUSTER_FREE          0x000
@@ -48,12 +48,21 @@
 #define FAT12_CLUSTER_EOC2          0xFF0
 
 // FAT16 clusters.
-#define FAT12_CLUSTER_FREE          0x0000
-#define FAT12_CLUSTER_RESERVED      0x0001
-#define FAT12_CLUSTER_DATA_FIRST    0x0002
-#define FAT12_CLUSTER_DATA_LAST     0xFFEF
-#define FAT12_CLUSTER_BAD           0xFFF7
-#define FAT12_CLUSTER_EOC           0xFFF8
+#define FAT16_CLUSTER_FREE          0x0000
+#define FAT16_CLUSTER_RESERVED      0x0001
+#define FAT16_CLUSTER_DATA_FIRST    0x0002
+#define FAT16_CLUSTER_DATA_LAST     0xFFEF
+#define FAT16_CLUSTER_BAD           0xFFF7
+#define FAT16_CLUSTER_EOC           0xFFF8
+
+// FAT32 clusters.
+#define FAT32_CLUSTER_FREE          0x0000000
+#define FAT32_CLUSTER_RESERVED      0x0000001
+#define FAT32_CLUSTER_DATA_FIRST    0x0000002
+#define FAT32_CLUSTER_DATA_LAST     0xFFFFFEF
+#define FAT32_CLUSTER_BAD           0xFFFFFF7
+#define FAT32_CLUSTER_EOC           0xFFFFFF8
+#define FAT32_CLUSTER_MASK          0x0FFFFFFF
 
 #define FAT_TYPE_FAT12  1
 #define FAT_TYPE_FAT16  2
@@ -107,10 +116,8 @@ typedef struct {
     uint32_t TotalSectors32;
 } __attribute__((packed)) fat_bpb_header_t;
 
+// Extended BIOS Parameter Block.
 typedef struct {
-    // BIOS Parameter Block.
-    fat_bpb_header_t BPB;
-    
     // Physical drive number.
     uint8_t DriveNumber;
 
@@ -128,64 +135,38 @@ typedef struct {
 
     // Type of FAT, should be used for display only.
     char FileSystemType[8];
-} __attribute__((packed)) fat_header_t;
+} __attribute__((packed)) fat_ebpb_header_t;
+
+// FAT32 Extended BIOS Parameter Block.
+typedef struct {
+    // Logical sectors per file allocation table.
+    uint32_t TableSize32;
+
+    // Drive description.
+    uint16_t DriveDescription;
+
+    // Version.
+    uint16_t Version;
+
+    // Root directory cluster.
+    uint32_t RootDirectoryCluster;
+
+    // Sector where the FS info sector resides.
+    uint16_t FsInfoSector;
+
+    uint16_t FirstBootSector;
+
+    // Reserved.
+    uint8_t Reserved[12];
+} __attribute__((packed)) fat32_ebpb_header_t;
+
+#define FAT_HEADER_SECTOR       0
+#define FAT_HEADER_SIZE_MAX     (sizeof(fat_bpb_header_t) + sizeof(fat_ebpb_header_t) + sizeof(fat32_ebpb_header_t))
 
 typedef struct {
     uint16_t Cluster1 : 12;
     uint16_t Cluster2 : 12;
 } __attribute__((packed)) fat12_cluster_pair_t;
-
-// FAT12.
-typedef struct {
-    // Underlying storage device.
-    storage_device_t *Device;
-    uint16_t PartitionIndex;
-
-    // Header area.
-    fat_header_t Header;
-
-    // FAT starting sector and length in sectors.
-    uint32_t TableStart;
-    uint32_t TableLength;
-
-    // FAT.
-    fat12_cluster_pair_t *Table;
-    fat12_cluster_pair_t *TableSpare;
-
-    // Root directory starting sector and length in sectors.
-    uint32_t RootDirectoryStart;
-    uint32_t RootDirectoryLength;
-
-    // Data area starting sector and length in sectors.
-    uint32_t DataStart;
-    uint32_t DataLength;
-} fat12_t;
-
-// FAT16.
-typedef struct {
-    // Underlying storage device.
-    storage_device_t *Device;
-    uint16_t PartitionIndex;
-
-    // Header area.
-    fat_header_t Header;
-
-    // FAT starting sector and length in sectors.
-    uint32_t TableStart;
-    uint32_t TableLength;
-
-    // FAT.
-    uint16_t *Table;
-    uint16_t *TableSpare;
-
-    // Root directory starting sector and length in sectors.
-    uint32_t RootDirectoryStart;
-    uint32_t RootDirectoryLength;
-
-    // Data area starting sector and length in sectors.
-    uint32_t DataStart;
-    uint32_t DataLength;
-} fat16_t;
 
 // FAT.
 typedef struct {
@@ -194,24 +175,31 @@ typedef struct {
     uint16_t PartitionIndex;
 
     // Header area.
-    fat_header_t *Header;
+    uint8_t *Header;
+
+    // Structs that point to header above.
+    fat_bpb_header_t *BPB;
+    fat_ebpb_header_t *EBPB;
+    fat32_ebpb_header_t *EBPB32;
+
+    // Type of FAT.
     uint8_t Type;
 
     // FAT starting sector and length in sectors.
-    uint64_t TableStart;
-    uint64_t TableLength;
+    uint32_t TableStart;
+    uint32_t TableLength;
 
     // FATs.
     uint8_t *Table;
     uint8_t *TableSpare;
 
      // Root directory starting sector and length in sectors.
-    uint64_t RootDirectoryStart;
-    uint64_t RootDirectoryLength;
+    uint32_t RootDirectoryStart;
+    uint32_t RootDirectoryLength;
 
     // Data area starting sector and length in sectors.
-    uint64_t DataStart;
-    uint64_t DataLength;
+    uint32_t DataStart;
+    uint32_t DataLength;
     uint32_t DataClusters;
 } fat_t;
 
@@ -245,15 +233,7 @@ typedef struct {
 } __attribute__((packed)) fat_dir_entry_t;
 
 // FAT12.
-extern void fat12_print_info(fat12_t *fat12Volume);
-extern bool fat12_entry_read(fat12_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, uint32_t length);
-extern bool fat12_get_dir(fat12_t *fat, fat_dir_entry_t *directory, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount);
-extern bool fat12_get_root_dir(fat12_t *fat, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount);
 
-extern void fat12_print_dir(fat12_t *fat, fat_dir_entry_t *directoryEntries, uint32_t directoryEntriesCount, uint32_t level);
-
-// FAT16.
-extern void fat16_print_info(fat16_t *fat16Volume);
 
 extern bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex);
 
