@@ -579,7 +579,7 @@ static bool floppy_storage_read(storage_device_t *storageDevice, uint64_t startB
 	return floppy_read_blocks((floppy_drive_t*)storageDevice->Device, &startByte, 1, 1, outBuffer, length);
 }
 
-static bool floppy_storage_read_blocks(storage_device_t *storageDevice, const uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length) {
+static bool floppy_storage_read_blocks(storage_device_t *storageDevice, uint16_t partitionIndex, const uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length) {
 	return floppy_read_blocks((floppy_drive_t*)storageDevice->Device, blocks, blockSize, blockCount, outBuffer, length);
 }
 

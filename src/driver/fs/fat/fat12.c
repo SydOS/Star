@@ -110,7 +110,7 @@ bool fat12_entry_read(fat12_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, 
     }
 
     // Read blocks from storage device.
-    bool result = fat->Device->ReadBlocks(fat->Device, blocks, 1, totalClusters, outBuffer, length);
+    bool result = fat->Device->ReadBlocks(fat->Device, fat->PartitionIndex, blocks, 1, totalClusters, outBuffer, length);
 
     // Free cluster list.
     kheap_free(blocks);

@@ -41,7 +41,7 @@ typedef struct storage_device_t {
     void (*Write)(struct storage_device_t *storageDevice, uint64_t startByte, uint32_t count, const uint8_t *data);
     uint64_t (*GetSize)(struct storage_device_t *storageDevice);
 
-    bool (*ReadBlocks)(struct storage_device_t *storageDevice, uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length);
+    bool (*ReadBlocks)(struct storage_device_t *storageDevice, uint16_t partitionIndex, uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length);
 } storage_device_t;
 
 extern storage_device_t *storageDevices;

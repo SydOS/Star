@@ -60,7 +60,7 @@ static inline uint32_t fat16_get_num_clusters(fat16_t *fat, fat_dir_entry_t *ent
     uint32_t clusterCount = 0;
     while (cluster >= 0x002 && cluster <= 0xFEF) {
         // Get value of next cluster from FAT.
-        cluster = fat->Table[cluster / 2];
+        cluster = fat->Table[cluster];
         clusterCount++;
     }
 
@@ -89,7 +89,7 @@ bool fat16_entry_read(fat16_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, 
         uint16_t nextCluster = fat->Table[cluster];
 
         // Add cluster to block list.
-        blocks[offset] = fat->DataStart + cluster - 2;
+        blocks[offset] = fat->DataStart + ((cluster - 2) * fat->Header.BPB.SectorsPerCluster);
 
         offset++;
         cluster = nextCluster;
@@ -97,7 +97,7 @@ bool fat16_entry_read(fat16_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, 
     }
 
     // Read blocks from storage device.
-    bool result = fat->Device->ReadBlocks(fat->Device, blocks, 1, totalClusters, outBuffer, length);
+    bool result = fat->Device->ReadBlocks(fat->Device, fat->PartitionIndex, blocks, fat->Header.BPB.SectorsPerCluster, totalClusters, outBuffer, length);
 
     // Free cluster list.
     kheap_free(blocks);

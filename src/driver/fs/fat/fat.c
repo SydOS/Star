@@ -71,7 +71,7 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
         uint32_t fat16ClustersLength = fat16Volume->TableLength * fat16Volume->Header.BPB.BytesPerSector;
         fat16Volume->Table = (uint16_t*)kheap_alloc(fat16ClustersLength);
         memset(fat16Volume->Table, 0, fat16ClustersLength);
-        storageDevice->ReadSectors(storageDevice, partitionIndex, fat16Volume->TableStart, fat16Volume->Table, 1024);//fat16ClustersLength);
+        storageDevice->ReadSectors(storageDevice, partitionIndex, fat16Volume->TableStart, fat16Volume->Table, fat16ClustersLength);
 
         // Get root dir.
         fat_dir_entry_t *rootDirEntries;

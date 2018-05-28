@@ -96,7 +96,7 @@ int16_t ata_read_sector(ata_device_t *ataDevice, uint64_t startSectorLba, void *
         (uint8_t)((startSectorLba >> 8) & 0xFF), (uint8_t)((startSectorLba >> 16) & 0xFF), ATA_CMD_READ_SECTOR);
 
     // Wait for device.
-    if (!ata_wait_for_drq(ataDevice->Channel))
+    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) == -1 || !ata_wait_for_drq(ataDevice->Channel))
        return ata_check_status(ataDevice->Channel, ataDevice->Master);
 
     // Read data.

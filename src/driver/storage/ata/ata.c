@@ -140,6 +140,11 @@ void ata_read_data_pio(ata_channel_t *channel, uint32_t size, void *outData, uin
 
     // Read words from device.
     for (uint32_t i = 0; i < size; i += 2) {
+        // If moving to the next sector, wait for IRQ.
+        if (i > 0 && (i % 512) == 0) {
+            ata_wait_for_irq(channel, true);
+        }
+
         uint16_t value = inw(ATA_REG_DATA(channel->CommandPort));
         if (i < length)
             buffer[i / 2] = value;
@@ -441,6 +446,29 @@ static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t p
     return true;
 }
 
+static bool ata_storage_read_blocks(storage_device_t *storageDevice, uint16_t partitionIndex, const uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length) {
+    ata_device_t *ataDevice = (ata_device_t*)storageDevice->Device;
+    
+    uint32_t remainingLength = length;
+	uintptr_t bufferOffset = 0;
+
+    // Read each block.
+    for (uint32_t block = 0; block < blockCount; block++) {
+        uint64_t startSector = blocks[block];
+        if (partitionIndex != PARTITION_NONE)
+            startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
+
+        uint32_t size = remainingLength;
+		if (size > (blockSize * ataDevice->BytesPerSector))
+			size = blockSize * ataDevice->BytesPerSector; 
+        ata_read_sector(ataDevice, startSector, outBuffer + bufferOffset, size);
+        remainingLength -= size;
+        bufferOffset += blockSize * ataDevice->BytesPerSector;
+    }
+    return true;
+	//return floppy_read_blocks((floppy_drive_t*)storageDevice->Device, blocks, blockSize, blockCount, outBuffer, length);
+}
+
 bool ata_init(pci_device_t *pciDevice) {
     // Is the PCI device an ATA controller?
     if (!(pciDevice->Class == PCI_CLASS_MASS_STORAGE && pciDevice->Subclass == PCI_SUBCLASS_MASS_STORAGE_IDE))
@@ -553,6 +581,7 @@ bool ata_init(pci_device_t *pciDevice) {
     ataPriStorageDevice->Device = ataController->Primary->MasterDevice;
 
     //ataPriStorageDevice->Read = ata_storage_read;
+    ataPriStorageDevice->ReadBlocks = ata_storage_read_blocks;
     ataPriStorageDevice->ReadSectors = ata_storage_read_sectors;
    // floppyStorageDevice->ReadBlocks = floppy_storage_read_blocks;
     //storage_register(floppyStorageDevice);
