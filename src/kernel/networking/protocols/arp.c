@@ -83,6 +83,14 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 }
 
 arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
+	if (responseFrame == 0x0) {
+		kprintf("ARP: Blank frame\n");
+		// Allocate memory for frame
+		responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
+		// Clear frame with 0s
+		memset(responseFrame, 0, sizeof(arp_frame_t));
+	}
+
 	// Generate global broadcast MAC
 	uint16_t frameSize;
 	uint8_t destMAC[NET_MAC_LENGTH];
@@ -99,7 +107,11 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 
 	// Wait for a reply
 	uint64_t targetTick = timer_ticks() + 2000;
-	while (isWaitingForResponse) {
+	while (isWaitingForResponse &&
+		   responseFrame->SenderIP[0] != targetIP[0] ||
+		   responseFrame->SenderIP[1] != targetIP[1] ||
+		   responseFrame->SenderIP[2] != targetIP[2] ||
+		   responseFrame->SenderIP[3] != targetIP[3]) {
 		if (timer_ticks() >= targetTick) {
 			kprintf("ARP: request timeout\n");
 			// Allocate memory for frame
