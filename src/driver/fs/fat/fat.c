@@ -33,7 +33,188 @@
 #include <driver/storage/floppy.h>
 #include <kernel/storage/storage.h>
 
+static inline uint32_t fat_get_total_sectors(fat_t *fatVolume) {
+    return fatVolume->Header->BPB.TotalSectors == 0 ? fatVolume->Header->BPB.TotalSectors32 : fatVolume->Header->BPB.TotalSectors;
+}
 
+void fat_print_info(fat_t *fatVolume) {
+    // Null terminate volume label and FS name.
+    char tempVolName[12];
+    strncpy(tempVolName, fatVolume->Header->VolumeLabel, 11);
+    tempVolName[11] = '\0';
+    char fatTypeInfo[9];
+    strncpy(fatTypeInfo, fatVolume->Header->FileSystemType, 8);
+    fatTypeInfo[8] = '\0';
+
+    // Determine type.
+    char *fatType = "Unknown";
+    switch (fatVolume->Type) {
+        case FAT_TYPE_FAT12:
+            fatType = "FAT12";
+            break;
+
+        case FAT_TYPE_FAT16:
+            fatType = "FAT16";
+            break;
+
+        case FAT_TYPE_FAT32:
+            fatType = "FAT32";
+            break;
+    }
+
+    // Print info.
+    kprintf("FAT: Volume \"%s\" | %u bytes | %u bytes per cluster\n", tempVolName, fat_get_total_sectors(fatVolume) * fatVolume->Header->BPB.BytesPerSector, fatVolume->Header->BPB.BytesPerSector * fatVolume->Header->BPB.SectorsPerCluster);
+    kprintf("FAT:   FAT type: %s (%s) | Serial number: 0x%X\n", fatType, fatTypeInfo, fatVolume->Header->SerialNumber);
+    kprintf("FAT:   FAT start: sector %u | Length: %u sectors\n", fatVolume->TableStart, fatVolume->TableLength);
+    kprintf("FAT:   Root Dir start: sector %u | Length: %u sectors\n", fatVolume->RootDirectoryStart, fatVolume->RootDirectoryLength);
+    kprintf("FAT:   Data start: sector %u | Length: %u sectors\n", fatVolume->DataStart, fatVolume->DataLength);
+    kprintf("FAT:   Total sectors: %u | Total clusters: %u\n", fat_get_total_sectors(fatVolume), fatVolume->DataClusters);
+}
+
+/**
+ * Gets the next FAT12 cluster in the specified chain.
+ * @clusters    The array of clusters to pull from.
+ * @clusterNum  The index of the cluster.
+ */
+static inline uint16_t fat12_get_cluster(fat12_cluster_pair_t *clusters, uint16_t clusterNum) {
+    // Get low or high part of 24-bit number.
+    if (clusterNum % 2)
+        return clusters[clusterNum / 2].Cluster2;
+    else 
+        return clusters[clusterNum / 2].Cluster1;
+}
+
+bool fat_entry_read(fat_t *fat, fat_dir_entry_t *entry, uint8_t *outBuffer, uint32_t length) {
+    // Ensure length isn't bigger than the entry size, if the entry size isn't zero.
+    if (entry->Length > 0 && length > entry->Length)
+        length = entry->Length;
+
+    // Get the total clusters of the entry.
+    uint16_t bytesPerCluster = fat->Header->BPB.SectorsPerCluster * fat->Header->BPB.BytesPerSector;
+    uint32_t totalClusters = DIVIDE_ROUND_UP(entry->Length > 0 ? entry->Length : length, bytesPerCluster);
+
+    // Create list of clusters.
+    uint64_t *blocks = (uint64_t*)kheap_alloc(totalClusters * sizeof(uint64_t));
+    memset(blocks, 0, totalClusters);
+    uint32_t remainingClusters = totalClusters;
+    uint32_t offset = 0;
+
+    // Get clusters.
+    if (fat->Type == FAT_TYPE_FAT12) {
+        // Get FAT12 clusters.
+        uint16_t cluster = entry->StartClusterLow;
+        while (cluster >= FAT12_CLUSTER_DATA_FIRST && cluster <= FAT12_CLUSTER_DATA_LAST && remainingClusters) {
+            // Get value of next cluster from FAT.
+            uint16_t nextCluster = fat12_get_cluster((fat12_cluster_pair_t*)fat->Table, cluster);
+
+            // Add cluster to block list.
+            blocks[offset] = fat->DataStart + ((cluster - FAT12_CLISTERS_RESERVED)) * fat->Header->BPB.SectorsPerCluster;
+
+            offset++;
+            cluster = nextCluster;
+            remainingClusters--;
+        }
+    }
+    else if (fat->Type == FAT_TYPE_FAT16) {
+        // Get FAT16 clusters.
+        uint16_t cluster = entry->StartClusterLow;
+        while (cluster >= FAT12_CLUSTER_DATA_FIRST && cluster <= FAT12_CLUSTER_DATA_LAST && remainingClusters) {
+            // Get value of next cluster from FAT.
+            uint16_t nextCluster = ((uint16_t*)fat->Table)[cluster];
+
+            // Add cluster to block list.
+            blocks[offset] = fat->DataStart + ((cluster - FAT16_CLISTERS_RESERVED)) * fat->Header->BPB.SectorsPerCluster;
+
+            offset++;
+            cluster = nextCluster;
+            remainingClusters--;
+        }
+    }
+    else {
+        // Unknown FAT type.
+        kheap_free(blocks);
+        return false;
+    }
+
+    // Read blocks from storage device.
+    bool result = fat->Device->ReadBlocks(fat->Device, fat->PartitionIndex, blocks, fat->Header->BPB.SectorsPerCluster, totalClusters, outBuffer, length);
+
+    // Free cluster list.
+    kheap_free(blocks);
+    return result;
+}
+
+bool fat_get_root_dir(fat_t *fat, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount) {
+    // FAT12 and FAT16 have a static root directory.
+    if (fat->Type == FAT_TYPE_FAT12 || fat->Type == FAT_TYPE_FAT16) {
+        // Allocate space for directory bytes.
+        const uint32_t rootDirLength = sizeof(fat_dir_entry_t) * fat->Header->BPB.MaxRootDirectoryEntries;
+        fat_dir_entry_t *rootDirEntries = (fat_dir_entry_t*)kheap_alloc(rootDirLength);
+        memset(rootDirEntries, 0, rootDirLength);
+
+        // Read from storage.
+        bool result = fat->Device->ReadSectors(fat->Device, fat->PartitionIndex, fat->RootDirectoryStart, rootDirEntries, rootDirLength);
+        if (!result) {
+            kheap_free(rootDirEntries);
+            return false;
+        }
+
+        // Count up entries.
+        uint32_t entryCount = 0;
+        for (uint32_t i = 0; i < rootDirLength / sizeof(fat_dir_entry_t) && rootDirEntries[i].FileName[0] != 0; i++)
+            entryCount++;
+
+        // Reduce size of directory array.
+        rootDirEntries = (fat_dir_entry_t*)kheap_realloc(rootDirEntries, entryCount * sizeof(fat_dir_entry_t));
+
+        // Get outputs.
+        *outDirEntries = rootDirEntries;
+        *outEntryCount = entryCount;
+        return true;
+    }
+
+    // Unknown FAT type.
+    return false;
+}
+
+void fat_print_dir(fat_t *fat, fat_dir_entry_t *directoryEntries, uint32_t directoryEntriesCount, uint32_t level) {
+    for (uint32_t i = 0; i < directoryEntriesCount; i++) {
+        kprintf("FAT:  ");
+        for (uint32_t p = 0; p < level; p++)
+            kprintf(" ");
+        
+
+        // Get file name and extension.
+        char fileName[9];
+        strncpy(fileName, directoryEntries[i].FileName, 8);
+        fileName[8] = '\0';
+
+        char extension[4];
+        strncpy(extension, directoryEntries[i].FileName+8, 3);
+        extension[3] = '\0';
+
+        if (extension[0] != ' ' && extension[0] != '\0')
+            kprintf("%s: %s.%s (%u bytes)\n", directoryEntries[i].Subdirectory ? "DIR " : "FILE", fileName, extension, directoryEntries[i].Length);
+        else
+            kprintf("%s: %s (%u bytes)\n", directoryEntries[i].Subdirectory ? "DIR " : "FILE", fileName, directoryEntries[i].Length);
+
+       /* if (directoryEntries[i].Subdirectory && directoryEntries[i].FileName[0] != '.') {
+            fat_dir_entry_t *subEntries;
+            uint32_t subCount = 0;
+            fat_get_dir_fat12(fat, directoryEntries+i, &subEntries, &subCount);
+            fat_print_dir(fat, subEntries, subCount, level+1);
+            kheap_free(subEntries);
+        }*/
+
+        if (strcmp(fileName, "BEEMOVIE") == 0) {
+            uint8_t *bees = (uint8_t*)kheap_alloc(directoryEntries[i].Length + 1);
+            fat_entry_read(fat, directoryEntries+i, bees, directoryEntries[i].Length);
+            bees[directoryEntries[i].Length] ='\0';
+            kprintf(bees);
+            kheap_free(bees);
+        }
+    }
+}
 
 bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     // Get header in first sector.
@@ -46,74 +227,47 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     storageDevice->ReadSectors(storageDevice, partitionIndex, fatHeader->BPB.ReservedSectorsCount, &fatVersion, sizeof(fatVersion));
     uint8_t fatDriveType = fatVersion & 0xFF;
 
-    // Determine signature.
-    if ((fatVersion & FAT_VERSION_MASK_FAT16) == FAT_VERSION_MASK_FAT16) {
-        // FAT16.
-        fat16_t *fat16Volume = (fat16_t*)kheap_alloc(sizeof(fat16_t));
-        memset(fat16Volume, 0, sizeof(fat16_t));
+    // Create FAT object.
+    fat_t *fatVolume = (fat_t*)kheap_alloc(sizeof(fat_t));
+    memset(fatVolume, 0, sizeof(fat_t));
 
-        // Populate fields.
-        fat16Volume->Device = storageDevice;
-        fat16Volume->PartitionIndex = partitionIndex;
-        fat16Volume->Header = *fatHeader;
-        fat16Volume->TableStart = fat16Volume->Header.BPB.ReservedSectorsCount;
-        fat16Volume->TableLength = fat16Volume->Header.BPB.TableSize;
-        fat16Volume->RootDirectoryStart = fat16Volume->TableStart + (fat16Volume->Header.BPB.TableSize * fat16Volume->Header.BPB.TableCount);
-        fat16Volume->RootDirectoryLength = ((fat16Volume->Header.BPB.MaxRootDirectoryEntries * sizeof(fat_dir_entry_t)) + (fat16Volume->Header.BPB.BytesPerSector - 1)) / fat16Volume->Header.BPB.BytesPerSector;
-        fat16Volume->DataStart = fat16Volume->RootDirectoryStart + fat16Volume->RootDirectoryLength;
-        uint32_t totalSectors = fat16Volume->Header.BPB.TotalSectors == 0 ? fat16Volume->Header.BPB.TotalSectors32 : fat16Volume->Header.BPB.TotalSectors;
-        fat16Volume->DataLength = totalSectors - fat16Volume->DataStart;
+    // Populate fields.
+    fatVolume->Device = storageDevice;
+    fatVolume->PartitionIndex = partitionIndex;
+    fatVolume->Header = fatHeader;
+    fatVolume->TableStart = fatVolume->Header->BPB.ReservedSectorsCount;
+    fatVolume->TableLength = fatVolume->Header->BPB.TableSize;
+    fatVolume->RootDirectoryStart = fatVolume->TableStart + (fatVolume->Header->BPB.TableSize * fatVolume->Header->BPB.TableCount);
+    fatVolume->RootDirectoryLength = ((fatVolume->Header->BPB.MaxRootDirectoryEntries * sizeof(fat_dir_entry_t)) + (fatVolume->Header->BPB.BytesPerSector - 1)) / fatVolume->Header->BPB.BytesPerSector;
+    fatVolume->DataStart = fatVolume->RootDirectoryStart + fatVolume->RootDirectoryLength;
+    uint32_t totalSectors = fatVolume->Header->BPB.TotalSectors == 0 ? fatVolume->Header->BPB.TotalSectors32 : fatVolume->Header->BPB.TotalSectors;
+    fatVolume->DataLength = totalSectors - fatVolume->DataStart;
+    fatVolume->DataClusters = fatVolume->DataLength / fatVolume->Header->BPB.SectorsPerCluster;
 
-        // Print info.
-        fat16_print_info(fat16Volume);
+    // Determine type based on cluster count.
+    if (fatVolume->DataClusters > FAT12_CLUSTERS_MAX)
+        fatVolume->Type = FAT_TYPE_FAT16;
+    else
+        fatVolume->Type = FAT_TYPE_FAT12;
 
-        // Get the FATs.
-        uint32_t fat16ClustersLength = fat16Volume->TableLength * fat16Volume->Header.BPB.BytesPerSector;
-        fat16Volume->Table = (uint16_t*)kheap_alloc(fat16ClustersLength);
-        memset(fat16Volume->Table, 0, fat16ClustersLength);
-        storageDevice->ReadSectors(storageDevice, partitionIndex, fat16Volume->TableStart, fat16Volume->Table, fat16ClustersLength);
+    // Get File Allocation Table.
+    uint32_t fatClustersLength = fatVolume->TableLength * fatVolume->Header->BPB.BytesPerSector;
+    fatVolume->Table = (uint8_t*)kheap_alloc(fatClustersLength);
+    memset(fatVolume->Table, 0, fatClustersLength);
+    storageDevice->ReadSectors(storageDevice, partitionIndex, fatVolume->TableStart, fatVolume->Table, fatClustersLength);
+    
+    // Print info.
+    fat_print_info(fatVolume);
 
-        // Get root dir.
-        fat_dir_entry_t *rootDirEntries;
-        uint32_t rootDirEntriesCount = 0;
-        fat16_get_root_dir(fat16Volume, &rootDirEntries, &rootDirEntriesCount);
-        fat16_print_dir(fat16Volume, rootDirEntries, rootDirEntriesCount, 0);
-        kheap_free(rootDirEntries);
-        kheap_free(fat16Volume->Table);
-        kheap_free(fat16Volume);
-    }
-    else if ((fatVersion & FAT_VERSION_MASK_FAT12) == FAT_VERSION_MASK_FAT12) {
-        // FAT12.
-        fat12_t *fat12Volume = (fat12_t*)kheap_alloc(sizeof(fat12_t));
-        memset(fat12Volume, 0, sizeof(fat12_t));
+    // Get root dir.
+    fat_dir_entry_t *rootDirEntries;
+    uint32_t rootDirEntriesCount = 0;
+    fat_get_root_dir(fatVolume, &rootDirEntries, &rootDirEntriesCount);
+    fat_print_dir(fatVolume, rootDirEntries, rootDirEntriesCount, 0);
+    kheap_free(rootDirEntries);
 
-        // Populate fields.
-        fat12Volume->Device = storageDevice;
-        fat12Volume->PartitionIndex = partitionIndex;
-        fat12Volume->Header = *fatHeader;
-        fat12Volume->TableStart = fat12Volume->Header.BPB.ReservedSectorsCount;
-        fat12Volume->TableLength = fat12Volume->Header.BPB.TableSize;
-        fat12Volume->RootDirectoryStart = fat12Volume->TableStart + (fat12Volume->Header.BPB.TableSize * fat12Volume->Header.BPB.TableCount);
-        fat12Volume->RootDirectoryLength = ((fat12Volume->Header.BPB.MaxRootDirectoryEntries * sizeof(fat_dir_entry_t)) + (fat12Volume->Header.BPB.BytesPerSector - 1)) / fat12Volume->Header.BPB.BytesPerSector;
-        fat12Volume->DataStart = fat12Volume->RootDirectoryStart + fat12Volume->RootDirectoryLength;
-        fat12Volume->DataLength = fat12Volume->Header.BPB.TotalSectors - fat12Volume->DataStart;
-
-        // Print info.
-        fat12_print_info(fat12Volume);
-
-        // Get the FATs.
-        uint32_t fat12ClustersLength = fat12Volume->TableLength * fat12Volume->Header.BPB.BytesPerSector;
-        fat12Volume->Table = (fat12_cluster_pair_t*)kheap_alloc(fat12ClustersLength);
-        memset(fat12Volume->Table, 0, fat12ClustersLength);
-        storageDevice->ReadSectors(storageDevice, partitionIndex, fat12Volume->TableStart, fat12Volume->Table, fat12ClustersLength);
-
-        // Get root dir.
-        fat_dir_entry_t *rootDirEntries;
-        uint32_t rootDirEntriesCount = 0;
-        fat12_get_root_dir(fat12Volume, &rootDirEntries, &rootDirEntriesCount);
-        fat12_print_dir(fat12Volume, rootDirEntries, rootDirEntriesCount, 0);
-        kheap_free(rootDirEntries);
-        kheap_free(fat12Volume->Table);
-        kheap_free(fat12Volume);
-    }
+    // Free stuff for now.
+    kheap_free(fatVolume->Table);
+    kheap_free(fatVolume->Header);
+    kheap_free(fatVolume);
 }

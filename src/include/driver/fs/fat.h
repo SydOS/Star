@@ -33,6 +33,32 @@
 #define FAT_VERSION_MASK_FAT12      0xFFFFF0
 #define FAT_VERSION_MASK_FAT16      0xFFFFFFF0
 
+#define FAT12_CLUSTERS_MAX          4084
+#define FAT16_CLUSTERS_MAX          65524
+#define FAT12_CLISTERS_RESERVED     2
+#define FAT16_CLISTERS_RESERVED     2
+
+// FAT12 clusters.
+#define FAT12_CLUSTER_FREE          0x000
+#define FAT12_CLUSTER_RESERVED      0x001
+#define FAT12_CLUSTER_DATA_FIRST    0x002
+#define FAT12_CLUSTER_DATA_LAST     0xFEF
+#define FAT12_CLUSTER_BAD           0xFF7
+#define FAT12_CLUSTER_EOC1          0xFF8
+#define FAT12_CLUSTER_EOC2          0xFF0
+
+// FAT16 clusters.
+#define FAT12_CLUSTER_FREE          0x0000
+#define FAT12_CLUSTER_RESERVED      0x0001
+#define FAT12_CLUSTER_DATA_FIRST    0x0002
+#define FAT12_CLUSTER_DATA_LAST     0xFFEF
+#define FAT12_CLUSTER_BAD           0xFFF7
+#define FAT12_CLUSTER_EOC           0xFFF8
+
+#define FAT_TYPE_FAT12  1
+#define FAT_TYPE_FAT16  2
+#define FAT_TYPE_FAT32  3
+
 typedef struct {
     // Jump instruction.
     uint8_t JumpInstruction[3];
@@ -57,7 +83,7 @@ typedef struct {
     // This is zero for FAT32.
     uint16_t MaxRootDirectoryEntries;
 
-    // Total number of sectors. FAT32 may set this value to zero.
+    // Total number of sectors if volume is under 32MB. FAT32 may set this value to zero.
     // If zero, use the 32-bit count value.
     uint16_t TotalSectors;
 
@@ -77,7 +103,7 @@ typedef struct {
     // Number of hidden sectors preceding this FAT partition, or zero for unpartitioned disks.
     uint32_t HiddenSectors;
 
-    // Total number of sectors if it exceeds 65535.
+    // Total number of sectors if it exceeds 65535 (32MB).
     uint32_t TotalSectors32;
 } __attribute__((packed)) fat_bpb_header_t;
 
@@ -160,6 +186,34 @@ typedef struct {
     uint32_t DataStart;
     uint32_t DataLength;
 } fat16_t;
+
+// FAT.
+typedef struct {
+    // Underlying storage device.
+    storage_device_t *Device;
+    uint16_t PartitionIndex;
+
+    // Header area.
+    fat_header_t *Header;
+    uint8_t Type;
+
+    // FAT starting sector and length in sectors.
+    uint64_t TableStart;
+    uint64_t TableLength;
+
+    // FATs.
+    uint8_t *Table;
+    uint8_t *TableSpare;
+
+     // Root directory starting sector and length in sectors.
+    uint64_t RootDirectoryStart;
+    uint64_t RootDirectoryLength;
+
+    // Data area starting sector and length in sectors.
+    uint64_t DataStart;
+    uint64_t DataLength;
+    uint32_t DataClusters;
+} fat_t;
 
 typedef struct {
     char FileName[11];
