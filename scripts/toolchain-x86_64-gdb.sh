@@ -14,4 +14,4 @@ function download_compile {
 }
 
 set -e
-download_compile https://ftp.gnu.org/gnu/gdb/gdb-8.1.tar.gz gdb-8.1 "--target=i686-elf"
+download_compile https://ftp.gnu.org/gnu/gdb/gdb-8.1.tar.gz gdb-8.1 "--target=x86_64-elf"

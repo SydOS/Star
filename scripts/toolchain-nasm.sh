@@ -1,4 +1,4 @@
-export PATH=$HOME/tools:$PATH
+export PATH=$HOME/SydOS-dev.framework:$PATH
 
 function download_compile {
 	echo $1
@@ -6,7 +6,7 @@ function download_compile {
 	tar -xf $2.archive
 	mkdir $2-build
 	cd $2-build
-	../$2/configure --prefix=$HOME/tools $3
+	../$2/configure --prefix=$HOME/SydOS-dev.framework $3
 	make -j$(getconf _NPROCESSORS_ONLN)
 	make install
 	cd ..

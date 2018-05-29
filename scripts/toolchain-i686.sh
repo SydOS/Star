@@ -10,7 +10,7 @@ export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr
 export CLOOG_MIRROR_BASE=https://www.bastoul.net/cloog/pages/download
 
-export PATH=$HOME/tools:$PATH
+export PATH=$HOME/SydOS-dev.framework:$PATH
 
 function download_compile {
 	echo $1
@@ -18,7 +18,7 @@ function download_compile {
 	tar -xf $2.archive
 	mkdir $2-build
 	cd $2-build
-	../$2/configure --prefix=$HOME/tools $3
+	../$2/configure --prefix=$HOME/SydOS-dev.framework $3
 	if [ "$2" == "gcc-$GCC_VERSION" ]; then
 		make all-gcc -j$(getconf _NPROCESSORS_ONLN)
 		make all-target-libgcc -j$(getconf _NPROCESSORS_ONLN)
@@ -34,9 +34,9 @@ function download_compile {
 
 set -e
 download_compile $GNU_MIRROR_BASE/gmp/gmp-$GMP_VERSION.tar.bz2 gmp-$GMP_VERSION
-download_compile $GNU_MIRROR_BASE/mpfr/mpfr-$MPFR_VERSION.tar.bz2 mpfr-$MPFR_VERSION "--with-gmp=$HOME/tools"
-download_compile $GNU_MIRROR_BASE/mpc/mpc-$MPC_VERSION.tar.gz mpc-$MPC_VERSION "--with-gmp=$HOME/tools --with-mpfr=$HOME/tools"
-download_compile $ISL_MIRROR_BASE/isl-$ISL_VERSION.tar.gz isl-$ISL_VERSION "--with-gmp-prefix=$HOME/tools"
-download_compile $CLOOG_MIRROR_BASE/cloog-$CLOOG_VERSION.tar.gz cloog-$CLOOG_VERSION "--with-gmp-prefix=$HOME/tools --with-isl-prefix=$HOME/tools"
-download_compile $GNU_MIRROR_BASE/binutils/binutils-$BINUTILS_VERSION.tar.gz binutils-$BINUTILS_VERSION "--with-isl=$HOME/tools --with-cloog=$HOME/tools --with-sysroot --disable-nls --disable-werror --target=i686-elf"
-download_compile $GNU_MIRROR_BASE/gcc/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz gcc-$GCC_VERSION "--with-isl=$HOME/tools --with-cloog=$HOME/tools --with-gmp=$HOME/tools --with-mpfr=$HOME/tools --with-mpc=$HOME/tools --disable-nls --enable-languages=c,c++ --without-headers --target=i686-elf"
+download_compile $GNU_MIRROR_BASE/mpfr/mpfr-$MPFR_VERSION.tar.bz2 mpfr-$MPFR_VERSION "--with-gmp=$HOME/SydOS-dev.framework"
+download_compile $GNU_MIRROR_BASE/mpc/mpc-$MPC_VERSION.tar.gz mpc-$MPC_VERSION "--with-gmp=$HOME/SydOS-dev.framework --with-mpfr=$HOME/SydOS-dev.framework"
+download_compile $ISL_MIRROR_BASE/isl-$ISL_VERSION.tar.gz isl-$ISL_VERSION "--with-gmp-prefix=$HOME/SydOS-dev.framework"
+download_compile $CLOOG_MIRROR_BASE/cloog-$CLOOG_VERSION.tar.gz cloog-$CLOOG_VERSION "--with-gmp-prefix=$HOME/SydOS-dev.framework --with-isl-prefix=$HOME/SydOS-dev.framework"
+download_compile $GNU_MIRROR_BASE/binutils/binutils-$BINUTILS_VERSION.tar.gz binutils-$BINUTILS_VERSION "--with-isl=$HOME/SydOS-dev.framework --with-cloog=$HOME/SydOS-dev.framework --with-sysroot --disable-nls --disable-werror --target=i686-elf"
+download_compile $GNU_MIRROR_BASE/gcc/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz gcc-$GCC_VERSION "--with-isl=$HOME/SydOS-dev.framework --with-cloog=$HOME/SydOS-dev.framework --with-gmp=$HOME/SydOS-dev.framework --with-mpfr=$HOME/SydOS-dev.framework --with-mpc=$HOME/SydOS-dev.framework --disable-nls --enable-languages=c,c++ --without-headers --target=i686-elf"
