@@ -34,6 +34,7 @@
 #define ATA_CMD_WRITE_SECTOR        0x30
 #define ATA_CMD_PACKET              0xA0
 #define ATA_CMD_IDENTIFY_PACKET     0xA1
+#define ATA_CMD_READ_DMA            0xC8
 #define ATA_CMD_IDENTIFY            0xEC
 
 #define ATA_SERIAL_LENGTH           20

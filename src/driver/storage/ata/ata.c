@@ -31,6 +31,8 @@
 #include <driver/storage/ata/ata_commands.h>
 #include <kernel/interrupts/irqs.h>
 #include <kernel/memory/kheap.h>
+#include <kernel/memory/pmm.h>
+#include <kernel/memory/paging.h>
 #include <kernel/storage/storage.h>
 #include <driver/pci.h>
 
@@ -289,6 +291,19 @@ bool ata_wait_for_drq(ata_channel_t *channel) {
     return true;
 }
 
+void ata_dma_start(ata_channel_t *channel, bool write) {
+    // Stop DMA busmaster, set direction, and start.
+    //outb(channel->BusMasterCommandPort, 0);
+    if (!write)
+        outb(channel->BusMasterCommandPort, ATA_DMA_CMD_WRITE);
+    outb(channel->BusMasterCommandPort, (!write ? ATA_DMA_CMD_WRITE : 0) | ATA_DMA_CMD_START);
+}
+
+void ata_dma_stop(ata_channel_t *channel) {
+    // Stop DMA.
+    outb(channel->BusMasterCommandPort, 0);
+}
+
 static void ata_print_device_info(ata_identify_result_t info) {
     /*kprintf("ATA:    Model: %s\n", info.model);
     kprintf("ATA:    Firmware: %s\n", info.firmwareRevision);
@@ -541,6 +556,7 @@ bool ata_init(pci_device_t *pciDevice) {
     // Get bus master info.
     if ((progIf & ATA_PCI_PIF_BUSMASTER) && pciDevice->BaseAddresses[4].PortMapped) {
         kprintf("ATA: Bus Master supported.\n");
+        pci_enable_busmaster(pciDevice);
         ataController->Primary->BusMasterCapable = true;
         ataController->Secondary->BusMasterCapable = true;
 
@@ -552,6 +568,29 @@ bool ata_init(pci_device_t *pciDevice) {
         ataController->Secondary->BusMasterCommandPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECCMD;
         ataController->Secondary->BusMasterStatusPort = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECSTATUS;
         ataController->Secondary->BusMasterPrdt = busMasterBase + ATA_PCI_BUSMASTER_PORT_SECPRDT;
+
+        // Initialize primary channel PRDT.
+        ataController->Primary->PrdtPage = pmm_pop_frame_nonlong();
+        outl(ataController->Primary->BusMasterPrdt, ataController->Primary->PrdtPage);
+        ataController->Primary->Prdt = (ata_prd_t*)paging_device_alloc(ataController->Primary->PrdtPage, ataController->Primary->PrdtPage);
+        memset(ataController->Primary->Prdt, 0, PAGE_SIZE_4K);
+        for (uint8_t i = 0; i < ATA_PRD_COUNT; i++) {
+            uint32_t prdPage = pmm_pop_frame_nonlong();
+            ataController->Primary->Prdt[i].BufferAddress = prdPage;
+            ataController->Primary->PrdBuffers[i] = (uint8_t*)paging_device_alloc(prdPage, prdPage);
+            memset(ataController->Primary->PrdBuffers[i], 0, ATA_PRD_BUF_SIZE);
+        }
+
+        // Initialize secondary channel PRDT.
+        ataController->Secondary->PrdtPage = pmm_pop_frame_nonlong();
+        outl(ataController->Secondary->BusMasterPrdt, ataController->Secondary->PrdtPage);
+        ataController->Secondary->Prdt = (ata_prd_t*)paging_device_alloc(ataController->Secondary->PrdtPage, ataController->Secondary->PrdtPage);
+        memset(ataController->Secondary->Prdt, 0, PAGE_SIZE_4K);
+        for (uint8_t i = 0; i < ATA_PRD_COUNT; i++) {
+            uint32_t prdPage = pmm_pop_frame_nonlong();
+            ataController->Secondary->Prdt[i].BufferAddress = prdPage;
+            ataController->Secondary->PrdBuffers[i] = (uint8_t*)paging_device_alloc(prdPage, prdPage);
+        }
     }
 
     // Reset and identify both channels.
@@ -571,9 +610,10 @@ bool ata_init(pci_device_t *pciDevice) {
 
     // Temporary.
     ataController->Primary->MasterDevice = (ata_device_t*)kheap_alloc(sizeof(ata_device_t));
-    ataController->Primary->MasterDevice->Channel = ataController->Primary;
-    ataController->Primary->MasterDevice->Master = true;
-    ataController->Primary->MasterDevice->BytesPerSector = ATA_SECTOR_SIZE_512;
+    ata_device_t *masterDevice = (ata_device_t*)ataController->Primary->MasterDevice;
+    masterDevice->Channel = ataController->Primary;
+    masterDevice->Master = true;
+    masterDevice->BytesPerSector = ATA_SECTOR_SIZE_512;
 
     // Register storage device.
     storage_device_t *ataPriStorageDevice = (storage_device_t*)kheap_alloc(sizeof(storage_device_t));

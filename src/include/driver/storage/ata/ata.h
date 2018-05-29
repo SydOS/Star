@@ -27,6 +27,7 @@
 
 #include <main.h>
 #include <driver/pci.h>
+#include <kernel/memory/paging.h>
 
 // Primary PATA interface ports.
 #define ATA_PRI_COMMAND_PORT    0x1F0
@@ -121,14 +122,23 @@ enum {
 
 #define ATA_PCI_BUSMASTER_STATUS_INTERRUPT  0x04
 
-struct ata_channel_t;
-
-// ATA device.
+// ATA DMA PRD.
 typedef struct {
-    struct ata_channel_t *Channel;
-    bool Master;
-    uint16_t BytesPerSector;
-} ata_device_t;
+    uint32_t BufferAddress;
+    uint16_t ByteCount;
+
+    uint16_t Reserved : 15;
+    bool EndOfTable : 1;
+} __attribute__((packed)) ata_prd_t;
+
+// Sufficient for a transfer of 256 512-byte sectors.
+#define ATA_PRD_COUNT       32
+#define ATA_PRD_BUF_SIZE    PAGE_SIZE_4K
+
+#define ATA_DMA_CMD_START   (1 << 0)
+#define ATA_DMA_CMD_WRITE   (1 << 3)
+
+struct ata_device_t;
 
 // ATA channel.
 typedef struct {
@@ -142,9 +152,20 @@ typedef struct {
     uint16_t BusMasterStatusPort;
     uint16_t BusMasterPrdt;
 
-    ata_device_t *MasterDevice;
-    ata_device_t *SlaveDevice;
+    uint32_t PrdtPage;
+    ata_prd_t *Prdt;
+    uint8_t *PrdBuffers[ATA_PRD_COUNT];
+
+    struct ata_device_t *MasterDevice;
+    struct ata_device_t *SlaveDevice;
 } ata_channel_t;
+
+// ATA device.
+typedef struct {
+    ata_channel_t *Channel;
+    bool Master;
+    uint16_t BytesPerSector;
+} ata_device_t;
 
 // ATA controller.
 typedef struct {
@@ -170,6 +191,9 @@ extern void ata_send_command(ata_channel_t *channel, uint8_t sectorCount, uint8_
 extern void ata_set_lba_high(ata_channel_t *channel, uint8_t lbaHigh);
 extern void ata_select_device(ata_channel_t *channel, bool master);
 extern bool ata_wait_for_drq(ata_channel_t *channel);
+
+extern void ata_dma_start(ata_channel_t *channel, bool write);
+extern void ata_dma_stop(ata_channel_t *channel);
 
 extern bool ata_init(pci_device_t *pciDevice);
 
