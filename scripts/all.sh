@@ -11,3 +11,4 @@ set -e
 ./toolchain-x86_64.sh
 ./toolchain-x86_64-gdb.sh
 ./toolchain-nasm.sh
+./toolchain-qemu.sh
