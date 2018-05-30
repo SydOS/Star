@@ -43,8 +43,11 @@
 #define ATA_REG_FEATURES(port)              (port+0x1) // Used for ATAPI.
 #define ATA_REG_SECTOR_COUNT(port)          (port+0x2) // Number of sectors to read/write.
 #define ATA_REG_SECTOR_NUMBER(port)         (port+0x3) // CHS, LBA.
+#define ATA_REG_LBA_LOW(port)               (port+0x3) // LBA low bits.
 #define ATA_REG_CYLINDER_LOW(port)          (port+0x4) // Low part of sector address.
+#define ATA_REG_LBA_MID(port)               (port+0x4) // LBA middle bits.
 #define ATA_REG_CYLINDER_HIGH(port)         (port+0x5) // High part of sector address.
+#define ATA_REG_LBA_HIGH(port)              (port+0x5) // LBA high bits.
 #define ATA_REG_DRIVE_SELECT(port)          (port+0x6) // Selects the drive and/or head.
 #define ATA_REG_COMMAND(port)               (port+0x7) // Send commands or read status.
 #define ATA_REG_STATUS(port)                (port+0x7) // Read status.
@@ -164,7 +167,9 @@ typedef struct {
 typedef struct {
     ata_channel_t *Channel;
     bool Master;
+
     uint16_t BytesPerSector;
+    bool Lba48BitSupported;
 } ata_device_t;
 
 // ATA controller.
@@ -183,6 +188,8 @@ typedef struct {
     bool Busy : 1;
 } __attribute__((packed)) ata_reg_status_t;
 
+#include <driver/storage/ata/ata_commands.h>
+
 extern int16_t ata_check_status(ata_channel_t *channel, bool master);
 extern void ata_read_data_pio(ata_channel_t *channel, uint32_t size, void *outData, uint32_t length);
 extern void ata_write_data_pio(ata_channel_t *channel, const void *data, uint32_t size);
@@ -192,8 +199,9 @@ extern void ata_set_lba_high(ata_channel_t *channel, uint8_t lbaHigh);
 extern void ata_select_device(ata_channel_t *channel, bool master);
 extern bool ata_wait_for_drq(ata_channel_t *channel);
 
+
+extern void ata_dma_reset(ata_channel_t *channel);
 extern void ata_dma_start(ata_channel_t *channel, bool write);
-extern void ata_dma_stop(ata_channel_t *channel);
 
 extern bool ata_init(pci_device_t *pciDevice);
 

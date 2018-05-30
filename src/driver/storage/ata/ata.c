@@ -291,17 +291,15 @@ bool ata_wait_for_drq(ata_channel_t *channel) {
     return true;
 }
 
-void ata_dma_start(ata_channel_t *channel, bool write) {
-    // Stop DMA busmaster, set direction, and start.
-    //outb(channel->BusMasterCommandPort, 0);
-    if (!write)
-        outb(channel->BusMasterCommandPort, ATA_DMA_CMD_WRITE);
-    outb(channel->BusMasterCommandPort, (!write ? ATA_DMA_CMD_WRITE : 0) | ATA_DMA_CMD_START);
+void ata_dma_reset(ata_channel_t *channel) {
+    // Reset DMA.
+    outb(channel->BusMasterCommandPort, 0);
+    outl(channel->BusMasterPrdt, channel->PrdtPage);
 }
 
-void ata_dma_stop(ata_channel_t *channel) {
-    // Stop DMA.
-    outb(channel->BusMasterCommandPort, 0);
+void ata_dma_start(ata_channel_t *channel, bool write) {
+    // Start DMA.
+    outb(channel->BusMasterCommandPort, (!write ? ATA_DMA_CMD_WRITE : 0) | ATA_DMA_CMD_START);
 }
 
 static void ata_print_device_info(ata_identify_result_t info) {
@@ -457,7 +455,7 @@ static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t p
     // Get offset into partition.
     if (partitionIndex != PARTITION_NONE)
         startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
-    ata_read_sector((ata_device_t*)storageDevice->Device, startSector, outBuffer, length);
+    ata_read_dma((ata_device_t*)storageDevice->Device, startSector, outBuffer, length);
     return true;
 }
 
@@ -476,7 +474,7 @@ static bool ata_storage_read_blocks(storage_device_t *storageDevice, uint16_t pa
         uint32_t size = remainingLength;
 		if (size > (blockSize * ataDevice->BytesPerSector))
 			size = blockSize * ataDevice->BytesPerSector; 
-        ata_read_sector(ataDevice, startSector, outBuffer + bufferOffset, size);
+        ata_read_dma(ataDevice, startSector, outBuffer + bufferOffset, size);
         remainingLength -= size;
         bufferOffset += blockSize * ataDevice->BytesPerSector;
     }

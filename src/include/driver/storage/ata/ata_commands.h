@@ -31,6 +31,7 @@
 
 #define ATA_CMD_READ_SECTOR         0x20
 #define ATA_CMD_READ_SECTOR_EXT     0x24
+#define ATA_CMD_READ_DMA_EXT        0x25
 #define ATA_CMD_WRITE_SECTOR        0x30
 #define ATA_CMD_PACKET              0xA0
 #define ATA_CMD_IDENTIFY_PACKET     0xA1
@@ -46,6 +47,9 @@
 #define ATA_IDENTIFY_INTEGRITY_MAGIC        0xA5
 #define ATA_IDENTIFY_GENERAL_NOT_ATA_DEVICE 0x8000
 #define ATA_IDENTIFY_GENERAL_ATAPI_DEVICE   0x8000
+
+#define ATA_MAX_SECTOR_LBA_28BIT    (2 ^ 28)
+#define ATA_MAX_SECTOR_LBA_48BIT    (2 ^ 48)
 
 // Word 80 ATA version flags.
 enum {
@@ -791,5 +795,8 @@ extern void ata_read_identify_words(ata_channel_t *channel, uint8_t *checksum, u
 
 extern int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t *outResult);
 extern int16_t ata_read_sector(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length);
+
+extern int16_t ata_read_dma(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length);
+
 
 #endif

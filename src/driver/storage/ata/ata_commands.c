@@ -109,80 +109,19 @@ int16_t ata_read_sector(ata_device_t *ataDevice, uint64_t startSectorLba, void *
         i++;
     }*/
 
-    uint32_t dd = inl(ataDevice->Channel->BusMasterPrdt);
-    uint8_t dd2 = inb(ataDevice->Channel->BusMasterStatusPort);
 
     // Stop DMA.
    // ata_dma_stop(ataDevice->Channel);
 
-    dd = inl(ataDevice->Channel->BusMasterPrdt);
 
-    outb(ataDevice->Channel->BusMasterCommandPort, 0);
-    outl(ataDevice->Channel->BusMasterPrdt, ataDevice->Channel->PrdtPage);
 
-    // Prepare data.
-    uint32_t remainingData = (sectorCount == 0 ? 256 : sectorCount) * ataDevice->BytesPerSector;
-    uint8_t prdIndex = 0;
-    while (remainingData > 0) {
-        uint32_t size = remainingData;
-        if (size > ATA_PRD_BUF_SIZE)
-            size = ATA_PRD_BUF_SIZE;
-        
-        // Set PRD fields.
-        ataDevice->Channel->Prdt[prdIndex].ByteCount = (uint16_t)size;
-        ataDevice->Channel->Prdt[prdIndex].EndOfTable = false;
 
-        // Move to next PRD entry.
-        prdIndex++;
-        remainingData -= size;
-    }
 
-    // Last PRD entry needs flag set.
-    ataDevice->Channel->Prdt[prdIndex - 1].EndOfTable = true;
+    
 
     outb(ataDevice->Channel->BusMasterStatusPort, 1 << 5);
 
-    // Send READ SECTOR command.
-    ata_set_lba_high(ataDevice->Channel, (uint8_t)((startSectorLba >> 24) & 0x0F));
-    ata_send_command(ataDevice->Channel, (uint8_t)sectorCount, (uint8_t)(startSectorLba & 0xFF),
-        (uint8_t)((startSectorLba >> 8) & 0xFF), (uint8_t)((startSectorLba >> 16) & 0xFF), ATA_CMD_READ_DMA);
 
-
-    // Start transfer with DMA.
-    outb(ataDevice->Channel->BusMasterCommandPort, ATA_DMA_CMD_WRITE | ATA_DMA_CMD_START);
-  //  ata_dma_start(ataDevice->Channel, false);
-
-    // Wait for device.
-    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) == -1) {
-        // Stop DMA.
-        ata_dma_stop(ataDevice->Channel);
-       return ata_check_status(ataDevice->Channel, ataDevice->Master);
-    }
-
-    while (inb(ataDevice->Channel->BusMasterStatusPort) & 0x1);
-
-    // Stop DMA.
-    ata_dma_stop(ataDevice->Channel);
-
-    dd = inl(ataDevice->Channel->BusMasterPrdt);
-    dd2 = inb(ataDevice->Channel->BusMasterStatusPort);
-
-    // Read data.
-    // Copy data out of DMA buffers.
-    remainingData = length;
-    prdIndex = 0;
-    while (remainingData > 0) {
-        uint32_t size = remainingData;
-        if (size > ATA_PRD_BUF_SIZE)
-            size = ATA_PRD_BUF_SIZE;
-
-        // Copy data.
-        memcpy((uint8_t*)outData + (prdIndex * ATA_PRD_BUF_SIZE), ataDevice->Channel->PrdBuffers[prdIndex], size); 
-
-        // Move to next PRD entry.
-        prdIndex++;
-        remainingData -= size;
-    }
 
     return ata_check_status(ataDevice->Channel, ataDevice->Master);
 }
@@ -207,6 +146,105 @@ int16_t ata_read_sector_ext(ata_channel_t *channel, bool master, uint64_t startS
     // Read data.
     //ata_read_data_pio(channel, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
     return ata_check_status(channel, master);
+}
+
+int16_t ata_read_dma(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length) {
+    // Get sector count.
+    uint32_t sectorCount = divide_round_up_uint32(length, ataDevice->BytesPerSector);
+    if (sectorCount > 256)
+        return ATA_STATUS_ERROR;
+
+    ata_check_status(ataDevice->Channel, ataDevice->Master);
+
+    // Reset DMA.
+    ata_dma_reset(ataDevice->Channel);
+
+    // Prepare buffers for incoming data.
+    uint32_t remainingData = sectorCount * ataDevice->BytesPerSector;
+    uint8_t prdIndex = 0;
+    while (remainingData > 0) {
+        uint32_t size = remainingData;
+        if (size > ATA_PRD_BUF_SIZE)
+            size = ATA_PRD_BUF_SIZE;
+        
+        // Set PRD fields.
+        ataDevice->Channel->Prdt[prdIndex].ByteCount = (uint16_t)size;
+        ataDevice->Channel->Prdt[prdIndex].EndOfTable = false;
+
+        // Move to next PRD entry.
+        prdIndex++;
+        remainingData -= size;
+    }
+
+    // Last PRD entry needs flag set.
+    ataDevice->Channel->Prdt[prdIndex - 1].EndOfTable = true;
+
+    // Is the requested sector above 28 bits?
+    if (startSectorLba > ATA_MAX_SECTOR_LBA_28BIT) { // 48-bit LBA.
+        // Send over high part of sector count.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)((sectorCount >> 8) & 0xFF));
+
+        // Send over high parts of LBA.
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 24) & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 32) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 40) & 0xFF));
+
+        // Send over lower part of sector count.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)(sectorCount & 0xFF));
+
+        // Send over lower parts of LBA and command.
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)(startSectorLba & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 8) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 16) & 0xFF));
+        outb(ATA_REG_COMMAND(ataDevice->Channel->CommandPort), ATA_CMD_READ_DMA_EXT);
+    }
+    else { // 28-bit LBA.
+        // If 256 sectors, count is to be zero.
+        if (sectorCount == 256)
+            sectorCount = 0;
+
+        // Send over sector count, LBA, and command.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)(sectorCount & 0xFF));
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)(startSectorLba & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 8) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 16) & 0xFF));
+        outb(ATA_REG_DRIVE_SELECT(ataDevice->Channel->CommandPort), inb(ATA_REG_DRIVE_SELECT(ataDevice->Channel->CommandPort))
+            | ATA_DEVICE_FLAGS_LBA | (uint8_t)((startSectorLba >> 24) & 0xF));
+        outb(ATA_REG_COMMAND(ataDevice->Channel->CommandPort), ATA_CMD_READ_DMA);
+    }
+
+    // Start transfer with DMA.
+    outb(ataDevice->Channel->BusMasterCommandPort, ATA_DMA_CMD_WRITE | ATA_DMA_CMD_START);
+    ata_dma_start(ataDevice->Channel, false);
+
+    // Wait for device.
+    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) == -1) {
+        // Stop DMA.
+        ata_dma_reset(ataDevice->Channel);
+        return ata_check_status(ataDevice->Channel, ataDevice->Master);
+    }
+
+    while (inb(ataDevice->Channel->BusMasterStatusPort) & 0x1);
+
+    // Stop DMA.
+    ata_dma_reset(ataDevice->Channel);
+
+    remainingData = length;
+    prdIndex = 0;
+    while (remainingData > 0) {
+        uint32_t size = remainingData;
+        if (size > ATA_PRD_BUF_SIZE)
+            size = ATA_PRD_BUF_SIZE;
+
+        // Copy data.
+        memcpy((uint8_t*)outData + (prdIndex * ATA_PRD_BUF_SIZE), ataDevice->Channel->PrdBuffers[prdIndex], size); 
+
+        // Move to next PRD entry.
+        prdIndex++;
+        remainingData -= size;
+    }
+
+    return ata_check_status(ataDevice->Channel, ataDevice->Master);
 }
 
 int16_t ata_write_sector(ata_channel_t *channel, bool master, uint32_t startSectorLba, const void *data, uint8_t sectorCount) {
