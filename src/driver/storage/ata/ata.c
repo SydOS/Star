@@ -455,12 +455,21 @@ static bool ata_storage_read_sectors(storage_device_t *storageDevice, uint16_t p
     // Get offset into partition.
     if (partitionIndex != PARTITION_NONE)
         startSector += storageDevice->PartitionMap->Partitions[partitionIndex]->LbaStart;
-    ata_read_dma((ata_device_t*)storageDevice->Device, startSector, outBuffer, length);
-    return true;
+
+    // Grab the ATA device.
+    ata_device_t *ataDevice = (ata_device_t*)storageDevice->Device;
+
+    // If DMA is enabled, use it.
+    if (ataDevice->Channel->BusMasterCapable)
+        return ata_read_dma(ataDevice, startSector, outBuffer, length) == ATA_CHK_STATUS_OK;
+    else
+        return ata_read_sector(ataDevice, startSector, outBuffer, length) == ATA_CHK_STATUS_OK;
 }
 
 static bool ata_storage_read_blocks(storage_device_t *storageDevice, uint16_t partitionIndex, const uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length) {
+    // Get ATA device.
     ata_device_t *ataDevice = (ata_device_t*)storageDevice->Device;
+    bool dmaEnabled = ataDevice->Channel->BusMasterCapable;
     
     uint32_t remainingLength = length;
 	uintptr_t bufferOffset = 0;
@@ -473,13 +482,21 @@ static bool ata_storage_read_blocks(storage_device_t *storageDevice, uint16_t pa
 
         uint32_t size = remainingLength;
 		if (size > (blockSize * ataDevice->BytesPerSector))
-			size = blockSize * ataDevice->BytesPerSector; 
-        ata_read_dma(ataDevice, startSector, outBuffer + bufferOffset, size);
+			size = blockSize * ataDevice->BytesPerSector;
+        if (dmaEnabled) {
+            // Read using DMA.
+            if (ata_read_dma(ataDevice, startSector, outBuffer + bufferOffset, size) != ATA_CHK_STATUS_OK)
+                return false;
+        }
+        else {
+            // Read using PIO.
+            if (ata_read_sector(ataDevice, startSector, outBuffer + bufferOffset, size) != ATA_CHK_STATUS_OK)
+                return false;
+        }
         remainingLength -= size;
         bufferOffset += blockSize * ataDevice->BytesPerSector;
     }
     return true;
-	//return floppy_read_blocks((floppy_drive_t*)storageDevice->Device, blocks, blockSize, blockCount, outBuffer, length);
 }
 
 bool ata_init(pci_device_t *pciDevice) {
