@@ -51,27 +51,6 @@
 #define ATA_MAX_SECTOR_LBA_28BIT    (2 ^ 28)
 #define ATA_MAX_SECTOR_LBA_48BIT    (2 ^ 48)
 
-// Word 80 ATA version flags.
-enum {
-    ATA_VERSION_ATA1    = 0x02,
-    ATA_VERSION_ATA2    = 0x04,
-    ATA_VERSION_ATA3    = 0x08,
-    ATA_VERSION_ATA4    = 0x10,
-    ATA_VERSION_ATA5    = 0x20,
-    ATA_VERSION_ATA6    = 0x40,
-    ATA_VERSION_ATA7    = 0x80,
-    ATA_VERSION_ATA8    = 0x100
-};
-
-// Word 76 SATA supported feature flags.
-enum {
-    ATA_SATA76_GEN1_SUPPORTED       = 0x02,
-    ATA_SATA76_GEN2_SUPPORTED       = 0x04,
-    ATA_SATA76_NCQ_SUPPORTED        = 0x100,
-    ATA_SATA76_POWER_SUPPORTED      = 0x200,
-    ATA_SATA76_PHY_EVENTS_SUPPORTED = 0x400
-};
-
 // Word 53 of IDENTIFY command.
 typedef struct {
     bool Words54_58Valid : 1;
@@ -793,7 +772,7 @@ typedef struct ata_identify_packet_result ata_identify_packet_result_t;
 extern uint16_t ata_read_identify_word(ata_channel_t *channel, uint8_t *checksum);
 extern void ata_read_identify_words(ata_channel_t *channel, uint8_t *checksum, uint8_t firstWord, uint8_t lastWord);
 
-extern int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t *outResult);
+extern int16_t ata_identify(ata_device_t *ataDevice, ata_identify_result_t *outResult);
 extern int16_t ata_read_sector(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length);
 
 extern int16_t ata_read_dma(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length);

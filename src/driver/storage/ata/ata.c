@@ -302,12 +302,33 @@ void ata_dma_start(ata_channel_t *channel, bool write) {
     outb(channel->BusMasterCommandPort, (!write ? ATA_DMA_CMD_WRITE : 0) | ATA_DMA_CMD_START);
 }
 
+static void ata_swap_string(char *dest, char *srcStr, uint16_t length) {
+    for (uint8_t i = 0; i < length; i += 2) {
+        dest[i+1] = srcStr[i];
+        dest[i] = srcStr[i+1];
+    }
+}
+
 static void ata_print_device_info(ata_identify_result_t info) {
-    /*kprintf("ATA:    Model: %s\n", info.model);
-    kprintf("ATA:    Firmware: %s\n", info.firmwareRevision);
-    kprintf("ATA:    Serial: %s\n", info.serial);
+    // Get model string.
+    char modelString[ATA_MODEL_LENGTH + 1];
+    ata_swap_string(modelString, info.Model, ATA_MODEL_LENGTH);
+    modelString[ATA_MODEL_LENGTH] = '\0';
+    kprintf("ATA:    Model: %s\n", modelString);
+
+    // Get firmware revision.
+    char firmwareString[ATA_FIRMWARE_LENGTH + 1];
+    ata_swap_string(firmwareString, info.FirmwareRevision, ATA_FIRMWARE_LENGTH);
+    firmwareString[ATA_FIRMWARE_LENGTH] = '\0';
+    kprintf("ATA:    Firmware: %s\n", firmwareString);
+
+    // Get serial.
+    char serialString[ATA_SERIAL_LENGTH + 1];
+    ata_swap_string(serialString, info.Serial, ATA_SERIAL_LENGTH);
+    serialString[ATA_SERIAL_LENGTH] = '\0';
+    kprintf("ATA:    Serial: %s\n", serialString);
     kprintf("ATA:    ATA versions:");
-    if (info.versionMajor & ATA_VERSION_ATA1)
+   /* if (info.versionMajor & ATA_VERSION_ATA1)
         kprintf(" ATA-1");
     if (info.versionMajor & ATA_VERSION_ATA2)
         kprintf(" ATA-2");
@@ -342,7 +363,7 @@ static void ata_print_device_info(ata_identify_result_t info) {
 }
 
 static void ata_print_device_packet_info(ata_identify_packet_result_t info) {
-    kprintf("ATA:    Model: %s\n", info.model);
+    /*kprintf("ATA:    Model: %s\n", info.model);
     kprintf("ATA:    Firmware: %s\n", info.firmwareRevision);
     kprintf("ATA:    Serial: %s\n", info.serial);
     kprintf("ATA:    ATA versions:");
@@ -377,7 +398,7 @@ static void ata_print_device_packet_info(ata_identify_packet_result_t info) {
     }
     else {
         kprintf("ATA:    Type: PATA\n");
-    }
+    }*/
 }
 
 void ata_reset_identify(ata_channel_t *channel) {
@@ -404,13 +425,13 @@ void ata_reset_identify(ata_channel_t *channel) {
         }
         else { // ATA device.
             ata_identify_result_t ataMaster;
-            if (ata_identify(channel, true, &ataMaster) == ATA_CHK_STATUS_OK) {
+           /* if (ata_identify(channel, true, &ataMaster) == ATA_CHK_STATUS_OK) {
                 kprintf("ATA: Found master device on channel 0x%X!\n", channel->CommandPort);
                 ata_print_device_info(ataMaster);
             }
             else {
                 kprintf("ATA: Failed to identify master device or no device exists on channel 0x%X.\n", channel->CommandPort);
-            }
+            }*/
         }
     }
     else { // Master isn't present.
@@ -623,12 +644,17 @@ bool ata_init(pci_device_t *pciDevice) {
     ata_select_device(ataController->Secondary, true);
     uint8_t *data = (uint8_t*)kheap_alloc(ATA_SECTOR_SIZE_512);
 
+
     // Temporary.
     ataController->Primary->MasterDevice = (ata_device_t*)kheap_alloc(sizeof(ata_device_t));
     ata_device_t *masterDevice = (ata_device_t*)ataController->Primary->MasterDevice;
     masterDevice->Channel = ataController->Primary;
     masterDevice->Master = true;
     masterDevice->BytesPerSector = ATA_SECTOR_SIZE_512;
+
+    ata_identify_result_t idResult;
+    ata_identify(ataController->Primary->MasterDevice, &idResult);
+    ata_print_device_info(idResult);
 
     // Register storage device.
     storage_device_t *ataPriStorageDevice = (storage_device_t*)kheap_alloc(sizeof(storage_device_t));

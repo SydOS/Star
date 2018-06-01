@@ -43,36 +43,39 @@ void ata_read_identify_words(ata_channel_t *channel, uint8_t *checksum, uint8_t 
         ata_read_identify_word(channel, checksum);
 }
 
-int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t *outResult) {
+int16_t ata_identify(ata_device_t *ataDevice, ata_identify_result_t *outResult) {
+    // Check status.
+    int16_t status = ata_check_status(ataDevice->Channel, ataDevice->Master);
+    if (status != ATA_CHK_STATUS_OK)
+        return status;
+
     // Send IDENTIFY command.
-    ata_send_command(channel, 0x00, 0x00, 0x00, 0x00, ATA_CMD_IDENTIFY);
+    outb(ATA_REG_COMMAND(ataDevice->Channel->CommandPort), ATA_CMD_IDENTIFY);
 
     // Wait for device.
-    if (ata_wait_for_irq(channel, master) != ATA_CHK_STATUS_OK || !ata_wait_for_drq(channel))
-       return ata_check_status(channel, master);
+    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) != ATA_CHK_STATUS_OK || !ata_wait_for_drq(ataDevice->Channel))
+        return ata_check_status(ataDevice->Channel, ataDevice->Master);
 
     // Read identify result.
     ata_identify_result_t result;
-    ata_read_data_pio(channel, sizeof(ata_identify_result_t), &result, sizeof(ata_identify_result_t));
+    ata_read_data_pio(ataDevice->Channel, sizeof(ata_identify_result_t), &result, sizeof(ata_identify_result_t));
 
-    // Checksum total, used at end.
-    uint8_t checksum = 0;
+    // Is the checksum valid?
+    if (result.ChecksumValidityIndicator == ATA_IDENTIFY_INTEGRITY_MAGIC) {
+        // Determine sum of bytes.
+        uint8_t checksum = 0;
+        uint8_t *resultBytes = (uint8_t*)&result;
+        for (uint16_t i = 0; i < sizeof(ata_identify_result_t); i++)
+            checksum += resultBytes[i];
 
-    // Read integrity word 255.
-    // If the low byte contains the magic number, validate checksum. If check fails, command failed.
-    /*uint16_t integrity = ata_read_identify_word(channel, &checksum);
-    if (((uint8_t)(integrity & 0xFF)) == ATA_IDENTIFY_INTEGRITY_MAGIC && checksum != 0)
-        return ATA_CHK_STATUS_ERROR;
-
-    // Ensure device is in fact an ATA device.
-    if (result.generalConfig & ATA_IDENTIFY_GENERAL_NOT_ATA_DEVICE)
-        return ATA_CHK_STATUS_ERROR;*/
-
-    // Ensure outputs are good.
+        // If sum is not zero, data is damaged.
+        if (checksum != 0)
+            return ATA_CHK_STATUS_ERROR;
+    }
 
     // Command succeeded.
     *outResult = result;
-    return ata_check_status(channel, master);
+    return ata_check_status(ataDevice->Channel, ataDevice->Master);
 }
 
 int16_t ata_read_sector(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length) {
@@ -121,7 +124,7 @@ int16_t ata_read_sector(ata_device_t *ataDevice, uint64_t startSectorLba, void *
     }
 
     // Wait for device.
-    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) == -1 || !ata_wait_for_drq(ataDevice->Channel))
+    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) != ATA_CHK_STATUS_OK || !ata_wait_for_drq(ataDevice->Channel))
         return ata_check_status(ataDevice->Channel, ataDevice->Master);
 
     // Read data and return status.
@@ -203,7 +206,7 @@ int16_t ata_read_dma(ata_device_t *ataDevice, uint64_t startSectorLba, void *out
     ata_dma_start(ataDevice->Channel, false);
 
     // Wait for device.
-    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) == -1) {
+    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) != ATA_CHK_STATUS_OK) {
         // Stop DMA.
         ata_dma_reset(ataDevice->Channel);
         return ata_check_status(ataDevice->Channel, ataDevice->Master);
