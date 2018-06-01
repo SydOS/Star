@@ -1,7 +1,33 @@
+/*
+ * File: ata.h
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #ifndef ATA_H
 #define ATA_H
 
 #include <main.h>
+#include <driver/pci.h>
+#include <kernel/memory/paging.h>
 
 // Primary PATA interface ports.
 #define ATA_PRI_COMMAND_PORT    0x1F0
@@ -17,8 +43,11 @@
 #define ATA_REG_FEATURES(port)              (port+0x1) // Used for ATAPI.
 #define ATA_REG_SECTOR_COUNT(port)          (port+0x2) // Number of sectors to read/write.
 #define ATA_REG_SECTOR_NUMBER(port)         (port+0x3) // CHS, LBA.
+#define ATA_REG_LBA_LOW(port)               (port+0x3) // LBA low bits.
 #define ATA_REG_CYLINDER_LOW(port)          (port+0x4) // Low part of sector address.
+#define ATA_REG_LBA_MID(port)               (port+0x4) // LBA middle bits.
 #define ATA_REG_CYLINDER_HIGH(port)         (port+0x5) // High part of sector address.
+#define ATA_REG_LBA_HIGH(port)              (port+0x5) // LBA high bits.
 #define ATA_REG_DRIVE_SELECT(port)          (port+0x6) // Selects the drive and/or head.
 #define ATA_REG_COMMAND(port)               (port+0x7) // Send commands or read status.
 #define ATA_REG_STATUS(port)                (port+0x7) // Read status.
@@ -96,8 +125,25 @@ enum {
 
 #define ATA_PCI_BUSMASTER_STATUS_INTERRUPT  0x04
 
+// ATA DMA PRD.
+typedef struct {
+    uint32_t BufferAddress;
+    uint16_t ByteCount;
 
-// ATA driver structures.
+    uint16_t Reserved : 15;
+    bool EndOfTable : 1;
+} __attribute__((packed)) ata_prd_t;
+
+// Sufficient for a transfer of 256 512-byte sectors.
+#define ATA_PRD_COUNT       32
+#define ATA_PRD_BUF_SIZE    PAGE_SIZE_4K
+
+#define ATA_DMA_CMD_START   (1 << 0)
+#define ATA_DMA_CMD_WRITE   (1 << 3)
+
+struct ata_device_t;
+
+// ATA channel.
 typedef struct {
     uint16_t CommandPort;
     uint16_t ControlPort;
@@ -108,13 +154,55 @@ typedef struct {
     uint16_t BusMasterCommandPort;
     uint16_t BusMasterStatusPort;
     uint16_t BusMasterPrdt;
+
+    uint32_t PrdtPage;
+    ata_prd_t *Prdt;
+    uint8_t *PrdBuffers[ATA_PRD_COUNT];
+
+    struct ata_device_t *MasterDevice;
+    struct ata_device_t *SlaveDevice;
 } ata_channel_t;
 
+// ATA device.
 typedef struct {
-    ata_channel_t Primary;
-    ata_channel_t Secondary;
+    ata_channel_t *Channel;
+    bool Master;
+
+    uint16_t BytesPerSector;
+    bool Lba48BitSupported;
 } ata_device_t;
 
-//extern void ata_init();
+// ATA controller.
+typedef struct {
+    ata_channel_t *Primary;
+    ata_channel_t *Secondary;
+} ata_controller_t;
+
+typedef struct {
+    bool Error : 1;
+    uint8_t Unused : 2;
+    bool DataRequest : 1;
+    bool ServiceRequest : 1;
+    bool DriveFault : 1;
+    bool Ready : 1;
+    bool Busy : 1;
+} __attribute__((packed)) ata_reg_status_t;
+
+#include <driver/storage/ata/ata_commands.h>
+
+extern int16_t ata_check_status(ata_channel_t *channel, bool master);
+extern void ata_read_data_pio(ata_channel_t *channel, uint32_t size, void *outData, uint32_t length);
+extern void ata_write_data_pio(ata_channel_t *channel, const void *data, uint32_t size);
+extern void ata_send_params(ata_channel_t *channel, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh);
+extern void ata_send_command(ata_channel_t *channel, uint8_t sectorCount, uint8_t sectorNumber, uint8_t cylinderLow, uint8_t cylinderHigh, uint8_t command);
+extern void ata_set_lba_high(ata_channel_t *channel, uint8_t lbaHigh);
+extern void ata_select_device(ata_channel_t *channel, bool master);
+extern bool ata_wait_for_drq(ata_channel_t *channel);
+
+
+extern void ata_dma_reset(ata_channel_t *channel);
+extern void ata_dma_start(ata_channel_t *channel, bool write);
+
+extern bool ata_init(pci_device_t *pciDevice);
 
 #endif

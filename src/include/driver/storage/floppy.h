@@ -1,9 +1,41 @@
+/*
+ * File: floppy.h
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #ifndef FLOPPY_H
 #define FLOPPY_H
 
 #include <main.h>
 
 #define FLOPPY_IRQ  6
+
+// Floppy drive types (from CMOS).
+#define FLOPPY_TYPE_NONE        0x0
+#define FLOPPY_TYPE_360_525     0x1
+#define FLOPPY_TYPE_1200_525    0x2
+#define FLOPPY_TYPE_720_35      0x3
+#define FLOPPY_TYPE_1440_35     0x4
+#define FLOPPY_TYPE_2880_35     0x5
 
 // Floppy registers.
 enum {
@@ -139,12 +171,11 @@ enum {
 };
 
 // Floppy data rates.
-enum {
-    FLOPPY_DRATE_1MBPS      = 0x3,
-    FLOPPY_DRATE_500KBPS    = 0x0,
-    FLOPPY_DRATE_300KBPS    = 0x1,
-    FLOPPY_DRATE_250KBPS    = 0x2
-};
+#define FLOPPY_SPEED_500KBPS    0x0
+#define FLOPPY_SPEED_300KBPS    0x1
+#define FLOPPY_SPEED_250KBPS    0x2
+#define FLOPPY_SPEED_1MBPS      0x3
+
 
 #define FLOPPY_CMD_RETRY_COUNT  10
 #define FLOPPY_IRQ_WAIT_TIME    500
@@ -153,14 +184,28 @@ enum {
 #define FLOPPY_VERSION_NONE     0xFF
 #define FLOPPY_VERSION_ENHANCED 0x90
 
-extern int8_t floppy_read_sector(uint8_t drive, uint32_t sectorLba, uint8_t buffer[], uint16_t bufferSize);
-extern int8_t floppy_read_track(uint8_t drive, uint8_t track, uint8_t buffer[], uint16_t bufferSize);
+
+typedef struct {
+    uint16_t BaseAddress;
+    uint8_t Number;
+
+    uint8_t Version;
+    uint8_t Type;
+
+    uint8_t *DmaBuffer;
+} floppy_drive_t;
+
+
+//extern bool floppy_read_blocks(uint8_t drive, const uint64_t *blocks, uint32_t blockSize, uint32_t blockCount, uint8_t *outBuffer, uint32_t length);
+
+
+extern bool floppy_seek(floppy_drive_t *floppyDrive, uint8_t track);
 
 extern void floppy_write_data(uint8_t data);
 extern uint8_t floppy_read_data();
 extern void floppy_sense_interrupt(uint8_t* st0, uint8_t* cyl);
 extern void floppy_set_motor(uint8_t drive, bool on);
 extern uint8_t floppy_version();
-extern void floppy_init();
+extern bool floppy_init(void);
 
 #endif

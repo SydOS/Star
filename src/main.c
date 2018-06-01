@@ -1,3 +1,27 @@
+/*
+ * File: main.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <tools.h>
 #include <io.h>
@@ -25,7 +49,12 @@
 
 #include <driver/usb/devices/usb_device.h>
 
+#include <kernel/networking/networking.h>
+
 #include <acpi.h>
+
+#include <driver/fs/fat.h>
+#include <kernel/storage/storage.h>
 
 // Displays a kernel panic message and halts the system.
 void panic(const char *format, ...) {
@@ -155,6 +184,9 @@ void kernel_late() {
 	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
 	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
+	// Initialize networking.
+	networking_init();
+
 	// Print logo.
 	kprintf("\n\e[94m");
 	kprintf("   _____           _  ____   _____ \n");
@@ -165,7 +197,7 @@ void kernel_late() {
 	kprintf(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
 	kprintf("          __/ |                    \n");
 	kprintf("         |___/                     \n");
-	kprintf("\e[36mCopyright (c) Sydney Erickson 2017 - 2018\e[0m\n\n");
+	kprintf("\e[36mCopyright (c) Sydney Erickson, John Davis 2017 - 2018\e[0m\n\n");
 
     // Ring serial terminals.
 	kprintf("\a");
@@ -224,6 +256,10 @@ void kernel_late() {
 
 		else if (strcmp(buffer, "uptime") == 0)
 			kprintf("Current uptime: %i milliseconds.\n", timer_ticks());
+		else if (strcmp(buffer, "floppy") == 0) {
+				// Mount? floppy drive. No partitions here.
+			fat_init(storageDevices, PARTITION_NONE);
+		}
 
 		else if (strcmp(buffer, "corp") == 0)
 			kprintf("Hacking CorpNewt's computer and installing SydOS.....\n");
@@ -262,6 +298,12 @@ void kernel_late() {
 				// Move to next device.
 				usbDevice = usbDevice->Next;
 			}
+		}
+		else if (strcmp(buffer, "lsnet") == 0) {
+			networking_print_devices();
+		}
+		else if (strcmp(buffer, "free") == 0) {
+			kprintf("Free page count: %u\n", pmm_frames_available_long());
 		}
 	}
 }

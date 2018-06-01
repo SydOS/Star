@@ -1,3 +1,27 @@
+/*
+ * File: main_early.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <multiboot.h>
 
@@ -13,8 +37,8 @@ extern uint32_t KERNEL_INIT_END;
 // Used in late memory initialization.
 uint32_t DMA_FRAMES_FIRST __attribute__((section(".inittables")));
 uint32_t DMA_FRAMES_LAST __attribute__((section(".inittables")));
-uint32_t PAGE_FRAME_STACK_PAE_START __attribute__((section(".inittables")));
-uint32_t PAGE_FRAME_STACK_PAE_END __attribute__((section(".inittables")));
+uint32_t PAGE_FRAME_STACK_LONG_START __attribute__((section(".inittables")));
+uint32_t PAGE_FRAME_STACK_LONG_END __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_START __attribute__((section(".inittables")));
 uint32_t PAGE_FRAME_STACK_END __attribute__((section(".inittables")));
 uint32_t EARLY_PAGES_LAST __attribute__((section(".inittables")));
@@ -215,22 +239,22 @@ __attribute__((section(".init"))) void kernel_main_early(uint32_t mbootMagic, mu
     DMA_FRAMES_FIRST = ALIGN_64K((uint32_t)&KERNEL_PHYSICAL_END);
     DMA_FRAMES_LAST = DMA_FRAMES_FIRST + (PAGE_SIZE_64K * 64);
 
-    // Determine PAE page frame stack offset and size. This is only created if PAE is enabled and more than 4GB of RAM exist.
-    if (memoryHigh > 0) {
-        PAGE_FRAME_STACK_PAE_START = ALIGN_4K(DMA_FRAMES_LAST);
-        PAGE_FRAME_STACK_PAE_END = PAGE_FRAME_STACK_PAE_START + ((memoryHigh / PAGE_SIZE_4K) * sizeof(uint64_t)); // Space for 64-bit addresses.
+    // Force PAE off for now.
+    PAE_ENABLED = false;
+
+    // Determine 64-bit page frame stack offset and size. This is only created if PAE is enabled and more than 4GB of RAM exist.
+    if (memoryHigh > 0 && PAE_ENABLED) {
+        PAGE_FRAME_STACK_LONG_START = ALIGN_4K(DMA_FRAMES_LAST);
+        PAGE_FRAME_STACK_LONG_END = PAGE_FRAME_STACK_LONG_START + ((memoryHigh / PAGE_SIZE_4K) * sizeof(uint64_t)); // Space for 64-bit addresses.
     }
     else {
-        PAGE_FRAME_STACK_PAE_START = 0;
-        PAGE_FRAME_STACK_PAE_END = 0;
+        PAGE_FRAME_STACK_LONG_START = 0;
+        PAGE_FRAME_STACK_LONG_END = 0;
     }
 
     // Determine page frame stack offset and size. This is placed after the DMA pages.
-    PAGE_FRAME_STACK_START = ALIGN_4K((PAGE_FRAME_STACK_PAE_END == 0) ? DMA_FRAMES_LAST : PAGE_FRAME_STACK_PAE_END);
+    PAGE_FRAME_STACK_START = ALIGN_4K((PAGE_FRAME_STACK_LONG_END == 0) ? DMA_FRAMES_LAST : PAGE_FRAME_STACK_LONG_END);
     PAGE_FRAME_STACK_END = PAGE_FRAME_STACK_START + ((memory / PAGE_SIZE_4K) * sizeof(uint32_t)); // Space for 32-bit addresses.
-
-    // Force PAE off for now.
-    //PAE_ENABLED = false;
 
     // Is PAE enabled?
     if (PAE_ENABLED)

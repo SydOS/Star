@@ -1,5 +1,31 @@
+/*
+ * File: ata_commands.c
+ *
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <io.h>
+#include <math.h>
+#include <string.h>
 #include <driver/storage/ata/ata.h>
 #include <driver/storage/ata/ata_commands.h>
 
@@ -17,238 +43,197 @@ void ata_read_identify_words(ata_channel_t *channel, uint8_t *checksum, uint8_t 
         ata_read_identify_word(channel, checksum);
 }
 
-int16_t ata_identify(ata_channel_t *channel, bool master, ata_identify_result_t *outResult) {
+int16_t ata_identify(ata_device_t *ataDevice, ata_identify_result_t *outResult) {
+    // Check status.
+    int16_t status = ata_check_status(ataDevice->Channel, ataDevice->Master);
+    if (status != ATA_CHK_STATUS_OK)
+        return status;
+
     // Send IDENTIFY command.
-    ata_send_command(channel, 0x00, 0x00, 0x00, 0x00, ATA_CMD_IDENTIFY);
+    outb(ATA_REG_COMMAND(ataDevice->Channel->CommandPort), ATA_CMD_IDENTIFY);
 
     // Wait for device.
-    if (ata_wait_for_irq(channel, master) != ATA_CHK_STATUS_OK || !ata_wait_for_drq(channel))
-       return ata_check_status(channel, master);
+    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) != ATA_CHK_STATUS_OK || !ata_wait_for_drq(ataDevice->Channel))
+        return ata_check_status(ataDevice->Channel, ataDevice->Master);
 
-    // Checksum total, used at end.
-    uint8_t checksum = 0;
-    ata_identify_result_t result = {};
+    // Read identify result.
+    ata_identify_result_t result;
+    ata_read_data_pio(ataDevice->Channel, sizeof(ata_identify_result_t), &result, sizeof(ata_identify_result_t));
 
-    // Read words 0-9.
-    result.generalConfig = ata_read_identify_word(channel, &checksum);
-    result.logicalCylinders = ata_read_identify_word(channel, &checksum);
-    result.specificConfig = ata_read_identify_word(channel, &checksum);
-    result.logicalHeads = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_words(channel, &checksum, 4, 5);
-    result.logicalSectorsPerTrack = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_words(channel, &checksum, 7, 9);
+    // Is the checksum valid?
+    if (result.ChecksumValidityIndicator == ATA_IDENTIFY_INTEGRITY_MAGIC) {
+        // Determine sum of bytes.
+        uint8_t checksum = 0;
+        uint8_t *resultBytes = (uint8_t*)&result;
+        for (uint16_t i = 0; i < sizeof(ata_identify_result_t); i++)
+            checksum += resultBytes[i];
 
-    // Read serial number (words 10-19).
-    for (uint16_t i = 0; i < ATA_SERIAL_LENGTH; i+=2) {
-        uint16_t value = ata_read_identify_word(channel, &checksum);
-        result.serial[i] = (char)(value >> 8);
-        result.serial[i+1] = (char)(value & 0xFF);
+        // If sum is not zero, data is damaged.
+        if (checksum != 0)
+            return ATA_CHK_STATUS_ERROR;
     }
-    result.serial[ATA_SERIAL_LENGTH] = '\0';
-
-    // Unused words 20-22.
-    ata_read_identify_words(channel, &checksum, 20, 22);
-
-    // Read firmware revision (words 23-26).
-    for (uint16_t i = 0; i < ATA_FIRMWARE_LENGTH; i+=2) {
-        uint16_t value = ata_read_identify_word(channel, &checksum);
-        result.firmwareRevision[i] = (char)(value >> 8);
-        result.firmwareRevision[i+1] = (char)(value & 0xFF);
-    }
-    result.firmwareRevision[ATA_FIRMWARE_LENGTH] = '\0';
-
-    // Read Model (words 27-46).
-    for (uint16_t i = 0; i < ATA_MODEL_LENGTH; i+=2) {
-        uint16_t value = ata_read_identify_word(channel, &checksum);
-        result.model[i] = (char)(value >> 8);
-        result.model[i+1] = (char)(value & 0xFF);
-    }
-    result.model[ATA_MODEL_LENGTH] = '\0';
-
-    // Read words 47-59.
-    result.maxSectorsInterrupt = (uint8_t)(ata_read_identify_word(channel, &checksum) & 0xFF);
-    result.trustedComputingFlags = ata_read_identify_word(channel, &checksum);
-    result.capabilities49 = ata_read_identify_word(channel, &checksum);
-    result.capabilities50 = ata_read_identify_word(channel, &checksum);
-    result.pioMode = (uint8_t)(ata_read_identify_word(channel, &checksum) >> 8);
-    ata_read_identify_word(channel, &checksum);
-    result.flags53 = ata_read_identify_word(channel, &checksum);
-    result.currentLogicalCylinders = ata_read_identify_word(channel, &checksum);
-    result.currentLogicalHeads = ata_read_identify_word(channel, &checksum);
-    result.currentLogicalSectorsPerTrack = ata_read_identify_word(channel, &checksum);
-    result.currentCapacitySectors = (uint32_t)ata_read_identify_word(channel, &checksum) | ((uint32_t)ata_read_identify_word(channel, &checksum) << 16);
-    result.flags59 = ata_read_identify_word(channel, &checksum);
-
-    // Read words 60-79.
-    result.totalLba28Bit = (uint32_t)ata_read_identify_word(channel, &checksum) | ((uint32_t)ata_read_identify_word(channel, &checksum) << 16);
-    ata_read_identify_word(channel, &checksum);
-    result.multiwordDmaFlags = ata_read_identify_word(channel, &checksum);
-    result.pioModesSupported = (uint8_t)(ata_read_identify_word(channel, &checksum) & 0xFF);
-    result.multiwordDmaMinCycleTime = ata_read_identify_word(channel, &checksum);
-    result.multiwordDmaRecCycleTime = ata_read_identify_word(channel, &checksum);
-    result.pioMinCycleTimeNoFlow = ata_read_identify_word(channel, &checksum);
-    result.pioMinCycleTimeIoRdy = ata_read_identify_word(channel, &checksum);
-    result.additionalSupportedFlags = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_words(channel, &checksum, 70, 74);
-    result.maxQueueDepth = (uint8_t)(ata_read_identify_word(channel, &checksum) & 0x1F);
-    result.serialAtaFlags76 = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_word(channel, &checksum);
-    result.serialAtaFlags78 = ata_read_identify_word(channel, &checksum);
-    result.serialAtaFlags79 = ata_read_identify_word(channel, &checksum);
-
-    // Read words 80-93.
-    result.versionMajor = ata_read_identify_word(channel, &checksum);
-    result.versionMinor = ata_read_identify_word(channel, &checksum);
-    result.commandFlags82 = ata_read_identify_word(channel, &checksum);
-    result.commandFlags83.data = ata_read_identify_word(channel, &checksum);
-    result.commandFlags84 = ata_read_identify_word(channel, &checksum);
-    result.commandFlags85 = ata_read_identify_word(channel, &checksum);
-    result.commandFlags86 = ata_read_identify_word(channel, &checksum);
-    result.commandFlags87 = ata_read_identify_word(channel, &checksum);
-    result.ultraDmaMode = ata_read_identify_word(channel, &checksum);
-    result.normalEraseTime = (uint8_t)(ata_read_identify_word(channel, &checksum) & 0xFF);
-    result.enhancedEraseTime = (uint8_t)(ata_read_identify_word(channel, &checksum) & 0xFF);
-    result.currentApmLevel = ata_read_identify_word(channel, &checksum);
-    result.masterPasswordRevision = ata_read_identify_word(channel, &checksum);
-    result.hardwareResetResult = ata_read_identify_word(channel, &checksum);
-
-    // Read acoustic values (word 94).
-    uint16_t acoustic = ata_read_identify_word(channel, &checksum);
-    result.recommendedAcousticValue = (uint8_t)(acoustic >> 8);
-    result.currentAcousticValue = (uint8_t)(acoustic & 0xFF);
-
-    // Read stream values (words 95-99).
-    result.streamMinSize = ata_read_identify_word(channel, &checksum);
-    result.streamTransferTime = ata_read_identify_word(channel, &checksum);
-    result.streamTransferTimePio = ata_read_identify_word(channel, &checksum);
-    result.streamAccessLatency = ata_read_identify_word(channel, &checksum);
-    result.streamPerfGranularity = (uint32_t)ata_read_identify_word(channel, &checksum) | ((uint32_t)ata_read_identify_word(channel, &checksum) << 16);
-
-    // Read total sectors for 48-bit LBA (words 100-103).
-    result.totalLba48Bit = (uint64_t)ata_read_identify_word(channel, &checksum) | ((uint64_t)ata_read_identify_word(channel, &checksum) << 16)
-        | ((uint64_t)ata_read_identify_word(channel, &checksum) << 32) | ((uint64_t)ata_read_identify_word(channel, &checksum) << 48);
-
-    // Read words 104-107.
-    result.streamTransferTimePio = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_word(channel, &checksum);
-    result.physicalSectorSize = ata_read_identify_word(channel, &checksum);
-    result.interSeekDelay = ata_read_identify_word(channel, &checksum);
-
-    // Read world wide name (words 108-111).
-    result.worldWideName = (uint64_t)ata_read_identify_word(channel, &checksum) | ((uint64_t)ata_read_identify_word(channel, &checksum) << 16)
-        | ((uint64_t)ata_read_identify_word(channel, &checksum) << 32) | ((uint64_t)ata_read_identify_word(channel, &checksum) << 48);
-
-    // Read words 112-128.
-    ata_read_identify_words(channel, &checksum, 112, 116);
-    result.logicalSectorSize = (uint32_t)ata_read_identify_word(channel, &checksum) | ((uint32_t)ata_read_identify_word(channel, &checksum) << 16);
-    result.commandFlags119 = ata_read_identify_word(channel, &checksum);
-    result.commandFlags120 = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_words(channel, &checksum, 121, 126);
-    result.removableMediaFlags = ata_read_identify_word(channel, &checksum);
-    result.securityFlags = ata_read_identify_word(channel, &checksum);
-
-    // Read unused words 129-159.
-    ata_read_identify_words(channel, &checksum, 129, 159);
-
-    // Read words 160-169.
-    result.cfaFlags = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_words(channel, &checksum, 161, 167);
-    result.formFactor = (uint8_t)(ata_read_identify_word(channel, &checksum) & 0xF);
-    result.dataSetManagementFlags = ata_read_identify_word(channel, &checksum);
-
-    // Read additional identifier (words 170-173).
-    for (uint16_t i = 0; i < ATA_ADD_ID_LENGTH; i+=2) {
-        uint16_t value = ata_read_identify_word(channel, &checksum);
-        result.additionalIdentifier[i] = (char)(value >> 8);
-        result.additionalIdentifier[i+1] = (char)(value & 0xFF);
-    }
-    result.additionalIdentifier[ATA_ADD_ID_LENGTH] = '\0';
-
-    // Read unused words 174 and 175.
-    ata_read_identify_words(channel, &checksum, 174, 175);
-
-    // Read current media serial number (words 176-205).
-    for (uint16_t i = 0; i < ATA_MEDIA_SERIAL_LENGTH; i+=2) {
-        uint16_t value = ata_read_identify_word(channel, &checksum);
-        result.mediaSerial[i] = (char)(value >> 8);
-        result.mediaSerial[i+1] = (char)(value & 0xFF);
-    }
-    result.mediaSerial[ATA_MEDIA_SERIAL_LENGTH] = '\0';
-
-    // Read words 206-219.
-    result.sctCommandTransportFlags = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_words(channel, &checksum, 207, 208);
-    result.physicalBlockAlignment = ata_read_identify_word(channel, &checksum);
-    result.writeReadVerifySectorCountMode3 = (uint32_t)ata_read_identify_word(channel, &checksum) | ((uint32_t)ata_read_identify_word(channel, &checksum) << 16);
-    result.writeReadVerifySectorCountMode2 = (uint32_t)ata_read_identify_word(channel, &checksum) | ((uint32_t)ata_read_identify_word(channel, &checksum) << 16);
-    result.nvCacheCapabilities = ata_read_identify_word(channel, &checksum);
-    result.nvCacheSize = (uint32_t)ata_read_identify_word(channel, &checksum) | ((uint32_t)ata_read_identify_word(channel, &checksum) << 16);
-    result.rotationRate = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_word(channel, &checksum);
-    result.nvCacheFlags = ata_read_identify_word(channel, &checksum);
-
-    // Read words 220-254.
-    result.writeReadVerifyCurrentMode = (uint8_t)(ata_read_identify_word(channel, &checksum) & 0xFF);
-    ata_read_identify_word(channel, &checksum);
-    result.transportVersionMajor = ata_read_identify_word(channel, &checksum);
-    result.transportVersionMinor = ata_read_identify_word(channel, &checksum);
-    ata_read_identify_words(channel, &checksum, 224, 229);
-    result.extendedSectors = (uint64_t)ata_read_identify_word(channel, &checksum) | ((uint64_t)ata_read_identify_word(channel, &checksum) << 16)
-        | ((uint64_t)ata_read_identify_word(channel, &checksum) << 32) | ((uint64_t)ata_read_identify_word(channel, &checksum) << 48);
-    ata_read_identify_words(channel, &checksum, 234, 254);
-
-    // Read integrity word 255.
-    // If the low byte contains the magic number, validate checksum. If check fails, command failed.
-    uint16_t integrity = ata_read_identify_word(channel, &checksum);
-    if (((uint8_t)(integrity & 0xFF)) == ATA_IDENTIFY_INTEGRITY_MAGIC && checksum != 0)
-        return ATA_CHK_STATUS_ERROR;
-
-    // Ensure device is in fact an ATA device.
-    if (result.generalConfig & ATA_IDENTIFY_GENERAL_NOT_ATA_DEVICE)
-        return ATA_CHK_STATUS_ERROR;
-
-    // Ensure outputs are good.
 
     // Command succeeded.
     *outResult = result;
-    return ata_check_status(channel, master);
+    return ata_check_status(ataDevice->Channel, ataDevice->Master);
 }
 
-int16_t ata_read_sector(ata_channel_t *channel, bool master, uint32_t startSectorLba, void *outData, uint8_t sectorCount) {
-    // Send READ SECTOR command.
-    ata_set_lba_high(channel, (uint8_t)((startSectorLba >> 24) & 0x0F));
-    ata_send_command(channel, sectorCount, (uint8_t)(startSectorLba & 0xFF),
-        (uint8_t)((startSectorLba >> 8) & 0xFF), (uint8_t)((startSectorLba >> 16) & 0xFF), ATA_CMD_READ_SECTOR);
+int16_t ata_read_sector(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length) {
+    // Check status.
+    int16_t status = ata_check_status(ataDevice->Channel, ataDevice->Master);
+    if (status != ATA_CHK_STATUS_OK)
+        return status;
+
+    // Get sector count.
+    uint32_t sectorCount = divide_round_up_uint32(length, ataDevice->BytesPerSector);
+    if (sectorCount > 256)
+        return ATA_STATUS_ERROR;
+
+    // Is the requested sector above 28 bits?
+    if (startSectorLba > ATA_MAX_SECTOR_LBA_28BIT) { // 48-bit LBA.
+        // Send over high part of sector count.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)((sectorCount >> 8) & 0xFF));
+
+        // Send over high parts of LBA.
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 24) & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 32) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 40) & 0xFF));
+
+        // Send over lower part of sector count.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)(sectorCount & 0xFF));
+
+        // Send over lower parts of LBA and command.
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)(startSectorLba & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 8) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 16) & 0xFF));
+        outb(ATA_REG_COMMAND(ataDevice->Channel->CommandPort), ATA_CMD_READ_SECTOR_EXT);
+    }
+    else { // 28-bit LBA.
+        // If 256 sectors, count is to be zero.
+        if (sectorCount == 256)
+            sectorCount = 0;
+
+        // Send over sector count, LBA, and command.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)(sectorCount & 0xFF));
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)(startSectorLba & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 8) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 16) & 0xFF));
+        outb(ATA_REG_DRIVE_SELECT(ataDevice->Channel->CommandPort), inb(ATA_REG_DRIVE_SELECT(ataDevice->Channel->CommandPort))
+            | ATA_DEVICE_FLAGS_LBA | (uint8_t)((startSectorLba >> 24) & 0xF));
+        outb(ATA_REG_COMMAND(ataDevice->Channel->CommandPort), ATA_CMD_READ_SECTOR);
+    }
 
     // Wait for device.
-    if (!ata_wait_for_drq(channel))
-       return ata_check_status(channel, master);
+    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) != ATA_CHK_STATUS_OK || !ata_wait_for_drq(ataDevice->Channel))
+        return ata_check_status(ataDevice->Channel, ataDevice->Master);
 
-    // Read data.
-    ata_read_data_pio(channel, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
-    return ata_check_status(channel, master);
+    // Read data and return status.
+    ata_read_data_pio(ataDevice->Channel, (sectorCount == 0 ? 256 : sectorCount) * ataDevice->BytesPerSector, outData, length);
+    return ata_check_status(ataDevice->Channel, ataDevice->Master);
 }
 
-int16_t ata_read_sector_ext(ata_channel_t *channel, bool master, uint64_t startSectorLba, void *outData, uint16_t sectorCount) {
-    // Get low and high parts of 48-bit LBA address.
-    uint32_t lbaLow = (uint32_t)(startSectorLba & 0xFFFFFFFF);
-    uint32_t lbaHigh = (uint32_t)(startSectorLba >> 32);
+int16_t ata_read_dma(ata_device_t *ataDevice, uint64_t startSectorLba, void *outData, uint32_t length) {
+    // Check status.
+    int16_t status = ata_check_status(ataDevice->Channel, ataDevice->Master);
+    if (status != ATA_CHK_STATUS_OK)
+        return status;
 
-    // Send high LBA bytes, then low LBA bytes and command.
-    ata_set_lba_high(channel, (uint8_t)((lbaHigh >> 24) & 0x0F));
-    ata_send_params(channel, (uint8_t)(sectorCount >> 8), (uint8_t)(lbaHigh & 0xFF),
-        (uint8_t)((lbaHigh >> 8) & 0xFF), (uint8_t)((lbaHigh >> 16) & 0xFF));
-    ata_set_lba_high(channel, (uint8_t)((lbaLow >> 24) & 0x0F));
-    ata_send_command(channel, (uint8_t)(sectorCount & 0xFF), (uint8_t)(lbaLow & 0xFF),
-        (uint8_t)((lbaLow >> 8) & 0xFF), (uint8_t)((lbaLow >> 16) & 0xFF), ATA_CMD_READ_SECTOR_EXT);
+    // Get sector count.
+    uint32_t sectorCount = divide_round_up_uint32(length, ataDevice->BytesPerSector);
+    if (sectorCount > 256)
+        return ATA_STATUS_ERROR;
+
+    // Reset DMA.
+    ata_dma_reset(ataDevice->Channel);
+
+    // Prepare buffers for incoming data.
+    uint32_t remainingData = sectorCount * ataDevice->BytesPerSector;
+    uint8_t prdIndex = 0;
+    while (remainingData > 0) {
+        uint32_t size = remainingData;
+        if (size > ATA_PRD_BUF_SIZE)
+            size = ATA_PRD_BUF_SIZE;
+
+        // Set PRD fields.
+        ataDevice->Channel->Prdt[prdIndex].ByteCount = (uint16_t)size;
+        ataDevice->Channel->Prdt[prdIndex].EndOfTable = false;
+
+        // Move to next PRD entry.
+        prdIndex++;
+        remainingData -= size;
+    }
+
+    // Last PRD entry needs flag set.
+    ataDevice->Channel->Prdt[prdIndex - 1].EndOfTable = true;
+    kprintf("ATA: Reading %u sectors now...\n", sectorCount);
+
+    // Is the requested sector above 28 bits?
+    if (startSectorLba > ATA_MAX_SECTOR_LBA_28BIT) { // 48-bit LBA.
+        // Send over high part of sector count.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)((sectorCount >> 8) & 0xFF));
+
+        // Send over high parts of LBA.
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 24) & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 32) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 40) & 0xFF));
+
+        // Send over lower part of sector count.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)(sectorCount & 0xFF));
+
+        // Send over lower parts of LBA and command.
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)(startSectorLba & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 8) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 16) & 0xFF));
+        outb(ATA_REG_COMMAND(ataDevice->Channel->CommandPort), ATA_CMD_READ_DMA_EXT);
+    }
+    else { // 28-bit LBA.
+        // If 256 sectors, count is to be zero.
+        if (sectorCount == 256)
+            sectorCount = 0;
+
+        // Send over sector count, LBA, and command.
+        outb(ATA_REG_SECTOR_COUNT(ataDevice->Channel->CommandPort), (uint8_t)(sectorCount & 0xFF));
+        outb(ATA_REG_LBA_LOW(ataDevice->Channel->CommandPort), (uint8_t)(startSectorLba & 0xFF));
+        outb(ATA_REG_LBA_MID(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 8) & 0xFF));
+        outb(ATA_REG_LBA_HIGH(ataDevice->Channel->CommandPort), (uint8_t)((startSectorLba >> 16) & 0xFF));
+        outb(ATA_REG_DRIVE_SELECT(ataDevice->Channel->CommandPort), inb(ATA_REG_DRIVE_SELECT(ataDevice->Channel->CommandPort))
+            | ATA_DEVICE_FLAGS_LBA | (uint8_t)((startSectorLba >> 24) & 0xF));
+        outb(ATA_REG_COMMAND(ataDevice->Channel->CommandPort), ATA_CMD_READ_DMA);
+    }
+
+    // Start transfer with DMA.
+    outb(ataDevice->Channel->BusMasterCommandPort, ATA_DMA_CMD_WRITE | ATA_DMA_CMD_START);
+    ata_dma_start(ataDevice->Channel, false);
 
     // Wait for device.
-    if (!ata_wait_for_drq(channel))
-       return ata_check_status(channel, master);
+    if (ata_wait_for_irq(ataDevice->Channel, ataDevice->Master) != ATA_CHK_STATUS_OK) {
+        // Stop DMA.
+        ata_dma_reset(ataDevice->Channel);
+        return ata_check_status(ataDevice->Channel, ataDevice->Master);
+    }
 
-    // Read data.
-    ata_read_data_pio(channel, outData, (sectorCount == 0 ? 256 : sectorCount) * ATA_SECTOR_SIZE_512);
-    return ata_check_status(channel, master);
+    // TODO???
+    while (inb(ataDevice->Channel->BusMasterStatusPort) & 0x1);
+
+    // Stop DMA.
+    ata_dma_reset(ataDevice->Channel);
+
+    remainingData = length;
+    prdIndex = 0;
+    while (remainingData > 0) {
+        uint32_t size = remainingData;
+        if (size > ATA_PRD_BUF_SIZE)
+            size = ATA_PRD_BUF_SIZE;
+
+        // Copy data.
+        memcpy((uint8_t*)outData + (prdIndex * ATA_PRD_BUF_SIZE), ataDevice->Channel->PrdBuffers[prdIndex], size);
+
+        // Move to next PRD entry.
+        prdIndex++;
+        remainingData -= size;
+    }
+
+    return ata_check_status(ataDevice->Channel, ataDevice->Master);
 }
 
 int16_t ata_write_sector(ata_channel_t *channel, bool master, uint32_t startSectorLba, const void *data, uint8_t sectorCount) {

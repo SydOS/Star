@@ -1,3 +1,27 @@
+/*
+ * File: paging_i386.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <tools.h>
 #include <kprint.h>
@@ -98,7 +122,7 @@ static void paging_map_pae(uintptr_t virtual, uint64_t physical, bool unmap) {
     uint64_t* directory = (uint64_t*)paging_get_pae_directory_address(dirIndex);
     if (MASK_DIRECTORY_PAE(directoryPointerTable[dirIndex]) == 0) {
         // Pop page for new directory.
-        uint64_t directoryFrameAddr = pmm_pop_frame_nonpae();
+        uint64_t directoryFrameAddr = pmm_pop_frame_nonlong();
         directoryPointerTable[dirIndex] = directoryFrameAddr | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
         paging_flush_tlb();
 
@@ -117,7 +141,7 @@ static void paging_map_pae(uintptr_t virtual, uint64_t physical, bool unmap) {
     uint64_t *table = (uint64_t*)(paging_get_pae_tables_address(dirIndex) + (tableIndex * PAGE_SIZE_4K)); 
     if (MASK_PAGE_4K_64BIT(directory[tableIndex]) == 0) {
         // Pop page frame for new table.
-        directory[tableIndex] = pmm_pop_frame_nonpae() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
+        directory[tableIndex] = pmm_pop_frame_nonlong() | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
         paging_flush_tlb();
 
         // Zero out new table.
@@ -224,7 +248,7 @@ bool paging_get_phys(uintptr_t virtual, uint64_t *physOut) {
 }
 
 uintptr_t paging_create_app_copy(void) {
-    uint64_t appDirPage = pmm_pop_frame_nonpae();
+    uint64_t appDirPage = pmm_pop_frame_nonlong();
 
     // Are we in PAE mode?
     if (memInfo.paeEnabled) {
@@ -241,7 +265,7 @@ uintptr_t paging_create_app_copy(void) {
         appPointerTable[dirIndex] = directoryPointerTable[dirIndex];
 
         // Create 2GB page directory.
-        uint32_t pageDirectoryAddr = pmm_pop_frame_nonpae();
+        uint32_t pageDirectoryAddr = pmm_pop_frame_nonlong();
         appPointerTable[2] = pageDirectoryAddr | PAGING_PAGE_PRESENT;
         paging_flush_tlb();
 
@@ -352,7 +376,7 @@ void paging_late_pae() {
 
     // Pop a new page frame for the PDPT, and map it to 0x0 in the current virtual space.
     // This must be a 32-bit address, so pull from the non-PAE stack.
-    memInfo.kernelPageDirectory = pmm_pop_frame_nonpae();
+    memInfo.kernelPageDirectory = pmm_pop_frame_nonlong();
     earlyPageTableLow[0] = (uint64_t)memInfo.kernelPageDirectory | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
 
     // Get pointer to the PDPT.
@@ -361,7 +385,7 @@ void paging_late_pae() {
 
     // Pop a new page for the 3GB page directory, which will hold the kernel at 0xC0000000.
     // This is mapped to 0x1000 in the current virtual address space.
-    uint64_t pageDirectoryAddr = pmm_pop_frame_nonpae();
+    uint64_t pageDirectoryAddr = pmm_pop_frame_nonlong();
     earlyPageTableLow[1] = pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     pageDirectoryPointerTable[3] = pageDirectoryAddr | PAGING_PAGE_PRESENT;
     paging_flush_tlb();
@@ -371,7 +395,7 @@ void paging_late_pae() {
     memset(pageDirectory, 0, PAGE_SIZE_4K);
 
     // Create the first page table for the kernel, and map it to 0x2000 in the current virtual space.
-    uint64_t pageKernelTableAddr = pmm_pop_frame_nonpae();
+    uint64_t pageKernelTableAddr = pmm_pop_frame_nonlong();
     earlyPageTableLow[2] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT;
     paging_flush_tlb();
 
@@ -388,7 +412,7 @@ void paging_late_pae() {
         // Have we reached the need to create another table?
         if (page > 0 && page % PAGE_SIZE_2M == 0) { 
             // Create another table and map to 0x2000 in the current virtual space.
-            pageKernelTableAddr = pmm_pop_frame_nonpae();
+            pageKernelTableAddr = pmm_pop_frame_nonlong();
             earlyPageTableLow[2] = pageKernelTableAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
             paging_flush_tlb();
 
@@ -408,7 +432,7 @@ void paging_late_pae() {
     pageDirectory[PAGE_PAE_DIRECTORY_SIZE - 1] = pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER; // 3GB directory.
 
     // Create 2GB page directory.
-    pageDirectoryAddr = pmm_pop_frame_nonpae();
+    pageDirectoryAddr = pmm_pop_frame_nonlong();
     earlyPageTableLow[1] = pageDirectoryAddr | PAGING_PAGE_READWRITE | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
     pageDirectoryPointerTable[2] = pageDirectoryAddr | PAGING_PAGE_PRESENT | PAGING_PAGE_USER;
     paging_flush_tlb();

@@ -1,3 +1,27 @@
+/*
+ * File: pci.c
+ * 
+ * Copyright (c) 2017-2018 Sydney Erickson, John Davis
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <main.h>
 #include <io.h>
 #include <kprint.h>
@@ -57,7 +81,7 @@ uint8_t pci_config_read_byte(pci_device_t *pciDevice, uint8_t reg) {
 void pci_config_write_dword(pci_device_t *pciDevice, uint8_t reg, uint32_t value) {
     // Build address.
     uint32_t address = PCI_PORT_ENABLE_BIT | ((uint32_t)pciDevice->Bus << 16)
-        | ((uint32_t)pciDevice->Device << 11) | ((uint32_t)pciDevice->Function << 8) | (reg << 2);
+        | ((uint32_t)pciDevice->Device << 11) | ((uint32_t)pciDevice->Function << 8) | (reg & 0xFC);
 
     // Send address to PCI system.
     outl(PCI_PORT_ADDRESS, address);
@@ -88,13 +112,18 @@ void pci_config_write_byte(pci_device_t *pciDevice, uint8_t reg, uint8_t value) 
     pci_config_write_word(pciDevice, reg, newValue);
 }
 
+void pci_enable_busmaster(pci_device_t *pciDevice) {
+    // Set busmaster bit.
+    pci_config_write_word(pciDevice, PCI_REG_COMMAND, pci_config_read_word(pciDevice, PCI_REG_COMMAND) | PCI_CMD_BUSMASTER);
+}
+
 /**
  * Print the description for a PCI device
  * @param dev PCIDevice struct with PCI device info
  */
 void pci_print_info(pci_device_t *pciDevice) {
     // Print base info
-    kprintf("\e[94mPCI device: %X:%X (%X:%X) | Class %X Sub %X | Bus %d Device %d Function %d\n", 
+    kprintf("\e[94mPCI device: %4X:%4X (%4X:%4X) | Class %X Sub %X | Bus %d Device %d Function %d\n", 
         pciDevice->VendorId, pciDevice->DeviceId, pciDevice->SubVendorId, pciDevice->SubDeviceId, pciDevice->Class, pciDevice->Subclass, pciDevice->Bus, 
         pciDevice->Device, pciDevice->Function);
     
@@ -104,7 +133,7 @@ void pci_print_info(pci_device_t *pciDevice) {
     // Print base addresses.
     for (uint8_t i = 0; i < PCI_BAR_COUNT; i++)
         if (pciDevice->BaseAddresses[i].BaseAddress)
-            kprintf("  - BAR%u: 0x%X (%s)\n", i + 1, pciDevice->BaseAddresses[i].BaseAddress, pciDevice->BaseAddresses[i].PortMapped ? "port-mapped" : "memory-mapped");
+            kprintf("  - BAR%u: 0x%X (%s)\n", i, pciDevice->BaseAddresses[i].BaseAddress, pciDevice->BaseAddresses[i].PortMapped ? "port-mapped" : "memory-mapped");
 
     // Interrupt info
     if(pciDevice->InterruptNo != 0) { 
