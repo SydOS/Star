@@ -37,6 +37,7 @@
 
 #include <kernel/memory/paging.h>
 #include <kernel/memory/pmm.h>
+#include <kernel/multitasking/syscalls.h>
 
 #include <kernel/lock.h>
 
@@ -84,7 +85,12 @@ static uint32_t tasking_new_process_id(void) {
     return processId;
 }
 
-void tasking_kill_thread(void) {
+void tasking_cleanup(void) {
+    // Invoke thread cleanup syscall.
+    syscalls_syscall(0, 0, 0, 0, 0, 0, SYSCALL_THREAD_CLEANUP);
+}
+
+void tasking_cleanup_syscall(void) {
     // Get processor we are running on.
     smp_proc_t *proc = smp_get_proc(lapic_id());
     uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
@@ -292,10 +298,11 @@ void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex) {
 }
 
 static void kernel_init_thread(void) {
-    while(true) {
-        syscalls_kprintf("Test %u ticks\n", timer_ticks());
+   // while(true) {
+        syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());
         sleep(1000);
-    }
+        syscalls_kprintf("TASKING: Done with ring 3 thread.\n");
+  //  }
 }
 
 static void kernel_main_thread(void) {
@@ -318,9 +325,9 @@ static void kernel_main_thread(void) {
     tasking_unfreeze();
 
     // Create userspace process.
-   // kprintf("Creating userspace process...\n");
-    //process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
-    //tasking_thread_schedule_proc(initProcess->MainThread, 0);
+    kprintf("Creating userspace process...\n");
+    process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
+    tasking_thread_schedule_proc(initProcess->MainThread, 0);
     
     kernel_late();
 }

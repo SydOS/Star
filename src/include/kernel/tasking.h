@@ -84,7 +84,7 @@ typedef struct {
 	bool TaskingEnabled;
 } tasking_proc_t;
 
-extern void tasking_kill_thread(void);
+extern void tasking_cleanup_syscall(void);
 
 extern thread_t *tasking_thread_create(process_t *process, char *name, thread_entry_func_t func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2);
 extern process_t *tasking_process_create(process_t *parent, char *name, bool userMode, char *mainThreadName, thread_entry_func_t mainThreadFunc,
