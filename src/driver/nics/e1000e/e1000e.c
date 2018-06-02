@@ -146,7 +146,7 @@ static void e1000e_receive_bytes(e1000e_t *e1000eDevice) {
         } while (!(descStatus & E1000E_RECEIVE_STS_EOP));
 
         // Ensure there even is a networking stack attached to this device.
-        kprintf("E1000E: current index: %u\n", e1000eDevice->CurrentRxDesc);
+        //kprintf("E1000E: current index: %u\n", e1000eDevice->CurrentRxDesc);
         if (processPackets)
             // Send packet to the networking stack.
             networking_handle_packet(e1000eDevice->NetDevice, packetData, packetLength);
@@ -224,7 +224,7 @@ static bool e1000e_callback(pci_device_t *pciDevice) {
     if (intReg == 0)
         return false;
 
-    kprintf("E1000E: IRQ raised (0x%X)!\n", intReg);
+    //kprintf("E1000E: IRQ raised (0x%X)!\n", intReg);
 
     // Link change.
     if (intReg & E1000E_INT_LSC) {

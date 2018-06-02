@@ -43,6 +43,12 @@ ethernet_frame_t* l2_ethernet_create_frame(uint8_t* MACDest, uint8_t* MACSrc,
 	}
 	kprintf("L2Eth: frame size of 0x%X calculated, (Eth frame 0x%X | payloadSize 0x%X)\n", 
 			*FrameSize, sizeof(ethernet_frame_t), payloadSize);
+	if (payloadSize > 1500) {
+		kprintf("L2Eth: payload size is too large. Max size 1500 bytes.");
+		FrameSize = 0;
+		ethernet_frame_t *frame = (ethernet_frame_t*)kheap_alloc(*FrameSize);
+		return frame;
+	}
 
 	// Allocate the RAM for our new Ethernet frame to live in
 	ethernet_frame_t *frame = (ethernet_frame_t*)kheap_alloc(*FrameSize);
@@ -73,5 +79,10 @@ ethernet_frame_t* l2_ethernet_create_frame(uint8_t* MACDest, uint8_t* MACSrc,
 
 ethernet_frame_t* l2_ethernet_handle_packet(net_packet_t *packet) {
 	ethernet_frame_t *frame = (ethernet_frame_t*)packet->PacketData;
+	frame->Ethertype = (frame->Ethertype << 8) | (frame->Ethertype >> 8);
+	//kprintf("L2Eth: %x", frame->Ethertype);
+	if(frame->Ethertype == 0x0806) {
+		arp_process_response(frame);
+	}
 	return frame;
 }
