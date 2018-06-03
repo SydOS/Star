@@ -27,6 +27,7 @@
 #include <byteswap.h>
 
 #include <kernel/memory/kheap.h>
+#include <kernel/networking/layers/l2-ethernet.h>
 #include <kernel/networking/protocols/arp.h>
 #include <kernel/networking/networking.h>
 
@@ -51,4 +52,81 @@ arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP) {
     memcpy((frame->TargetIP), TargetIP, 4);
 
     return frame;
+}
+
+ethernet_frame_t* arp_create_packet(net_device_t* netDevice, uint8_t* targetIP, uint16_t *frameSize) {
+	// Generate global broadcast MAC
+	uint8_t destMAC[8];
+    for (int x = 0; x < NET_MAC_LENGTH; x++) {
+        destMAC[x] = 0xFF;
+    }
+
+	arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
+	ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, frameSize);
+	kheap_free(arpFrame);
+	return frame;
+}
+
+bool isWaitingForResponse = false;
+arp_frame_t* responseFrame;
+
+void arp_process_response(ethernet_frame_t* ethFrame) {
+	// Generate temporary frame
+	arp_frame_t* inFrame = (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t));
+
+	// Check if we are waiting for an ARP reply and it is a reply
+	if (isWaitingForResponse == true && swap_uint16(inFrame->Opcode) == 2) { // TODO replace with #define for opcode.
+		responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
+		memcpy(responseFrame, (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t)), sizeof(arp_frame_t));
+		isWaitingForResponse = false;
+	}
+}
+
+arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
+	if (responseFrame == 0x0) {
+		kprintf("ARP: Blank frame\n");
+		// Allocate memory for frame
+		responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
+		// Clear frame with 0s
+		memset(responseFrame, 0, sizeof(arp_frame_t));
+	}
+
+	// Generate global broadcast MAC
+	uint16_t frameSize;
+	uint8_t destMAC[NET_MAC_LENGTH];
+    for (int x = 0; x < NET_MAC_LENGTH; x++) {
+        destMAC[x] = 0xFF;
+    }
+
+	// Generate and send ARP request
+	arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
+	ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, &frameSize);
+	isWaitingForResponse = true;
+	netDevice->Send(netDevice, frame, frameSize);
+	kheap_free(arpFrame);
+
+	// Wait for a reply
+	uint64_t targetTick = timer_ticks() + 2000;
+	while (isWaitingForResponse &&
+		   responseFrame->SenderIP[0] != targetIP[0] ||
+		   responseFrame->SenderIP[1] != targetIP[1] ||
+		   responseFrame->SenderIP[2] != targetIP[2] ||
+		   responseFrame->SenderIP[3] != targetIP[3]) {
+		if (timer_ticks() >= targetTick) {
+			kprintf("ARP: request timeout\n");
+			// Allocate memory for frame
+			arp_frame_t *frame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
+
+			// Clear frame with 0s
+			memset(frame, 0, sizeof(arp_frame_t));
+			return frame;
+		}
+	}
+	
+	kprintf("ARP: IP for %2X:%2X:%2X:%2X:%2X:%2X is %u.%u.%u.%u\n",
+	responseFrame->SenderMAC[0], responseFrame->SenderMAC[1], responseFrame->SenderMAC[2], responseFrame->SenderMAC[3], responseFrame->SenderMAC[4], responseFrame->SenderMAC[5],
+	responseFrame->SenderIP[0], responseFrame->SenderIP[1], responseFrame->SenderIP[2], responseFrame->SenderIP[3]);
+
+	// Return new frame
+	return responseFrame;
 }

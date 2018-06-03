@@ -23,6 +23,7 @@
  */
 
 #include <main.h>
+#include <string.h>
 #include <kernel/timer.h>
 
 /**
@@ -78,6 +79,14 @@ char* utoa(uint32_t value, char* result, int base) {
 		*ptr1++ = tmp_char;
 	}
 	return result;
+}
+
+int32_t atoi(const char *str) {
+	// Convert decimal string to number.
+	int32_t value = 0;
+	for (uint16_t i = 0; i < strlen(str); i++)
+		value = value * 10 + (str[i] - '0');
+	return value;
 }
 
 uint32_t random_seed = 1;

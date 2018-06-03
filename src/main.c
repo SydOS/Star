@@ -50,6 +50,7 @@
 #include <driver/usb/devices/usb_device.h>
 
 #include <kernel/networking/networking.h>
+#include <kernel/networking/protocols/arp.h>
 
 #include <acpi.h>
 
@@ -119,6 +120,10 @@ void kernel_main() {
 	// We should never get here.
 	panic("MAIN: Tasking failed to start!\n");
 }
+
+#define OCTETS 4
+#define DELIMINATOR '.'
+#define DIGIT_OFFSET 48
 
 void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
 	while (1) { 
@@ -275,17 +280,46 @@ void kernel_late() {
 					break;
 				}
 			}
-			uint32_t msLen = strlen(msStr);
 
-			uint32_t hz = 0;
-			uint32_t ms = 0;
-			for (uint16_t i = 0; i < hzLen; i++)
-				hz = hz * 10 + (hzStr[i] - '0');
-			for (uint16_t i = 0; i < msLen; i++)
-				ms = ms * 10 + (msStr[i] - '0');
+			// Get freq.
+			char *hzStrTmp = (char*)kheap_alloc(hzLen + 1);
+			strncpy(hzStrTmp, hzStr, hzLen);
+			hzStrTmp[hzLen] = '\0';
+			uint32_t hz = atoi(hzStrTmp);
+			kheap_free(hzStrTmp);
+
+			// Get duration.
+			uint32_t ms = atoi(msStr);
 
 			kprintf("Beeping at %u hertz for %u ms...\n", hz, ms);
 			speaker_play_tone(hz, ms);
+		}
+		else if (strncmp(buffer, "arpping ", 7) == 0) {
+			char* ipstr = buffer + 8;
+			
+			// Parse IPv4 string
+			uint8_t octets[4];
+			int array_len = strlen(ipstr);
+			int multiplier = 1;
+			int current_num = 0;
+			int octet_index = OCTETS - 1;
+			for (int index = array_len - 1; index >= 0 && octet_index >= 0; index--) {
+				if (ipstr[index] == DELIMINATOR) {
+					octets[octet_index] = current_num;
+					octet_index--;
+
+					multiplier = 1;
+					current_num = 0;
+				} else if (ipstr[index] >= DIGIT_OFFSET && ipstr[index] <= DIGIT_OFFSET+10) {
+					current_num += (ipstr[index] - DIGIT_OFFSET) * multiplier;
+					multiplier *= 10;
+				}
+			}
+			octets[octet_index] = current_num;
+
+			// ARP request it
+			arp_frame_t* frame = arp_get_mac_address(&NetDevices[0], octets);
+			kheap_free(frame);
 		}
 		else if (strcmp(buffer, "lsusb") == 0) {
 			usb_device_t *usbDevice = StartUsbDevice;

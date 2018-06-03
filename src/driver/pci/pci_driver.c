@@ -42,7 +42,7 @@
 const pci_driver_t PciDrivers[] = {
     // Storage.
     //{ "AHCI controller", ahci_init }, // Disable for now.
-    { "ATA controller", ata_init },
+    //{ "ATA controller", ata_init },
 
     // USB.
     { "UHCI host controller", usb_uhci_init },

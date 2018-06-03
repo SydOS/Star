@@ -39,14 +39,14 @@
 pci_device_t *PciDevices = NULL;
 
 static bool pci_irq_callback(irq_regs_t *regs, uint8_t irqNum) {
-    kprintf("PCI: IRQ %u raised!\n", irqNum);
+   //kprintf("PCI: IRQ %u raised!\n", irqNum);
 
     // Call handlers of devices that are on the raised IRQ, until the IRQ is handled.
     pci_device_t *pciDevice = PciDevices;
     while (pciDevice != NULL) {
         // Ensure device's IRQ matches and there is an interrupt handler.
         if (pciDevice->InterruptNo == irqNum) {
-            kprintf("Checking device %X:%X, status: 0x%X\n", pciDevice->VendorId, pciDevice->DeviceId, pci_config_read_word(pciDevice, PCI_REG_STATUS));
+            //kprintf("Checking device %X:%X, status: 0x%X\n", pciDevice->VendorId, pciDevice->DeviceId, pci_config_read_word(pciDevice, PCI_REG_STATUS));
             if ((pciDevice->InterruptHandler != NULL) && pciDevice->InterruptHandler(pciDevice))
                 return true;
         }

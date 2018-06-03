@@ -33,37 +33,42 @@ spinlock_lock:
     ; Get lock object.
     mov rax, rdi
 
-.loop:
-    ; Attemp to lock object.
-    lock bts qword [rax], 0
-    pause
-	jc .loop
-
     ; Get RFLAGS register.
     pushfq
     pop rdx
     push rdx
     popfq
 
+    ; Disable interrupts.
+    cli
+
+.loop:
+    ; Attemp to lock object.
+    lock bts qword [rax], 0
+    jnc .locked
+
+    ; Renable interrupts if we didn't get the lock.
+    sti
+    pause
+	jmp .loop
+
+.locked:
     ; Save state of interrupts.
     and rdx, 0x200
     mov [rax+8], rdx
-
-    ; Disable interrupts.
-    cli
 	ret
 
 global spinlock_release
 spinlock_release:
-    ; Get lock object.
+    ; Get lock object and interrupt state.
     mov rax, rdi
+    mov rdx, [rax+8]
+    cmp rdx, 0
 
     ; Release lock.
     mov qword [rax], 0
 
     ; Enable interrupts if they were enabled before.
-    mov rdx, [rax+8]
-    cmp rdx, 0
     jz .spinlock_release_ret
     sti
 
