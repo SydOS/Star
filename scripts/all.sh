@@ -10,5 +10,6 @@ set -e
 ./toolchain-i586-gdb.sh
 ./toolchain-x86_64.sh
 ./toolchain-x86_64-gdb.sh
+./toolchain-grub.sh
 ./toolchain-nasm.sh
 ./toolchain-qemu.sh

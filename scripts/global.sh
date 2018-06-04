@@ -14,6 +14,7 @@ export PCRE_VERSION=8.42
 export GLIB_VERSION=2.56.1
 export PIXMAN_VERSION=0.34.0
 export QEMU_VERSION=2.12.0
+export GRUB_VERSION=2.02
 
 export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr
