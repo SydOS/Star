@@ -30,8 +30,15 @@
 // File in VFS (node).
 typedef struct {
     char Name[128]; // TODO
+    uint16_t Flags;
 
-    
+    // Permission mask, user, group IDs.
+    uint32_t PermMask;
+    uint32_t UserId;
+    uint32_t GroupId;
+
+    // Length in bytes.
+    uint64_t Length;
 } vfs_node_t;
 
 extern vfs_node_t *RootVfsNode;
