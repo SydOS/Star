@@ -29,7 +29,11 @@
 
 // File in VFS (node).
 typedef struct {
+    char Name[128]; // TODO
 
+    
 } vfs_node_t;
 
+extern vfs_node_t *RootVfsNode;
+extern void vfs_init(void);
 #endif

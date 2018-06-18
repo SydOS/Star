@@ -54,6 +54,8 @@
 
 #include <acpi.h>
 
+#include <kernel/vfs/vfs.h>
+
 #include <driver/fs/fat.h>
 #include <kernel/storage/storage.h>
 
@@ -175,6 +177,9 @@ void kernel_late() {
 	floppy_init();
 
 	pci_init();
+
+	// Initialize VFS.
+	vfs_init();
 
 	// Print info.
 	kprintf("\e[92mKernel is located at 0x%p!\n", memInfo.kernelStart);
