@@ -124,8 +124,9 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	}
 	
 	kprintf("ARP: IP for %2X:%2X:%2X:%2X:%2X:%2X is %u.%u.%u.%u\n",
-	responseFrame->SenderMAC[0], responseFrame->SenderMAC[1], responseFrame->SenderMAC[2], responseFrame->SenderMAC[3], responseFrame->SenderMAC[4], responseFrame->SenderMAC[5],
-	responseFrame->SenderIP[0], responseFrame->SenderIP[1], responseFrame->SenderIP[2], responseFrame->SenderIP[3]);
+			responseFrame->SenderMAC[0], responseFrame->SenderMAC[1], responseFrame->SenderMAC[2], responseFrame->SenderMAC[3], 
+			responseFrame->SenderMAC[4], responseFrame->SenderMAC[5], responseFrame->SenderIP[0], responseFrame->SenderIP[1], 
+			responseFrame->SenderIP[2], responseFrame->SenderIP[3]);
 
 	// Return new frame
 	return responseFrame;
