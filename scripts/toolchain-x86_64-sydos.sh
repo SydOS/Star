@@ -90,6 +90,26 @@ cd binutils-2.30-build
 ../binutils-2.30/configure --prefix=$HOME/SydOS-toolchain.framework --with-isl=$HOME/SydOS-toolchain.framework --with-cloog=$HOME/SydOS-toolchain.framework --with-sysroot --disable-nls --disable-werror --target=x86_64-sydos
 make
 make install
+make distclean
+../binutils-2.30/configure --prefix=$HOME/SydOS-toolchain.framework --with-isl=$HOME/SydOS-toolchain.framework --with-cloog=$HOME/SydOS-toolchain.framework --with-sysroot --disable-nls --disable-werror --target=i386-sydos
+make
+make install
+make distclean
+../binutils-2.30/configure --prefix=$HOME/SydOS-toolchain.framework --with-isl=$HOME/SydOS-toolchain.framework --with-cloog=$HOME/SydOS-toolchain.framework --with-sysroot --disable-nls --disable-werror --target=i486-sydos
+make
+make install
+make distclean
+../binutils-2.30/configure --prefix=$HOME/SydOS-toolchain.framework --with-isl=$HOME/SydOS-toolchain.framework --with-cloog=$HOME/SydOS-toolchain.framework --with-sysroot --disable-nls --disable-werror --target=i586-sydos
+make
+make install
+make distclean
+../binutils-2.30/configure --prefix=$HOME/SydOS-toolchain.framework --with-isl=$HOME/SydOS-toolchain.framework --with-cloog=$HOME/SydOS-toolchain.framework --with-sysroot --disable-nls --disable-werror --target=i686-sydos
+make
+make install
+make distclean
+../binutils-2.30/configure --prefix=$HOME/SydOS-toolchain.framework --with-isl=$HOME/SydOS-toolchain.framework --with-cloog=$HOME/SydOS-toolchain.framework --with-sysroot --disable-nls --disable-werror --target=i786-sydos
+make
+make install
 cd ..
 
 #rm -rf binutils-$BINUTILS_VERSION*
