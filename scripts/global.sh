@@ -2,7 +2,7 @@ export GMP_VERSION=6.1.2
 export MPFR_VERSION=4.0.1
 export MPC_VERSION=1.1.0
 export ISL_VERSION=0.19
-export CLOOG_VERSION=0.18.4
+export CLOOG_VERSION=0.19.0
 export BINUTILS_VERSION=2.30
 export GCC_VERSION=8.1.0
 export GDB_VERSION=8.1
@@ -18,7 +18,7 @@ export GRUB_VERSION=2.02
 
 export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr
-export CLOOG_MIRROR_BASE=https://www.bastoul.net/cloog/pages/download
+export CLOOG_MIRROR_BASE=https://github.com/periscop/cloog/releases/download
 export PKG_CONFIG_MIRROR_BASE=https://pkg-config.freedesktop.org/releases
 export LIBFFI_MIRROR_BASE=http://sourceware.org/pub/libffi
 export PCRE_MIRROR_BASE=https://ftp.pcre.org/pub/pcre
@@ -32,8 +32,10 @@ export PATH=$INSTALL_DIR/bin:$PATH
 function download_compile {
 	echo $1
 	rm -rf $2*
-	curl $1 > $2.archive
+
+	curl $1 -L > $2.archive
 	tar -xf $2.archive
+	
 	mkdir $2-build
 	cd $2-build
 
