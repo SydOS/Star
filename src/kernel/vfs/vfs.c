@@ -39,7 +39,7 @@ int32_t vfs_open(const char *path, int32_t flags) {
 
 void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mounted as root.
     kprintf("VFS: Initializing...!\n");
-    RootVfsNode = (vfs_node_t*)kheap_alloc(sizeof(RootVfsNode));
+    RootVfsNode = (vfs_node_t*)kheap_alloc(sizeof(vfs_node_t));
     memset(RootVfsNode, 0, sizeof(vfs_node_t));
     RootVfsNode->Name[0] = '/';
 

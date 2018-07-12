@@ -25,7 +25,7 @@
 ; 32-bit code.
 [bits 32]
 section .text
-extern tasking_kill_thread
+extern tasking_cleanup
 
 ; Thread execution shim.
 global _tasking_thread_exec
@@ -48,6 +48,6 @@ _tasking_thread_exec:
     call eax
 
     ; Kill thread and wait to die.
-    call tasking_kill_thread
+    call tasking_cleanup
 .loop:
     jmp .loop
