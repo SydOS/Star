@@ -26,6 +26,7 @@
 #include <kprint.h>
 #include <string.h>
 #include <kernel/vfs/vfs.h>
+#include <kernel/tasking.h>
 
 #include <kernel/memory/kheap.h>
 
@@ -34,7 +35,12 @@ vfs_node_t *RootVfsNode;
 
 int32_t vfs_open(const char *path, int32_t flags) {
     kprintf("VFS: Opening %s with flags 0x%X...\n", path, flags);
-    return 66;
+
+    // Get handle.
+    int32_t handle = tasking_process_get_file_handle();
+    kprintf("VFS: Opened %s with handle %u!\n", path, handle);
+
+    return handle;
 }
 
 void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mounted as root.
@@ -44,6 +50,7 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     RootVfsNode->Name[0] = '/';
 
     int32_t dd = vfs_open("/", 0);
+    int32_t df = vfs_open("/nou.txt", 0);
 
     kprintf("VFS: Initialized root node at 0x%p!\n", RootVfsNode);
 }

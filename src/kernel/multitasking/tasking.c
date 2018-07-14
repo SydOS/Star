@@ -283,6 +283,30 @@ process_t *tasking_process_create(process_t *parent, char *name, bool userMode, 
     return process;
 }
 
+uint32_t tasking_process_get_file_handle(void) {
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
+
+    // Pause tasking on processor.
+    threadLists[procIndex].TaskingEnabled = false;
+
+    // Get current process.
+    uint32_t handle = 0;
+    process_t *currentProcess = threadLists[procIndex].CurrentThread->Parent;
+
+    // Get next file handle.
+    spinlock_lock(&processLock);
+    currentProcess->LastFileHandle++;
+    currentProcess->OpenFiles = (vfs_node_t**)kheap_realloc(currentProcess->OpenFiles, sizeof(vfs_node_t*) * currentProcess->LastFileHandle);
+    handle = currentProcess->LastFileHandle;
+    spinlock_release(&processLock);
+
+    // Resume tasking on processor and return handle.
+    threadLists[procIndex].TaskingEnabled = true;
+    return handle;
+}
+
 void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex) {
     // Pause tasking on processor.
     threadLists[procIndex].TaskingEnabled = false;
