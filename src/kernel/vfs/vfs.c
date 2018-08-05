@@ -34,6 +34,9 @@
 vfs_node_t *RootVfsNode;
 
 int32_t vfs_open(const char *path, int32_t flags) {
+
+    // TODO: need to parse path, map node to handle, etc.
+
     kprintf("VFS: Opening %s with flags 0x%X...\n", path, flags);
 
     // Get handle.
