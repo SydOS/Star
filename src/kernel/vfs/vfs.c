@@ -57,7 +57,7 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     RootVfsNode->Name[0] = '/';
 
     int32_t dd = vfs_open("/", 0);
-    int32_t df = vfs_open("/nou.txt", 0);
+    int32_t df = vfs_open("/tmp/nou.txt", 0);
 
     kprintf("VFS: Initialized root node at 0x%p!\n", RootVfsNode);
 }

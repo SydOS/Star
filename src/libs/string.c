@@ -178,10 +178,13 @@ size_t strlen(const char *str) {
 
 
 char *strrchr(const char *str, int32_t c) {
-	while (*str != (char)c)
-        if (!*str++)
-            return 0;
-    return (char*)str;
+	char* ret=0;
+    do {
+        if(*str == (char)c)
+            ret=str;
+    } while(*str++);
+    return ret;
+
 }
 
 int32_t toupper(int32_t c) {
