@@ -177,6 +177,13 @@ size_t strlen(const char *str) {
 }
 
 
+char *strrchr(const char *str, int32_t c) {
+	while (*str != (char)c)
+        if (!*str++)
+            return 0;
+    return (char*)str;
+}
+
 int32_t toupper(int32_t c) {
 	if (c >= 97 && c <= 122)
 		c -= 32;

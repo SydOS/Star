@@ -14,6 +14,8 @@ extern char* strcpy(char *dest, const char *src);
 extern char* strncpy(char *dest, const char *src, size_t n);
 extern size_t strlen(const char* str);
 
+extern char *strrchr(const char *str, int32_t c);
+
 extern int32_t toupper(int32_t c);
 extern int32_t tolower(int32_t c);
 extern int32_t isdigit(int32_t c);

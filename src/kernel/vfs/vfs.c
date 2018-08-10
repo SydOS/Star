@@ -43,6 +43,10 @@ int32_t vfs_open(const char *path, int32_t flags) {
     int32_t handle = tasking_process_get_file_handle();
     kprintf("VFS: Opened %s with handle %u!\n", path, handle);
 
+    // Get filename.
+    char *fileName = strrchr(path, '/') + 1;
+    kprintf("VFS: Filename is %s\n", fileName);
+
     return handle;
 }
 
