@@ -22,7 +22,7 @@ export CLOOG_MIRROR_BASE=https://www.bastoul.net/cloog/pages/download
 export PKG_CONFIG_MIRROR_BASE=https://pkg-config.freedesktop.org/releases
 export LIBFFI_MIRROR_BASE=http://sourceware.org/pub/libffi
 export PCRE_MIRROR_BASE=https://ftp.pcre.org/pub/pcre
-export GLIB_MIRROR_BASE=http://mirror.umd.edu/gnome/sources/glib/2.56
+export GLIB_MIRROR_BASE=http://mirror.umd.edu/gnome/sources/glib/2.57
 export CAIROGRAPHICS_MIRROR_BASE=https://www.cairographics.org/releases
 export QEMU_MIRROR_BASE=https://download.qemu.org
 
