@@ -14,8 +14,10 @@ You will need the NASM compiler, QEMU, and an i686-elf toolchain. You can compil
 **NOTE:** the toolchain build script will place all binaries in `$HOME/tools`. You must add this to your PATH variable.
 
 ```
-brew install nasm qemu
-cd scripts && ./toolchain-i686.sh
+$ brew install qemu
+$ cd scripts
+$ ./toolchain-i686.sh 
+$ ./toolchain-nasm.sh
 ```
 
 ### Building
