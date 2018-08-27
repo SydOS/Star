@@ -51,6 +51,7 @@ arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP) {
         frame->TargetMAC[x] = 0x00;
     memcpy((frame->TargetIP), TargetIP, 4);
 
+    // Return the frame to caller
     return frame;
 }
 
@@ -61,9 +62,13 @@ ethernet_frame_t* arp_create_packet(net_device_t* netDevice, uint8_t* targetIP, 
         destMAC[x] = 0xFF;
     }
 
+    // Create an ARP request frame
 	arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
+	// Wrap our ARP request frame in an Ethernet frame
 	ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, frameSize);
+	// Free the arpFrame field since we don't need it, it's copied into the Ethernet frame
 	kheap_free(arpFrame);
+	// Return our new fully packed ARP request packet
 	return frame;
 }
 
@@ -76,8 +81,11 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 
 	// Check if we are waiting for an ARP reply and it is a reply
 	if (isWaitingForResponse == true && swap_uint16(inFrame->Opcode) == 2) { // TODO replace with #define for opcode.
+		// Set the global responseFrame variable to our inputted frame
 		responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
+		// idk
 		memcpy(responseFrame, (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t)), sizeof(arp_frame_t));
+		// Set waiting for response to false so handling code will work
 		isWaitingForResponse = false;
 	}
 }
