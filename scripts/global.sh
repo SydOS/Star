@@ -6,7 +6,7 @@ export ISL_VERSION=0.19
 export BINUTILS_VERSION=2.31.1
 export GCC_VERSION=8.2.0
 export GDB_VERSION=8.1.1
-export CLOOG_VERSION=0.19.0
+export CLOOG_VERSION=0.18.4
 export NASM_VERSION=2.13.03
 export PKG_CONFIG_VERSION=0.29.2
 export LIBFFI_VERSION=3.2.1
@@ -19,7 +19,7 @@ export GRUB_VERSION=2.02
 
 export GNU_MIRROR_BASE=https://ftp.gnu.org/gnu
 export ISL_MIRROR_BASE=http://isl.gforge.inria.fr
-export CLOOG_MIRROR_BASE=https://github.com/periscop/cloog/releases/download
+export CLOOG_MIRROR_BASE=https://www.bastoul.net/cloog/pages/download
 export PKG_CONFIG_MIRROR_BASE=https://pkg-config.freedesktop.org/releases
 export LIBFFI_MIRROR_BASE=http://sourceware.org/pub/libffi
 export PCRE_MIRROR_BASE=https://ftp.pcre.org/pub/pcre
