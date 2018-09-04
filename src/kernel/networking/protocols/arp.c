@@ -130,9 +130,11 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 		   		responseFrames[i]->SenderIP[2] == targetIP[2] &&
 		   		responseFrames[i]->SenderIP[3] == targetIP[3]) {
 
+				// Copy the frame from our buffer to a local variable
 				responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
 				memcpy(responseFrame, responseFrames[i], sizeof(arp_frame_t));
 
+				// We got our response
 				didFindResponse = true;
 			}
 		}
