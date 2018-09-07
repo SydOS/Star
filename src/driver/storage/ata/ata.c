@@ -668,7 +668,7 @@ bool ata_init(pci_device_t *pciDevice) {
     //storage_register(floppyStorageDevice);
 
     // Read MBR.
-    mbr_init(ataPriStorageDevice);
+   // mbr_init(ataPriStorageDevice);
   //  mbr_t *mbr = (mbr_t*)kheap_alloc(sizeof(mbr_t));
   //  int16_t status = ata_read_sector(&ataDevice->Primary, true, 0, mbr, 1);
 

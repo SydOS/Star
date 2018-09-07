@@ -311,8 +311,11 @@ void fat_print_dir(fat_t *fat, fat_dir_entry_t *directoryEntries, uint32_t direc
 }
 
 bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
+    kprintf("FAT: Init\n");
+
     // Get first sector of drive, which contains the FAT header.
     uint8_t *fatHeader = (uint8_t*)kheap_alloc(FAT_HEADER_SIZE_MAX);
+    kprintf("FAT: first\n");
     if (!storageDevice->ReadSectors(storageDevice, partitionIndex, FAT_HEADER_SECTOR, fatHeader, FAT_HEADER_SIZE_MAX)) {
         kheap_free(fatHeader);
         return false;
@@ -327,7 +330,7 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     fatVolume->BPB = (fat_bpb_header_t*)fatVolume->Header;
 
     // Determine type of FAT.
-    if (storageDevice->PartitionMap->Partitions[partitionIndex]->FsType == FILESYSTEM_TYPE_FAT32) {
+    if ((partitionIndex != PARTITION_NONE) && (storageDevice->PartitionMap->Partitions[partitionIndex]->FsType == FILESYSTEM_TYPE_FAT32)) {
         // FAT is FAT32.
         fatVolume->Type = FAT_TYPE_FAT32;
 
