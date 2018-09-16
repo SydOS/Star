@@ -81,7 +81,7 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 	// Check if we are waiting for an ARP reply and it is a reply
 	if (swap_uint16(inFrame->Opcode) == 2) { // TODO replace with #define for opcode.
 		// Free oldest response in the buffer
-		free(responseFrames[50]);
+		kheap_free(responseFrames[50]);
 		// Move all current responses up the buffer
 		// EG 49 to 50, 48 to 49, 47 to 48
 		for (int i = 49; i > 0; i--) {
