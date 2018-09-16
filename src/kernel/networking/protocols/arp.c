@@ -46,23 +46,23 @@ arp_frame_t* arp_request(uint8_t* SenderMAC, uint8_t* TargetIP) {
 	frame->Opcode = swap_uint16(1);
 	memcpy((frame->SenderMAC), SenderMAC, NET_MAC_LENGTH);
 	for (int x = 0; x < NET_IPV4_LENGTH; x++)
-        frame->SenderIP[x] = 0x00;
-    for (int x = 0; x < NET_MAC_LENGTH; x++)
-        frame->TargetMAC[x] = 0x00;
-    memcpy((frame->TargetIP), TargetIP, 4);
+		frame->SenderIP[x] = 0x00;
+	for (int x = 0; x < NET_MAC_LENGTH; x++)
+		frame->TargetMAC[x] = 0x00;
+	memcpy((frame->TargetIP), TargetIP, 4);
 
-    // Return the frame to caller
-    return frame;
+	// Return the frame to caller
+	return frame;
 }
 
 ethernet_frame_t* arp_create_packet(net_device_t* netDevice, uint8_t* targetIP, uint16_t *frameSize) {
 	// Generate global broadcast MAC
 	uint8_t destMAC[8];
-    for (int x = 0; x < NET_MAC_LENGTH; x++) {
-        destMAC[x] = 0xFF;
-    }
+	for (int x = 0; x < NET_MAC_LENGTH; x++) {
+		destMAC[x] = 0xFF;
+	}
 
-    // Create an ARP request frame
+	// Create an ARP request frame
 	arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
 	// Wrap our ARP request frame in an Ethernet frame
 	ethernet_frame_t* frame = l2_ethernet_create_frame(destMAC, netDevice->MacAddress, 0x0806, sizeof(arp_frame_t), arpFrame, frameSize);
@@ -98,9 +98,9 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	// Sweep up the responses, from 0 -> 50
 	for (int i = 0; i < 50; i++) {
 		if (responseFrames[i]->SenderIP[0] == targetIP[0] &&
-	   		responseFrames[i]->SenderIP[1] == targetIP[1] &&
-	   		responseFrames[i]->SenderIP[2] == targetIP[2] &&
-	   		responseFrames[i]->SenderIP[3] == targetIP[3]) {
+			responseFrames[i]->SenderIP[1] == targetIP[1] &&
+			responseFrames[i]->SenderIP[2] == targetIP[2] &&
+			responseFrames[i]->SenderIP[3] == targetIP[3]) {
 
 			// Copy the frame from our buffer to a local variable
 			arp_frame_t* responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
@@ -123,9 +123,9 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	// Generate global broadcast MAC
 	uint16_t frameSize;
 	uint8_t destMAC[NET_MAC_LENGTH];
-    for (int x = 0; x < NET_MAC_LENGTH; x++) {
-        destMAC[x] = 0xFF;
-    }
+	for (int x = 0; x < NET_MAC_LENGTH; x++) {
+		destMAC[x] = 0xFF;
+	}
 
 	// Generate and send ARP request
 	arp_frame_t *arpFrame = arp_request(netDevice->MacAddress, targetIP);
@@ -141,9 +141,9 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 		// Sweep up the responses, from 0 -> 50
 		for (int i = 0; i < 50; i++) {
 			if (responseFrames[i]->SenderIP[0] == targetIP[0] &&
-		   		responseFrames[i]->SenderIP[1] == targetIP[1] &&
-		   		responseFrames[i]->SenderIP[2] == targetIP[2] &&
-		   		responseFrames[i]->SenderIP[3] == targetIP[3]) {
+				responseFrames[i]->SenderIP[1] == targetIP[1] &&
+				responseFrames[i]->SenderIP[2] == targetIP[2] &&
+				responseFrames[i]->SenderIP[3] == targetIP[3]) {
 
 				// Copy the frame from our buffer to a local variable
 				responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
