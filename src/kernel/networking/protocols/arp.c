@@ -98,10 +98,8 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	// Check our table to see if a response for the IP is already in it
 	// Sweep up the responses, from 0 -> 50
 	for (int i = 0; i < 50; i++) {
-		if (responseFrames[i]->SenderIP[0] == targetIP[0] &&
-			responseFrames[i]->SenderIP[1] == targetIP[1] &&
-			responseFrames[i]->SenderIP[2] == targetIP[2] &&
-			responseFrames[i]->SenderIP[3] == targetIP[3]) {
+		// If the responseFrame at index i has the same IP...
+		if (memcmp(responseFrames[i]->SenderIP, targetIP, sizeof (targetIP))) {
 
 			// Copy the frame from our buffer to a local variable
 			arp_frame_t* responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
@@ -144,10 +142,8 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	while (!didFindResponse) {
 		// Sweep up the responses, from 0 -> 50
 		for (int i = 0; i < 50; i++) {
-			if (responseFrames[i]->SenderIP[0] == targetIP[0] &&
-				responseFrames[i]->SenderIP[1] == targetIP[1] &&
-				responseFrames[i]->SenderIP[2] == targetIP[2] &&
-				responseFrames[i]->SenderIP[3] == targetIP[3]) {
+			// If the responseFrame at index i has the same IP...
+			if (memcmp(responseFrames[i]->SenderIP, targetIP, sizeof (targetIP))) {
 
 				// Copy the frame from our buffer to a local variable
 				responseFrame = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
