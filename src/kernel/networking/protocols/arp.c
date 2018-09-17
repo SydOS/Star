@@ -110,6 +110,10 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	// Check our table to see if a response for the IP is already in it
 	// Sweep up the responses, from 0 -> 50
 	for (int i = 0; i < 50; i++) {
+		// debug printing
+		kprintf("ARP: comparing %u.%u.%u.%u to %u.%u.%u.%u", responseFrames[i]->SenderIP[0], responseFrames[i]->SenderIP[1],
+			responseFrames[i]->SenderIP[2], responseFrames[i]->SenderIP[3], targetIP[0], targetIP[1], targetIP[2], targetIP[3]);
+
 		// If the responseFrame at index i has the same IP...
 		if (memcmp(responseFrames[i]->SenderIP, targetIP, sizeof(responseFrames[i]->SenderIP)) == 0) {
 
