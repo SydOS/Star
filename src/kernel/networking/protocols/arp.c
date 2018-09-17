@@ -76,12 +76,13 @@ arp_frame_t* responseFrames[50];
 
 void arp_initialize() {
 	kprintf("ARP: initializing responseFrames array\n");
+	kprintf("ARP: one entry is 0x%X bytes\n", sizeof(arp_frame_t));
 	for (int i = 0; i < 50; i++) {
 		// Allocate memory for frame
 		responseFrames[i] = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
 		// Clear frame with 0s
 		memset(responseFrames[i], 0, sizeof(arp_frame_t));
-		kprintf("ARP: new entry at %X\n", responseFrames[i]);
+		kprintf("ARP: new entry at 0x%X\n", &responseFrames[i]);
 	}
 }
 
