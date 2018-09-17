@@ -96,7 +96,7 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 		// Move all current responses up the buffer
 		// EG 49 to 50, 48 to 49, 47 to 48
 		for (int i = 49; i > 0; i--) {
-			memcpy(responseFrames[i+1], responseFrames[i], sizeof(arp_frame_t));
+			responseFrames[i+1] = responseFrames[i];
 		}
 		// Allocate our newest response frame some memory
 		responseFrames[0] = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
