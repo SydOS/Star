@@ -106,20 +106,6 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 }
 
 arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
-	for (int i = 0; i < 50; i++) {
-		kprintf("%X %X\n", responseFrames[0], &responseFrames[0]);
-	}
-	// If our frames haven't been properly cleared and made yet
-	if (responseFrames[0] == 0x0) {
-		kprintf("ARP: Generating blank frame\n");
-		for (int i = 0; i < 50; i++) {
-			// Allocate memory for frame
-			responseFrames[i] = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
-			// Clear frame with 0s
-			memset(responseFrames[i], 0, sizeof(arp_frame_t));
-		}
-	}
-
 	// Check our table to see if a response for the IP is already in it
 	// Sweep up the responses, from 0 -> 50
 	for (int i = 0; i < 50; i++) {
