@@ -74,6 +74,17 @@ ethernet_frame_t* arp_create_packet(net_device_t* netDevice, uint8_t* targetIP, 
 
 arp_frame_t* responseFrames[50];
 
+void arp_initialize() {
+	kprintf("ARP: initializing responseFrames array\n");
+	for (int i = 0; i < 50; i++) {
+		// Allocate memory for frame
+		responseFrames[i] = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
+		// Clear frame with 0s
+		memset(responseFrames[i], 0, sizeof(arp_frame_t));
+		kprintf("ARP: new entry at %X\n", responseFrames[i]);
+	}
+}
+
 void arp_process_response(ethernet_frame_t* ethFrame) {
 	// Generate temporary frame
 	arp_frame_t* inFrame = (arp_frame_t*)((uint8_t*)ethFrame+sizeof(ethernet_frame_t));

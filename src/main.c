@@ -166,6 +166,8 @@ void kernel_late() {
 	//kprintf("MAIN: Adding second kernel thread...\n");
 	//tasking_thread_add_kernel(tasking_thread_create("hmm", (uintptr_t)hmmm_thread, 12, 3, 4));
 
+	arp_initialize();
+
 	kprintf("MAIN: Adding second process...\n"); 
 	//tasking_process_add(tasking_process_create("another one", tasking_thread_create("ring3", (uintptr_t)secondprocess_thread, 0, 0, 0), false));
 
