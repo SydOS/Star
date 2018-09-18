@@ -60,10 +60,10 @@ ipv4_frame_t* l3_ipv4_create_frame(uint8_t* SourceIP, uint8_t* DestinationIP,
 
     // Copy the 4 bytes an IP address should be
 	// This is the destination MAC address
-	memcpy(frame->SourceIP, SourceIP, sizeof(SourceIP));
+	memcpy(frame->SourceIP, SourceIP, sizeof(frame->SourceIP));
 	kprintf("L3IPv4: copied destination IP address to 0x%X\n", &frame->SourceIP);
 	// This is the source MAC address
-	memcpy(frame->DestinationIP, DestinationIP, sizeof(DestinationIP));
+	memcpy(frame->DestinationIP, DestinationIP, sizeof(frame->DestinationIP));
 	kprintf("L3IPv4: copied source IP address to 0x%X\n", &frame->DestinationIP);
 
     memcpy((void*)frame + sizeof(ipv4_frame_t), payloadPointer, payloadSize);
