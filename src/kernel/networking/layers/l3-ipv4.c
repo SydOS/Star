@@ -23,6 +23,7 @@
  */
 
 #include <byteswap.h>
+#include <kprint.h>
 
 #include <kernel/memory/kheap.h>
 
