@@ -42,11 +42,13 @@ int32_t memcmp(const void *str1, const void *str2, size_t n) {
 }
 
 // Copies n bytes from memory area src to memory area dest.
-void memcpy(uint8_t *dest, uint8_t *src, size_t n) {
+void memcpy(void *destptr, void *srcptr, size_t n) {
+	uint8_t* dst = (uint8_t*)destptr;
+	uint8_t* src = (uint8_t*)srcptr;
 	// Copy bytes.
 	for (size_t i = 0; i < n; i++)
 	{
-		dest[i] = src[i];
+		dst[i] = src[i];
 		//kprintf("Byte %i\n", i);
 	}
 }
