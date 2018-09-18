@@ -97,7 +97,7 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 		// Free oldest response in the buffer
 		kheap_free(responseFrames[49]);
 		// Move all current responses up the buffer
-		// EG 49 to 50, 48 to 49, 47 to 48
+		// EG 48 to 49, 47 to 48, 46 to 47
 		for (int i = 48; i > 0; i--) {
 			responseFrames[i+1] = responseFrames[i];
 		}
