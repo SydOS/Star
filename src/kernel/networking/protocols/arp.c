@@ -25,7 +25,9 @@
 #include <main.h>
 #include <string.h>
 #include <byteswap.h>
+#include <kprint.h>
 
+#include <kernel/timer.h>
 #include <kernel/memory/kheap.h>
 #include <kernel/networking/layers/l2-ethernet.h>
 #include <kernel/networking/protocols/arp.h>
