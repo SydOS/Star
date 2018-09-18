@@ -183,5 +183,5 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 			responseFrame->SenderIP[2], responseFrame->SenderIP[3]);
 
 	// Return new frame
-	return frame;
+	return responseFrame;
 }
