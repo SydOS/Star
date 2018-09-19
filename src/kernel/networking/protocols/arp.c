@@ -98,8 +98,10 @@ void arp_process_response(ethernet_frame_t* ethFrame) {
 		kheap_free(responseFrames[49]);
 		// Move all current responses up the buffer
 		// EG 48 to 49, 47 to 48, 46 to 47
-		for (int i = 48; i > 0; i--) {
+		for (int i = 48; i >= 0; i--) {
 			responseFrames[i+1] = responseFrames[i];
+			kprintf("ARP: (%u) copying %u.%u.%u.%u to %u\n", i, responseFrames[i]->SenderIP[0], responseFrames[i]->SenderIP[1],
+			responseFrames[i]->SenderIP[2], responseFrames[i]->SenderIP[3], i+1);
 		}
 		// Allocate our newest response frame some memory
 		responseFrames[0] = (arp_frame_t*)kheap_alloc(sizeof(arp_frame_t));
@@ -113,7 +115,7 @@ arp_frame_t* arp_get_mac_address(net_device_t* netDevice, uint8_t* targetIP) {
 	// Sweep up the responses, from 0 -> 50
 	for (int i = 0; i < 50; i++) {
 		// debug printing
-		kprintf("ARP: comparing %u.%u.%u.%u to %u.%u.%u.%u", responseFrames[i]->SenderIP[0], responseFrames[i]->SenderIP[1],
+		kprintf("ARP: (%u) comparing %u.%u.%u.%u to %u.%u.%u.%u\n", i, responseFrames[i]->SenderIP[0], responseFrames[i]->SenderIP[1],
 			responseFrames[i]->SenderIP[2], responseFrames[i]->SenderIP[3], targetIP[0], targetIP[1], targetIP[2], targetIP[3]);
 
 		// If the responseFrame at index i has the same IP...
