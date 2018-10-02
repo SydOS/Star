@@ -41,6 +41,12 @@ typedef struct {
     uint64_t Length;
 } vfs_node_t;
 
+// Directory entry.
+typedef struct {
+    char *Name;
+    uint32_t Inode;
+} vfs_dir_ent_t;
+
 extern vfs_node_t *RootVfsNode;
 
 extern int32_t vfs_open(const char *path, int32_t flags);

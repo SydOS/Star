@@ -45,8 +45,8 @@ const pci_driver_t PciDrivers[] = {
     { "ATA controller", ata_init },
 
     // USB.
-    { "UHCI host controller", usb_uhci_init },
-    { "OHCI host controller", usb_ohci_init },
+   // { "UHCI host controller", usb_uhci_init },
+   // { "OHCI host controller", usb_ohci_init },
 
     // Network adapters.
     //{ "Realtek RTL8139 Ethernet", rtl8139_init },

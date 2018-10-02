@@ -298,13 +298,22 @@ uint32_t tasking_process_get_file_handle(void) {
     // Get next file handle.
     spinlock_lock(&processLock);
     currentProcess->LastFileHandle++;
-    currentProcess->OpenFiles = (vfs_node_t**)kheap_realloc(currentProcess->OpenFiles, sizeof(vfs_node_t*) * currentProcess->LastFileHandle);
+    currentProcess->OpenFiles = (vfs_node_t**)kheap_realloc(currentProcess->OpenFiles, sizeof(vfs_node_t*) * (currentProcess->LastFileHandle + 1));
     handle = currentProcess->LastFileHandle;
     spinlock_release(&processLock);
 
     // Resume tasking on processor and return handle.
     threadLists[procIndex].TaskingEnabled = true;
     return handle;
+}
+
+process_t *tasking_process_get_current(void) {
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
+
+    // Get current process.
+    return threadLists[procIndex].CurrentThread->Parent;
 }
 
 void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex) {

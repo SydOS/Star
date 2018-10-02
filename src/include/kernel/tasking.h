@@ -98,6 +98,7 @@ extern process_t *tasking_process_create(process_t *parent, char *name, bool use
 
 extern thread_t *tasking_thread_create_kernel(char *name, thread_entry_func_t func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2);
 extern uint32_t tasking_process_get_file_handle(void);
+extern process_t *tasking_process_get_current(void);
 extern void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex);
 
 extern void tasking_tick(irq_regs_t* regs, uint32_t procIndex);

@@ -33,6 +33,18 @@
 // The root VFS node.
 vfs_node_t *RootVfsNode;
 
+vfs_dir_ent_t *vfs_read_dir(vfs_node_t *node) {
+
+}
+
+vfs_node_t *vfs_get_node(int32_t handle) {
+    // Get current handle.
+    process_t *currentProcess = tasking_process_get_current();
+    if (handle > currentProcess->LastFileHandle)
+        return NULL;
+    return currentProcess->OpenFiles[handle];
+}
+
 int32_t vfs_open(const char *path, int32_t flags) {
 
     // TODO: need to parse path, map node to handle, etc.
@@ -41,6 +53,9 @@ int32_t vfs_open(const char *path, int32_t flags) {
 
     // Get handle.
     int32_t handle = tasking_process_get_file_handle();
+    process_t *currentProcess = tasking_process_get_current();
+    currentProcess->OpenFiles[handle] = (vfs_node_t*)kheap_alloc(sizeof(vfs_node_t));
+    vfs_node_t *node = vfs_get_node(handle);
     kprintf("VFS: Opened %s with handle %u!\n", path, handle);
 
     // Get filename.
@@ -50,6 +65,12 @@ int32_t vfs_open(const char *path, int32_t flags) {
     return handle;
 }
 
+int32_t vfs_getdents(uint32_t fd) {
+    
+}
+
+
+
 void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mounted as root.
     kprintf("VFS: Initializing...!\n");
     RootVfsNode = (vfs_node_t*)kheap_alloc(sizeof(vfs_node_t));
@@ -57,7 +78,10 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     RootVfsNode->Name[0] = '/';
 
     int32_t dd = vfs_open("/", 0);
-    int32_t df = vfs_open("/tmp/nou.txt", 0);
+   // int32_t df = vfs_open("/tmp/nou.txt", 0);
+
+    // List our /.
+    vfs_read_dir(RootVfsNode);
 
     kprintf("VFS: Initialized root node at 0x%p!\n", RootVfsNode);
 }
