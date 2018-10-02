@@ -65,8 +65,18 @@ int32_t vfs_open(const char *path, int32_t flags) {
     return handle;
 }
 
-int32_t vfs_getdents(uint32_t fd) {
-    
+int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_t count) {
+    // Get current process.
+    process_t *currentProcess = tasking_process_get_current();
+
+    // Ensure handle is valid.
+    if (handle > currentProcess->LastFileHandle || currentProcess->OpenFiles[handle] == NULL)
+        return -1; // Invalid handle.
+
+    // Get the directory entries here probably.
+
+    // Success.
+    return 0;
 }
 
 
