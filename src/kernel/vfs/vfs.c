@@ -73,7 +73,14 @@ int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_
     if (handle > currentProcess->LastFileHandle || currentProcess->OpenFiles[handle] == NULL)
         return -1; // Invalid handle.
 
+    // Get node.
+    vfs_node_t *node = currentProcess->OpenFiles[handle];
+
     // Get the directory entries here probably.
+    for (uint32_t i = 0; i < count; i++) {
+        directories[i].Inode = i;
+        directories[i].Name = "test.bin";
+    }
 
     // Success.
     return 0;
@@ -87,11 +94,21 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     memset(RootVfsNode, 0, sizeof(vfs_node_t));
     RootVfsNode->Name[0] = '/';
 
-    int32_t dd = vfs_open("/", 0);
+    int32_t rootDirHandle = vfs_open("/", 0);
    // int32_t df = vfs_open("/tmp/nou.txt", 0);
 
     // List our /.
-    vfs_read_dir(RootVfsNode);
+    //vfs_read_dir(RootVfsNode);
+
+    // Get entries of /.
+    uint32_t count = 6;
+    vfs_dir_ent_t *entries = (vfs_dir_ent_t*)kheap_alloc(sizeof(vfs_dir_ent_t) * count);
+    vfs_get_dir_entries(rootDirHandle, entries, count);
+
+    // Print entries.
+    for (uint32_t i = 0; i < count; i++) {
+        kprintf("VFS:   entry %u: %s\n", entries[i].Inode, entries[i].Name);
+    }
 
     kprintf("VFS: Initialized root node at 0x%p!\n", RootVfsNode);
 }
