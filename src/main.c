@@ -305,5 +305,15 @@ void kernel_late() {
 		else if (strcmp(buffer, "free") == 0) {
 			kprintf("Free page count: %u\n", pmm_frames_available_long());
 		}
+		else if (strcmp(buffer, "help") == 0) {
+			kprintf("beep");
+			kprintf("corp");
+			kprintf("exit");
+			kprintf("free");
+			kprintf("help");
+			kprintf("lsnet");
+			kprintf("lsusb");
+			kprintf("uptime");
+		}
 	}
 }
