@@ -49,7 +49,7 @@ We use [SemVer](http://semver.org/) for versioning. For the versions available, 
 
 ## Authors
 
-* **Sydney Erickson** - *Project Owner and Manager* - [1byte2bytes](https://github.com/PurpleBooth)
+* **Sydney Erickson** - *Project Owner and Manager* - [1byte2bytes](https://github.com/1byte2bytes)
 * **John Davis** - *Computer Wizard, driver writer and debugger* - [Goldfish64](https://github.com/Goldfish64)
 
 See also the list of [contributors](https://github.com/1byte2bytes/SydOS/graphs/contributors) who participated in this project.
