@@ -211,7 +211,7 @@ void kernel_late() {
 
 	char buffer[100];
 	while (true) {
-		kprintf("\e[96mroot@sydos ~:\e[0m ");
+		kprintf("\e[96m>\e[0m ");
 
 		uint16_t i = 0;
 		while (i < 98) {
