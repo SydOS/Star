@@ -267,6 +267,30 @@ void kernel_late() {
 				// Mount? floppy drive.
 			fat_init(storageDevices);
 		}
+		else if (strcmp(buffer, "hilda") == 0) {
+			kprintf("\e[92m");
+			kprintf("              ..       *((/,                   \n");
+			kprintf("          @@@@@@@@#/////////////(@             \n");
+			kprintf("       #@@@@@@@/////////////////////&*         \n");
+			kprintf("@@@@@@@@@@@@@//////&///////////////////&       \n");
+			kprintf("    @@@@@(///@//@(///@&///////(////(&///&      \n");
+			kprintf("   @@@&//////&/,@&@#&@(/@@&/////@&@@/////(     \n");
+			kprintf("  #@#///////&.@         ,/,,,@        .*&//(   \n");
+			kprintf("   @//////(*..&   .@@    &.  @  @@     @.(/@   \n");
+			kprintf("   ///////*. .@    @@    ,.  ,  *@,    # @/@   \n");
+			kprintf("    //////@   .            .&.        ..  @@   \n");
+			kprintf("    @@. &/&.    ,(     @.    &*.,&@@#.   .@ &  \n");
+			kprintf("    (.  .&@.      .....        .(        .&.(  \n");
+			kprintf("   *     ,#                  /*@..       .@.&  \n");
+			kprintf("    #    . .                             ,.&   \n");
+			kprintf("     @ .   .. .        ../&@@@&         .&&    \n");
+			kprintf("      &///(@,.        .  . ...         ,#///   \n");
+			kprintf("      &//((@*&,,.                    .@(((/#   \n");
+			kprintf("    #(//((&****@*,,..           ...&(**@((//&  \n");
+			kprintf("  @////(((@...****/@&/,,,,,,,,(@@*****,,(((//# \n");
+			kprintf("@//////((((#..,....,***(*********/,....@(((///&\n");
+			kprintf("\e[97m");
+		}
 
 		else if (strcmp(buffer, "corp") == 0)
 			kprintf("Hacking CorpNewt's computer and installing SydOS.....\n");
