@@ -283,7 +283,7 @@ process_t *tasking_process_create(process_t *parent, char *name, bool userMode, 
     return process;
 }
 
-uint32_t tasking_process_get_file_handle(void) {
+int32_t tasking_process_get_file_handle(void) {
     // Get processor we are running on.
     smp_proc_t *proc = smp_get_proc(lapic_id());
     uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
@@ -292,14 +292,27 @@ uint32_t tasking_process_get_file_handle(void) {
     threadLists[procIndex].TaskingEnabled = false;
 
     // Get current process.
-    uint32_t handle = 0;
+    int32_t handle = -1;
     process_t *currentProcess = threadLists[procIndex].CurrentThread->Parent;
 
     // Get next file handle.
     spinlock_lock(&processLock);
-    currentProcess->LastFileHandle++;
-    currentProcess->OpenFiles = (vfs_node_t**)kheap_realloc(currentProcess->OpenFiles, sizeof(vfs_node_t*) * (currentProcess->LastFileHandle + 1));
-    handle = currentProcess->LastFileHandle;
+
+    // Try to find a free handle.
+    for (uint32_t i = 0; i < currentProcess->OpenFilesCount; i++) {
+        if (currentProcess->OpenFiles[i] == NULL) {
+            handle = i;
+            break;
+        }
+    }
+            
+    // If handle is still -1, we need to increase our array size.
+    if (handle == -1) {
+        currentProcess->OpenFilesCount++;
+        currentProcess->OpenFiles = (vfs_open_node_t**)kheap_realloc(currentProcess->OpenFiles, sizeof(vfs_open_node_t*) * (currentProcess->OpenFilesCount));
+        handle = currentProcess->OpenFilesCount - 1;
+    }
+    
     spinlock_release(&processLock);
 
     // Resume tasking on processor and return handle.

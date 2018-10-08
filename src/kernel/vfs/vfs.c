@@ -39,10 +39,10 @@ vfs_dir_ent_t *vfs_read_dir(vfs_node_t *node) {
 
 }
 
-vfs_node_t *vfs_get_node(int32_t handle) {
+vfs_open_node_t *vfs_get_node(int32_t handle) {
     // Get current handle.
     process_t *currentProcess = tasking_process_get_current();
-    if (handle > currentProcess->LastFileHandle)
+    if (handle < 0 || handle >= currentProcess->OpenFilesCount)
         return NULL;
     return currentProcess->OpenFiles[handle];
 }
@@ -56,7 +56,10 @@ int32_t vfs_open(const char *path, int32_t flags) {
     // Get handle.
     int32_t handle = tasking_process_get_file_handle();
     process_t *currentProcess = tasking_process_get_current();
-    currentProcess->OpenFiles[handle] = RootVfsNode; //(vfs_node_t*)kheap_alloc(sizeof(vfs_node_t));
+    //currentProcess->OpenFiles[handle] = RootVfsNode; //(vfs_node_t*)kheap_alloc(sizeof(vfs_node_t));
+    currentProcess->OpenFiles[handle] = (vfs_open_node_t*)kheap_alloc(sizeof(vfs_open_node_t));
+    currentProcess->OpenFiles[handle]->Node = RootVfsNode;
+    currentProcess->OpenFiles[handle]->CurrentPosition = 0;
     //vfs_node_t *node = vfs_get_node(handle);
     kprintf("VFS: Opened %s with handle %u!\n", path, handle);
 
@@ -72,11 +75,11 @@ int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_
     process_t *currentProcess = tasking_process_get_current();
 
     // Ensure handle is valid.
-    if (handle > currentProcess->LastFileHandle || currentProcess->OpenFiles[handle] == NULL)
+    if (handle < 0 || handle >= currentProcess->OpenFilesCount || currentProcess->OpenFiles[handle] == NULL)
         return -1; // Invalid handle.
 
     // Get node.
-    vfs_node_t *node = currentProcess->OpenFiles[handle];
+    vfs_node_t *node = currentProcess->OpenFiles[handle]->Node;
 
     // Get child nodes of /.
     vfs_node_t *dirNodes;

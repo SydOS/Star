@@ -53,7 +53,11 @@ typedef struct {
     void (*GetDirNodes)(struct vfs_node_t *fsNode, struct vfs_node_t **outDirNodes, uint32_t *outCount);
 } vfs_node_t;
 
-
+// Open file node.
+typedef struct {
+    vfs_node_t *Node;
+    uint64_t CurrentPosition;
+} vfs_open_node_t;
 
 extern vfs_node_t *RootVfsNode;
 
