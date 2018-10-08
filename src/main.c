@@ -268,7 +268,7 @@ void kernel_late() {
 			kprintf("Current uptime: %i milliseconds.\n", timer_ticks());
 		else if (strcmp(buffer, "floppy") == 0) {
 				// Mount? floppy drive. No partitions here.
-			fat_init(storageDevices, PARTITION_NONE);
+			//fat_init(storageDevices, PARTITION_NONE);
 		}
 
 		else if (strcmp(buffer, "corp") == 0)

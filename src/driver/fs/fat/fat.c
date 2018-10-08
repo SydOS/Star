@@ -32,6 +32,7 @@
 
 #include <driver/storage/floppy.h>
 #include <kernel/storage/storage.h>
+#include <kernel/vfs/vfs.h>
 
 
 
@@ -310,7 +311,35 @@ void fat_print_dir(fat_t *fat, fat_dir_entry_t *directoryEntries, uint32_t direc
     }
 }
 
-bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
+bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_t *outCount) {
+    // Get FAT volume and directory entry.
+    fat_t *fatVolume = (fat_t*)fsNode->FsObject;
+    fat_dir_entry_t *fatDirEntry = (fat_dir_entry_t*)fsNode->FsFileObject;
+
+    // Variables to hold directory entries.
+    fat_dir_entry_t *fatDirEntries;
+    uint32_t fatDirEntriesCount = 0;
+
+    // If the starting cluster is zero, its the root directory.
+    if (fatDirEntry->StartClusterLow == 0)
+        fat_get_root_dir(fatVolume, &fatDirEntries, &fatDirEntriesCount);
+
+    vfs_node_t *dirNodes = (vfs_node_t*)kheap_alloc(sizeof(vfs_node_t) * fatDirEntriesCount);
+    memset(dirNodes, 0, sizeof(vfs_node_t) * fatDirEntriesCount);
+
+    // Generate VFS nodes.
+    for (uint32_t i = 0; i < fatDirEntriesCount; i++) {
+        dirNodes[i].Name = fatDirEntries[i].FileName; // TODO  change not to be like this. should be its own memory spot.
+        dirNodes[i].FsObject = fatVolume;
+        dirNodes[i].FsFileObject = fatDirEntries+i;
+    }
+
+    *outDirNodes = dirNodes;
+    *outCount = fatDirEntriesCount;
+    return true;
+}
+
+fat_t *fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     kprintf("FAT: Init\n");
 
     // Get first sector of drive, which contains the FAT header.
@@ -318,7 +347,7 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     kprintf("FAT: first\n");
     if (!storageDevice->ReadSectors(storageDevice, partitionIndex, FAT_HEADER_SECTOR, fatHeader, FAT_HEADER_SIZE_MAX)) {
         kheap_free(fatHeader);
-        return false;
+        return NULL;
     }
 
     // Create FAT object.
@@ -389,18 +418,30 @@ bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex) {
     memset(fatVolume->Table, 0, fatClustersLength);
     storageDevice->ReadSectors(storageDevice, partitionIndex, fatVolume->TableStart, fatVolume->Table, fatClustersLength);
     
+    // Populate root directory.
+    fatVolume->RootDirectory = (fat_dir_entry_t*)kheap_alloc(sizeof(fat_dir_entry_t));
+    memset(fatVolume->RootDirectory, 0, sizeof(fat_dir_entry_t));
+    fatVolume->RootDirectory->FileName[0] = '/';
+    fatVolume->RootDirectory->Subdirectory = true;
+    fatVolume->RootDirectory->StartClusterLow = 0;
+    fatVolume->RootDirectory->StartClusterHigh = 0;
+    fatVolume->RootDirectory->Length = 0;
+    
     // Print info.
     fat_print_info(fatVolume);
 
     // Get root dir.
-    fat_dir_entry_t *rootDirEntries;
+   /* fat_dir_entry_t *rootDirEntries;
     uint32_t rootDirEntriesCount = 0;
     fat_get_root_dir(fatVolume, &rootDirEntries, &rootDirEntriesCount);
     fat_print_dir(fatVolume, rootDirEntries, rootDirEntriesCount, 0);
-    kheap_free(rootDirEntries);
+    kheap_free(rootDirEntries);*/
+
+    // Return FAT object.
+    return fatVolume;
 
     // Free stuff for now.
-    kheap_free(fatVolume->Table);
-    kheap_free(fatVolume->Header);
-    kheap_free(fatVolume);
+   // kheap_free(fatVolume->Table);
+   // kheap_free(fatVolume->Header);
+   // kheap_free(fatVolume);
 }

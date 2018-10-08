@@ -27,6 +27,7 @@
 
 #include <main.h>
 #include <kernel/storage/storage.h>
+#include <kernel/vfs/vfs.h>
 
 #define FAT_DIRECTORY_ENTRY_SIZE    32
 
@@ -168,41 +169,7 @@ typedef struct {
     uint16_t Cluster2 : 12;
 } __attribute__((packed)) fat12_cluster_pair_t;
 
-// FAT.
-typedef struct {
-    // Underlying storage device.
-    storage_device_t *Device;
-    uint16_t PartitionIndex;
-
-    // Header area.
-    uint8_t *Header;
-
-    // Structs that point to header above.
-    fat_bpb_header_t *BPB;
-    fat_ebpb_header_t *EBPB;
-    fat32_ebpb_header_t *EBPB32;
-
-    // Type of FAT.
-    uint8_t Type;
-
-    // FAT starting sector and length in sectors.
-    uint32_t TableStart;
-    uint32_t TableLength;
-
-    // FATs.
-    uint8_t *Table;
-    uint8_t *TableSpare;
-
-     // Root directory starting sector and length in sectors.
-    uint32_t RootDirectoryStart;
-    uint32_t RootDirectoryLength;
-
-    // Data area starting sector and length in sectors.
-    uint32_t DataStart;
-    uint32_t DataLength;
-    uint32_t DataClusters;
-} fat_t;
-
+// FAT directory entry.
 typedef struct {
     char FileName[11];
 
@@ -232,10 +199,50 @@ typedef struct {
     uint32_t Length;
 } __attribute__((packed)) fat_dir_entry_t;
 
+// FAT.
+typedef struct {
+    // Underlying storage device.
+    storage_device_t *Device;
+    uint16_t PartitionIndex;
+
+    // Header area.
+    uint8_t *Header;
+
+    // Structs that point to header above.
+    fat_bpb_header_t *BPB;
+    fat_ebpb_header_t *EBPB;
+    fat32_ebpb_header_t *EBPB32;
+
+    // Type of FAT.
+    uint8_t Type;
+
+    // FAT starting sector and length in sectors.
+    uint32_t TableStart;
+    uint32_t TableLength;
+
+    // FATs.
+    uint8_t *Table;
+    uint8_t *TableSpare;
+
+     // Root directory starting sector and length in sectors.
+    uint32_t RootDirectoryStart;
+    uint32_t RootDirectoryLength;
+
+    // Root directory.
+    fat_dir_entry_t *RootDirectory;
+
+    // Data area starting sector and length in sectors.
+    uint32_t DataStart;
+    uint32_t DataLength;
+    uint32_t DataClusters;
+} fat_t;
+
+
+
 // FAT12.
 
-
-extern bool fat_init(storage_device_t *storageDevice, uint16_t partitionIndex);
+extern bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_t *outCount);
+extern fat_t *fat_init(storage_device_t *storageDevice, uint16_t partitionIndex);
 
 
 #endif

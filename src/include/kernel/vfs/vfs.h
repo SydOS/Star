@@ -27,9 +27,14 @@
 
 #include <main.h>
 
+// Directory entry.
+typedef struct {
+    char *Name;
+} vfs_dir_ent_t;
+
 // File in VFS (node).
 typedef struct {
-    char Name[128]; // TODO
+    char *Name;
     uint16_t Flags;
 
     // Permission mask, user, group IDs.
@@ -39,13 +44,16 @@ typedef struct {
 
     // Length in bytes.
     uint64_t Length;
+
+    // Underlying FS objects.
+    void *FsObject;
+    void *FsFileObject;
+
+    // Pointers to FS-specific methods.
+    void (*GetDirNodes)(struct vfs_node_t *fsNode, struct vfs_node_t **outDirNodes, uint32_t *outCount);
 } vfs_node_t;
 
-// Directory entry.
-typedef struct {
-    char *Name;
-    uint32_t Inode;
-} vfs_dir_ent_t;
+
 
 extern vfs_node_t *RootVfsNode;
 

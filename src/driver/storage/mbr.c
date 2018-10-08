@@ -87,7 +87,7 @@ bool mbr_init(storage_device_t *storageDevice) {
     part_print_map(storageDevice->PartitionMap);
 
     // Test FAT16.
-    if (storageDevice->PartitionMap->Partitions[1]->FsType == FILESYSTEM_TYPE_FAT32) {
+    /*if (storageDevice->PartitionMap->Partitions[1]->FsType == FILESYSTEM_TYPE_FAT32) {
         fat_init(storageDevice, 1);
-    }
+    }*/
 }
