@@ -37,6 +37,7 @@
 #include <kernel/memory/pmm.h>
 #include <kernel/interrupts/smp.h>
 #include <kernel/tasking.h>
+#include <kernel/vfs/vfs.h>
 
 #include <kernel/lock.h>
 
@@ -101,6 +102,12 @@ uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
         case SYSCALL_THREAD_CLEANUP:
             tasking_cleanup_syscall();
             return 0;
+
+        case SYSCALL_OPEN:
+            return vfs_open((const char*)arg0, (int32_t)arg1);
+
+        case SYSCALL_GET_DIR_ENTRIES:
+            return vfs_get_dir_entries((uint32_t)arg0, (vfs_dir_ent_t*)arg1, (uint32_t)arg2);
 
         default:
             return -1;

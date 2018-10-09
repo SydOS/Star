@@ -104,4 +104,6 @@ extern void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex);
 extern void tasking_tick(irq_regs_t* regs, uint32_t procIndex);
 extern void tasking_init(void);
 
+extern process_t *kernelProcess;
+
 #endif

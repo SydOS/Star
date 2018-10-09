@@ -57,7 +57,7 @@ lock_t processLock = { };
 
 bool taskingEnabled = false;
 
-static process_t *kernelProcess = NULL;
+process_t *kernelProcess = NULL;
 
 static inline void tasking_freeze() {
     taskingEnabled = false;
@@ -343,13 +343,7 @@ void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex) {
     threadLists[procIndex].TaskingEnabled = true;
 }
 
-static void kernel_init_thread(void) {
-   // while(true) {
-        syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());
-        sleep(1000);
-        syscalls_kprintf("TASKING: Done with ring 3 thread.\n");
-  //  }
-}
+
 
 static void kernel_main_thread(void) {
     // Get processor we are running on.
@@ -370,10 +364,7 @@ static void kernel_main_thread(void) {
     kprintf("TASKING: All processors started, enabling multitasking!\n");
     tasking_unfreeze();
 
-    // Create userspace process.
-    kprintf("Creating userspace process...\n");
-    process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
-    tasking_thread_schedule_proc(initProcess->MainThread, 0);
+
     
     kernel_late();
 }

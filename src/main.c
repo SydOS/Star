@@ -164,6 +164,20 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 	}
 }
 
+static void kernel_init_thread(void) {
+    // Open file.
+    int32_t handle = (int32_t)syscalls_syscall("", 0, 0, 0, 0, 0, SYSCALL_OPEN);
+
+    while(true) {
+        syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());
+        sleep(1000);
+        syscalls_kprintf("TASKING: doing dir listing\n");
+
+        uint8_t entries[128];
+        syscalls_syscall(0, entries, 128, 0, 0, 0, SYSCALL_GET_DIR_ENTRIES);
+    }
+}
+
 void kernel_late() {
 	//kprintf("MAIN: Adding second kernel thread...\n");
 	//tasking_thread_add_kernel(tasking_thread_create("hmm", (uintptr_t)hmmm_thread, 12, 3, 4));
@@ -211,6 +225,11 @@ void kernel_late() {
 
     // Ring serial terminals.
 	kprintf("\a");
+
+	// Create userspace process.
+    kprintf("Creating userspace process...\n");
+    process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
+    tasking_thread_schedule_proc(initProcess->MainThread, 0);
 
 	char buffer[100];
 	while (true) {
