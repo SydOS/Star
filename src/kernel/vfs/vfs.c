@@ -86,10 +86,31 @@ int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_
     uint32_t dirNodesCount = 0;
     node->GetDirNodes(node, &dirNodes, &dirNodesCount);
 
-    // Print entries.
+    // Copy nodes to buffer.
+    uint32_t currentPosition = 0;
     for (uint32_t i = 0; i < dirNodesCount; i++) {
-        kprintf("VFS:   entry %u: %s\n", 0, dirNodes[i].Name);
+        // Get length of name.
+        uint32_t nameLength = strlen(dirNodes[i].Name);
+        uint32_t totalSize = nameLength + sizeof(vfs_dir_ent_t);
+
+        // Make sure there is enough room. If not return the bytes written.
+        if (currentPosition + totalSize > count)
+            return currentPosition + 1;
+
+        // Create entry.
+        vfs_dir_ent_t *dirEntry = (vfs_dir_ent_t*)((uint8_t*)directories + currentPosition);
+        dirEntry->NextOffset = i;
+        dirEntry->Type = 0;
+        dirEntry->Length = totalSize;
+        strcpy(dirEntry->Name, dirNodes[i].Name);
+        currentPosition += totalSize;
     }
+
+
+    // Print entries.
+    //for (uint32_t i = 0; i < dirNodesCount; i++) {
+   //     kprintf("VFS:   entry %u: %s\n", 0, dirNodes[i].Name);
+   // }
 
     // Success.
     return 0;
@@ -112,10 +133,26 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     int32_t rootDirHandle = vfs_open("/", 0);
    // int32_t df = vfs_open("/tmp/nou.txt", 0);
 
-    // List our /.
-    vfs_get_dir_entries(rootDirHandle, NULL, 0);
+    // List our / test.
+
+    uint8_t *buffer = (uint8_t*)kheap_alloc(512);
+
+
+    int32_t result = vfs_get_dir_entries(rootDirHandle, buffer, 512);
+    
+    uint32_t current = 0;
+    while (current < 512) {
+        vfs_dir_ent_t *dirEntry = (vfs_dir_ent_t*)(buffer + current);
+
+        // If entry is zero, we reached the end.
+        if (dirEntry->Length == 0)
+            break;
+
+        kprintf("%s\n", dirEntry->Name);
+        current += dirEntry->Length;
+    }
 
     
 
-    
+    kprintf("VFS: Initialized!\n");
 }

@@ -29,8 +29,11 @@
 
 // Directory entry.
 typedef struct {
-    char *Name;
-} vfs_dir_ent_t;
+    uint64_t NextOffset;
+    uint16_t Length;
+    uint8_t Type;
+    char Name[];
+} __attribute__((packed)) vfs_dir_ent_t;
 
 // File in VFS (node).
 typedef struct {
