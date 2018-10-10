@@ -198,6 +198,7 @@ thread_t *tasking_thread_create(process_t *process, char *name, thread_entry_fun
 
     // Map stack to lower half if its a user process.
     if (process->UserMode) {
+        // Freeze tasking so we don't mess up.
         tasking_freeze();
 
         // Change to new paging structure.
@@ -213,7 +214,14 @@ thread_t *tasking_thread_create(process_t *process, char *name, thread_entry_fun
         paging_change_directory(oldPagingTablePhys);
         paging_device_free(stackBottom, stackBottom);
 
+        // Resume tasking.
         tasking_unfreeze();
+
+        // Since this is a user-mode thread, we also need a syscall stack.
+        thread->StackSyscallPage = pmm_pop_frame();
+        thread->StackSyscallPointer = (uintptr_t)paging_device_alloc(thread->StackSyscallPage, thread->StackSyscallPage);
+        memset((void*)thread->StackSyscallPointer, 0, PAGE_SIZE_4K);
+        thread->StackSyscallPointer += PAGE_SIZE_4K;
     }
     else {
         thread->StackPointer = stackTop - sizeof(irq_regs_t);
@@ -283,6 +291,18 @@ process_t *tasking_process_create(process_t *parent, char *name, bool userMode, 
     return process;
 }
 
+uintptr_t tasking_get_syscall_stack(void) {
+    // Get processor we are running on.
+    smp_proc_t *proc = smp_get_proc(lapic_id());
+    uint32_t procIndex = (proc != NULL) ? proc->Index : 0;
+
+    // Get current thread.
+    thread_t *currentThread = threadLists[procIndex].CurrentThread;
+
+    // Return stack for syscalls.
+    return currentThread->StackSyscallPointer;
+}
+
 int32_t tasking_process_get_file_handle(void) {
     // Get processor we are running on.
     smp_proc_t *proc = smp_get_proc(lapic_id());
@@ -343,8 +363,6 @@ void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex) {
     threadLists[procIndex].TaskingEnabled = true;
 }
 
-
-
 static void kernel_main_thread(void) {
     // Get processor we are running on.
     smp_proc_t *proc = smp_get_proc(lapic_id());
@@ -363,9 +381,6 @@ static void kernel_main_thread(void) {
     // Start up global tasking and enter into the late kernel.
     kprintf("TASKING: All processors started, enabling multitasking!\n");
     tasking_unfreeze();
-
-
-    
     kernel_late();
 }
 
@@ -374,7 +389,7 @@ static void kernel_idle_thread(uintptr_t procIndex) {
 
     // Do nothing.
     while (true) {
-        sleep(1000);
+        //sleep(1000);
        // kprintf("hi %u\n", lapic_id());
     }
 }

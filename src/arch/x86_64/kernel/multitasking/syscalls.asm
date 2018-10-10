@@ -28,8 +28,7 @@ section .text
 extern SyscallStack
 
 extern syscalls_handler
-extern gdt_tss_get
-extern gdt_tss_get_kernel_stack
+extern tasking_get_syscall_stack
 
 global _syscalls_syscall
 _syscalls_syscall:
@@ -83,10 +82,8 @@ _syscalls_syscall_handler:
     push rcx
     push r11
 
-    ; Get current TSS and ring 0 stack.
-    call gdt_tss_get
-    mov rdi, rax
-    call gdt_tss_get_kernel_stack
+    ; Get syscall stack for this thread.
+    call tasking_get_syscall_stack
 
     ; Restore caller's RFLAGS into R11 and RIP into R10.
     pop r11
@@ -115,6 +112,9 @@ _syscalls_syscall_handler:
     ; 72 = 14 registers plus 8 bytes, location of index.
     mov rbx, [rbx+120]
     push rbx
+
+    ; Now that we are in a good state, re-enable interrupts so the system can resume tasking as needed.
+    sti
 
     ; Call C handler. Afterwards, discard the index argument from stack.
     call syscalls_handler
@@ -153,7 +153,98 @@ _syscalls_interrupt_handler:
     push r10
 
     ; Push segments to stack.
-    ; DS and ES cannot be directly pushed, so we must copy them to RAX first.
+    ; DS and ES cannot be directly pushed, so we must copy them to RBX first.
+    mov rbx, ds
+    push rbx
+    mov rbx, es
+    push rbx
+    push fs
+    push gs
+
+    ; Set up kernel segments.
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    ; Push args to stack.
+    push rdi
+    push rsi
+    push rdx
+    push rcx
+    push r8
+    push r9
+
+    ; Get syscall stack for this thread. The stack pointer will be in RAX afterwards.
+    call tasking_get_syscall_stack
+
+    ; Pop args from stack.
+    pop r9
+    pop r8
+    pop rcx
+    pop rdx
+    pop rsi
+    pop rdi
+
+    ; Restore segments.
+    ; DS and ES cannot be directly restored, so we must copy them to RBX first.
+    pop gs
+    pop fs
+    pop rbx
+    mov es, bx
+    pop rbx
+    mov ds, bx
+
+    ; Restore unused x64 registers (R10, R11, R12, R13, R14, R15) to stack.
+    pop r10
+    pop r11
+    pop r12
+    pop r13
+    pop r14
+    pop r15
+
+    ; Copy SS, RSP, RFLAGS, CS, and RIP into our syscall stack.
+    ; We need to offset 16 bytes for RBP and RBX which are still on stack.
+    sub rax, 8
+    mov rbx, [rsp+16+32] ; SS
+    mov [rax], rbx
+    sub rax, 8
+    mov rbx, [rsp+16+24] ; RSP
+    mov [rax], rbx
+    sub rax, 8
+    mov rbx, [rsp+16+16] ; RFLAGS
+    mov [rax], rbx
+    sub rax, 8
+    mov rbx, [rsp+16+8] ; CS
+    mov [rax], rbx
+    sub rax, 8
+    mov rbx, [rsp+16] ; RIP
+    mov [rax], rbx
+    ;sub rax, 8
+
+    ; Restore unused general registers (RBP and RBX).
+    pop rbp
+    pop rbx
+
+    ; Changeover to the syscall stack.
+    mov rsp, rax
+
+    ; SS, RSP, RFLAGS, CS, and RIP are already on the stack.
+    ; Push unused general registers (RBX and RBP) to stack.
+    push rbx
+    push rbp
+
+    ; Push unused x64 registers (R15, R14, R13, R12, R11, and R10) to stack.
+    push r15
+    push r14
+    push r13
+    push r12
+    push r11
+    push r10
+
+    ; Push segments to stack.
+    ; DS and ES cannot be directly pushed, so we must copy them to RBX first.
     mov rbx, ds
     push rbx
     mov rbx, es
@@ -176,9 +267,15 @@ _syscalls_interrupt_handler:
     mov rbx, [rax+8]
     push rbx
 
+    ; Now that we are in a good state, re-enable interrupts so the system can resume tasking as needed.
+    sti
+
     ; Call C handler. Afterwards, discard the index argument from stack.
     call syscalls_handler
     pop rbx
+
+    ; Disable interrupts.
+    cli
 
     ; Restore segments.
     ; DS and ES cannot be directly restored, so we must copy them to RAX first.

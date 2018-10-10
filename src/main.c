@@ -175,6 +175,17 @@ static void kernel_init_thread(void) {
 
         uint8_t entries[128];
         syscalls_syscall(0, entries, 128, 0, 0, 0, SYSCALL_GET_DIR_ENTRIES);
+		 uint32_t current = 0;
+    while (current < 128) {
+        vfs_dir_ent_t *dirEntry = (vfs_dir_ent_t*)(entries + current);
+
+        // If entry is zero, we reached the end.
+        if (dirEntry->Length == 0)
+            break;
+
+        syscalls_kprintf("%s\n", dirEntry->Name);
+        current += dirEntry->Length;
+    }
     }
 }
 

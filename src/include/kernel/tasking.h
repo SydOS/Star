@@ -56,9 +56,11 @@ typedef struct thread_t {
 	uint32_t ThreadId;
 	thread_entry_func_t EntryFunc;
 
-	// Stack.
+	// Stacks.
 	uint64_t StackPage;
 	uintptr_t StackPointer;
+	uint64_t StackSyscallPage; // Used in kernel-mode during syscalls.
+	uintptr_t StackSyscallPointer;
 
 	// Scheduling relationship to other threads.
 	struct thread_t *SchedNext;
@@ -97,6 +99,7 @@ extern process_t *tasking_process_create(process_t *parent, char *name, bool use
 
 
 extern thread_t *tasking_thread_create_kernel(char *name, thread_entry_func_t func, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2);
+extern uintptr_t tasking_get_syscall_stack(void);
 extern int32_t tasking_process_get_file_handle(void);
 extern process_t *tasking_process_get_current(void);
 extern void tasking_thread_schedule_proc(thread_t *thread, uint32_t procIndex);
