@@ -221,7 +221,6 @@ _syscalls_interrupt_handler:
     sub rax, 8
     mov rbx, [rsp+16] ; RIP
     mov [rax], rbx
-    ;sub rax, 8
 
     ; Restore unused general registers (RBP and RBX).
     pop rbp

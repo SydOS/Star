@@ -27,6 +27,7 @@
 section .text
 
 extern syscalls_handler
+extern tasking_get_syscall_stack
 
 global _syscalls_sysenter
 _syscalls_sysenter:
@@ -79,6 +80,29 @@ _syscalls_sysenter_handler:
     push ebx
     push esi
     push edi
+
+    ; Get syscall stack for this thread. The stack pointer will be in EDX afterwards.
+    call tasking_get_syscall_stack
+    mov edx, eax
+
+    ; Restore caller's EDI, ESI, EBX, EAX, EBP, and ECX.
+    pop edi
+    pop esi
+    pop ebx
+    pop eax
+    pop ebp
+    pop ecx
+
+    ; Changeover to syscall stack.
+    mov esp, edx
+
+    ; Push caller's ESP (in ECX), EBP, EAX, EBX, ESI, and EDI to stack.
+    push ecx
+    push ebp
+    push eax
+    push ebx
+    push esi
+    push edi
     
     ; Get caller's stack.
     mov eax, ecx
@@ -94,8 +118,14 @@ _syscalls_sysenter_handler:
     dec ecx
     jnz .loop_syse_args
 
+    ; Now that we are in a good state, re-enable interrupts so the system can resume tasking as needed.
+    sti
+
     ; Call C handler.
     call syscalls_handler
+
+    ; Disable interrupts.
+    cli
 
     ; Pop off args and discard.
     mov ecx, 7
@@ -150,6 +180,68 @@ _syscalls_interrupt_handler:
     mov fs, ax
     mov gs, ax
 
+    ; Get syscall stack for this thread. The stack pointer will be in EAX afterwards.
+    call tasking_get_syscall_stack
+
+    ; Restore segments.
+    pop gs
+    pop fs
+    pop es
+    pop ds
+
+    ; Restore general registers (EDI, ESI, EBP, EDX).
+    pop edi
+    pop esi
+    pop ebp
+    pop edx
+
+    ; Copy SS, ESP, EFLAGS, CS, and EIP into our syscall stack.
+    ; We need to offset 8 bytes for EBX and ECX which are still on stack.
+    sub eax, 4
+    mov ebx, [esp+8+16] ; SS
+    mov [eax], ebx
+    sub eax, 4
+    mov ebx, [esp+8+12] ; ESP
+    mov [eax], ebx
+    sub eax, 4
+    mov ebx, [esp+8+8] ; EFLAGS
+    mov [eax], ebx
+    sub eax, 4
+    mov ebx, [esp+8+4] ; CS
+    mov [eax], ebx
+    sub eax, 4
+    mov ebx, [esp+8] ; EIP
+    mov [eax], ebx
+
+    ; Restore additional general registers (ECX and EBX).
+    pop ecx
+    pop ebx
+
+    ; Changeover to syscall stack.
+    mov esp, eax
+
+    ; SS, ESP, EFLAGS, CS, and EIP are already on the stack.
+    ; Push general registers (EBX, ECX, EDX, EBP, ESI, and EDI) to stack.
+    push ebx
+    push ecx
+    push edx
+    push ebp
+    push esi
+    push edi
+
+    ; Push segments to stack.
+    push ds
+    push es
+    push fs
+    push gs
+
+    ; Set up kernel segments.
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
     ; Get caller's ESP from our stack.
     ; 52 = number of bytes to go up stack until we get the ESP that was pushed prior.
     mov eax, [esp+52]
@@ -164,8 +256,14 @@ _syscalls_interrupt_handler:
     dec ecx
     jnz .loop_int_args
 
+    ; Now that we are in a good state, re-enable interrupts so the system can resume tasking as needed.
+    sti
+
     ; Call C handler.
     call syscalls_handler
+
+    ; Disable interrupts.
+    cli
 
     ; Pop off args and discard.
     mov ecx, 7
