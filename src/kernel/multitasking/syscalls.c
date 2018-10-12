@@ -90,12 +90,11 @@ static uintptr_t syscalls_uptime_handler(uintptr_t ptrAddr) {
 }
 
 uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5, uintptr_t index) {
-    if (index == 0xAB) {
-       kprintf_va(true, arg0, arg1);
-       return 0xFE;
-    }
-    
     switch (index) {
+        case 0xAB:
+            kprintf_va(true, arg0, arg1);
+            return 0xFE;
+
         case SYSCALL_UPTIME:
             return syscalls_uptime_handler(arg0);
 
@@ -108,12 +107,10 @@ uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
 
         case SYSCALL_GET_DIR_ENTRIES:
             return vfs_get_dir_entries((uint32_t)arg0, (vfs_dir_ent_t*)arg1, (uint32_t)arg2);
-
-        default:
-            return -1;
     }
 
-    return 0xFE;
+    // Unknown syscall.
+    return -1;
 }
 
 void syscalls_init_ap(void) {
