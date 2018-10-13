@@ -329,7 +329,15 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
 
     // Generate VFS nodes.
     for (uint32_t i = 0; i < fatDirEntriesCount; i++) {
-        dirNodes[i].Name = fatDirEntries[i].FileName; // TODO  change not to be like this. should be its own memory spot.
+        // Get length of filename.
+        uint32_t nameLength = strlen(fatDirEntries[i].FileName);
+        if (nameLength > 11)
+            nameLength = 11;
+        dirNodes[i].Name = (char*)kheap_alloc(nameLength + 1);
+        strncpy(dirNodes[i].Name, fatDirEntries[i].FileName, nameLength + 1);
+        dirNodes[i].Name[nameLength] = '\0';
+
+        // Set other objects.
         dirNodes[i].FsObject = fatVolume;
         dirNodes[i].FsFileObject = fatDirEntries+i;
     }

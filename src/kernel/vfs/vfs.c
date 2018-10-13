@@ -35,10 +35,6 @@
 // The root VFS node.
 vfs_node_t *RootVfsNode;
 
-vfs_dir_ent_t *vfs_read_dir(vfs_node_t *node) {
-
-}
-
 vfs_open_node_t *vfs_get_node(int32_t handle) {
     // Get current handle.
     process_t *currentProcess = tasking_process_get_current();
@@ -56,11 +52,9 @@ int32_t vfs_open(const char *path, int32_t flags) {
     // Get handle.
     int32_t handle = tasking_process_get_file_handle();
     process_t *currentProcess = tasking_process_get_current();
-    //currentProcess->OpenFiles[handle] = RootVfsNode; //(vfs_node_t*)kheap_alloc(sizeof(vfs_node_t));
     currentProcess->OpenFiles[handle] = (vfs_open_node_t*)kheap_alloc(sizeof(vfs_open_node_t));
     currentProcess->OpenFiles[handle]->Node = RootVfsNode;
     currentProcess->OpenFiles[handle]->CurrentPosition = 0;
-    //vfs_node_t *node = vfs_get_node(handle);
     kprintf("VFS: Opened %s with handle %u!\n", path, handle);
 
     // Get filename.
@@ -90,7 +84,7 @@ int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_
     uint32_t currentPosition = 0;
     for (uint32_t i = 0; i < dirNodesCount; i++) {
         // Get length of name.
-        uint32_t nameLength = strlen(dirNodes[i].Name);
+        uint32_t nameLength = strlen(dirNodes[i].Name) + 1;
         uint32_t totalSize = nameLength + sizeof(vfs_dir_ent_t);
 
         // Make sure there is enough room. If not return the bytes written.
@@ -103,16 +97,11 @@ int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_
         dirEntry->Type = 0;
         dirEntry->Length = totalSize;
         strcpy(dirEntry->Name, dirNodes[i].Name);
+        dirEntry->Name[nameLength] = '\0';
         currentPosition += totalSize;
     }
 
-
-    // Print entries.
-    //for (uint32_t i = 0; i < dirNodesCount; i++) {
-   //     kprintf("VFS:   entry %u: %s\n", 0, dirNodes[i].Name);
-   // }
-
-    // Success.
+    // Return 0 to indicate end of directory.
     return 0;
 }
 
