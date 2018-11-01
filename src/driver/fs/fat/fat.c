@@ -328,22 +328,31 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
     memset(dirNodes, 0, sizeof(vfs_node_t) * fatDirEntriesCount);
 
     // Generate VFS nodes.
+    uint32_t destIndex = 0;
     for (uint32_t i = 0; i < fatDirEntriesCount; i++) {
+        // If the attributes are 0x0F, its an LFN entry. Ignore for now.
+        if (fatDirEntries[i].VolumeLabel && fatDirEntries[i].System && fatDirEntries[i].Hidden && fatDirEntries[i].ReadOnly)
+            continue;
+
         // Get length of filename.
         uint32_t nameLength = strlen(fatDirEntries[i].FileName);
         if (nameLength > 11)
             nameLength = 11;
-        dirNodes[i].Name = (char*)kheap_alloc(nameLength + 1);
-        strncpy(dirNodes[i].Name, fatDirEntries[i].FileName, nameLength + 1);
-        dirNodes[i].Name[nameLength] = '\0';
+        dirNodes[destIndex].Name = (char*)kheap_alloc(nameLength + 1);
+        strncpy(dirNodes[destIndex].Name, fatDirEntries[i].FileName, nameLength + 1);
+        dirNodes[destIndex].Name[nameLength] = '\0';
 
         // Set other objects.
-        dirNodes[i].FsObject = fatVolume;
-        dirNodes[i].FsFileObject = fatDirEntries+i;
+        dirNodes[destIndex].FsObject = fatVolume;
+        dirNodes[destIndex].FsFileObject = fatDirEntries+i;
+        destIndex++;
     }
 
+    // Resize as needed.
+    dirNodes = (vfs_node_t*)kheap_realloc(dirNodes, sizeof(vfs_node_t) * destIndex);
+
     *outDirNodes = dirNodes;
-    *outCount = fatDirEntriesCount;
+    *outCount = destIndex;
     return true;
 }
 
