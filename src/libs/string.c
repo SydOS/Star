@@ -176,7 +176,7 @@ size_t strlen(const char *str) {
 	return len;
 }
 
-char *strchr(const char *s, int c)
+char *strchr(const char *s, int32_t c)
 {
     while (*s != (char)c)
         if (!*s++)
