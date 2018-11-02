@@ -69,6 +69,10 @@
 #define FAT_TYPE_FAT16  2
 #define FAT_TYPE_FAT32  3
 
+#define FAT_FILENAME_LENGTH     8
+#define FAT_EXT_LENGTH          3
+#define FAT_LFN_FILENAME_LENGTH 13
+
 typedef struct {
     // Jump instruction.
     uint8_t JumpInstruction[3];
@@ -199,6 +203,18 @@ typedef struct {
     uint32_t Length;
 } __attribute__((packed)) fat_dir_entry_t;
 
+// FAT LFN entry.
+typedef struct {
+    uint8_t SequenceNumber;
+    uint16_t Name1[5];
+    uint8_t Attributes;
+    uint8_t Type;
+    uint8_t Checksum;
+    uint16_t Name2[6];
+    uint16_t FirstCluster;
+    uint16_t Name3[2];
+} __attribute__((packed)) fat_dir_lfn_entry_t;
+
 // FAT.
 typedef struct {
     // Underlying storage device.
@@ -237,7 +253,12 @@ typedef struct {
     uint32_t DataClusters;
 } fat_t;
 
-
+// FAT LFN chain entries.
+typedef struct {
+    uint8_t SequenceNumber;
+    char Name[13];
+    struct fat_lfn_segment_t *NextSegment;
+} fat_lfn_segment_t;
 
 // FAT12.
 

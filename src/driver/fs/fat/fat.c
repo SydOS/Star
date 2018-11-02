@@ -330,25 +330,84 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
 
     // Generate VFS nodes.
     uint32_t destIndex = 0;
+    fat_lfn_segment_t *lfnFirstSegment = NULL;
+    fat_lfn_segment_t *lfnCurrentSegment = NULL;
     for (uint32_t i = 0; i < fatDirEntriesCount; i++) {
-        // If the attributes are 0x0F, its an LFN entry. Ignore for now.
-        if (fatDirEntries[i].VolumeLabel && fatDirEntries[i].System && fatDirEntries[i].Hidden && fatDirEntries[i].ReadOnly)
+        // If the attributes are 0x0F, its an LFN entry.
+        if (fatDirEntries[i].VolumeLabel && fatDirEntries[i].System && fatDirEntries[i].Hidden && fatDirEntries[i].ReadOnly) {
+            // Create next segment.
+            lfnCurrentSegment = (fat_lfn_segment_t*)kheap_alloc(sizeof(fat_lfn_segment_t));
+            memset(lfnCurrentSegment, 0, sizeof(fat_lfn_segment_t));
+            lfnCurrentSegment->NextSegment = lfnFirstSegment;
+            lfnFirstSegment = lfnCurrentSegment;
+               
+            // Get LFN entry.
+            fat_dir_lfn_entry_t *lfnEntry = (fat_dir_lfn_entry_t*)(fatDirEntries + i);
+            lfnCurrentSegment->SequenceNumber = lfnEntry->SequenceNumber;
+
+            // Get name characters.
+            for (uint32_t i = 0; i < 5; i++)
+                lfnCurrentSegment->Name[i] = (char)lfnEntry->Name1[i];
+            for (uint32_t i = 0; i < 6; i++)
+                lfnCurrentSegment->Name[i+5] = (char)lfnEntry->Name2[i];
+            for (uint32_t i = 0; i < 2; i++)
+                lfnCurrentSegment->Name[i+5+6] = (char)lfnEntry->Name3[i];
+
+            // Move onto next entry.
             continue;
-
-        // Get length of filename.
-        uint32_t nameLength = strlen(fatDirEntries[i].FileName);
-        if (nameLength > 11)
-            nameLength = 11;
-
-        // Trim spaces from end.
-        char *nameStrPtr = fatDirEntries[i].FileName + nameLength;
-        while (isspace((char)*(--nameStrPtr))) {
-            nameLength--;
         }
 
-        dirNodes[destIndex].Name = (char*)kheap_alloc(nameLength + 1);
-        strncpy(dirNodes[destIndex].Name, fatDirEntries[i].FileName, nameLength);
-        dirNodes[destIndex].Name[nameLength] = '\0';
+        // Do we have LFN segments present? If so use that name instead of the 8.3 name.
+        if (lfnFirstSegment != NULL) {
+            // Count segments.
+            uint32_t lfnSegmentCount = 0;
+            lfnCurrentSegment = lfnFirstSegment;
+            while (lfnSegmentCount <= 20 && lfnCurrentSegment != NULL) {
+                lfnSegmentCount++;
+                lfnCurrentSegment = lfnCurrentSegment->NextSegment;
+            }
+
+            // Allocate string.
+            dirNodes[destIndex].Name = (char*)kheap_alloc(lfnSegmentCount * FAT_LFN_FILENAME_LENGTH);
+            lfnCurrentSegment = lfnFirstSegment;
+            for (uint32_t i = 0; i < lfnSegmentCount; i++) {
+                strncpy(dirNodes[destIndex].Name + (i * FAT_LFN_FILENAME_LENGTH), lfnCurrentSegment->Name, FAT_LFN_FILENAME_LENGTH);
+                lfnCurrentSegment = lfnCurrentSegment->NextSegment;
+            }
+
+            // Reduce allocation size if needed.
+            uint32_t nameLength = strlen(dirNodes[destIndex].Name);
+            if (nameLength + 1 < lfnSegmentCount * FAT_LFN_FILENAME_LENGTH)
+                dirNodes[destIndex].Name = (char*)kheap_realloc(dirNodes[destIndex].Name, nameLength + 1);
+            dirNodes[destIndex].Name[nameLength] = '\0';
+        }
+        else {
+            // Trim spaces from filename.
+            uint32_t nameLength = FAT_FILENAME_LENGTH;
+            char *nameStrPtr = fatDirEntries[i].FileName + nameLength;
+            while (isspace((char)*(--nameStrPtr)) && nameLength > 0) {
+                nameLength--;
+            }
+
+            // Trim spaces from extension
+            uint32_t extLength = FAT_EXT_LENGTH;
+            char *extStrPtr = fatDirEntries[i].FileName + FAT_FILENAME_LENGTH + extLength;
+            while (isspace((char)*(--extStrPtr)) && extLength > 0) {
+                extLength--;
+            }
+
+            // Allocate space for name, dot, extension, and null terminator.
+            uint32_t totalLength = nameLength + 1 + (extLength > 0 ? extLength + 1 : 0);
+            dirNodes[destIndex].Name = (char*)kheap_alloc(totalLength);
+            strncpy(dirNodes[destIndex].Name, fatDirEntries[i].FileName, nameLength);
+
+            // Get extension if there is one.
+            if (extLength > 0) {
+                strncpy(dirNodes[destIndex].Name + nameLength + 1, fatDirEntries[i].FileName + 8, extLength);
+                dirNodes[destIndex].Name[nameLength] = '.';
+            }
+            dirNodes[destIndex].Name[totalLength - 1] = '\0';
+        }
 
         // Set other objects.
         dirNodes[destIndex].FsObject = fatVolume;
