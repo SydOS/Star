@@ -256,6 +256,7 @@ typedef struct {
 // FAT LFN chain entries.
 typedef struct {
     uint8_t SequenceNumber;
+    uint8_t Checksum;
     char Name[13];
     struct fat_lfn_segment_t *NextSegment;
 } fat_lfn_segment_t;

@@ -311,6 +311,14 @@ void fat_print_dir(fat_t *fat, fat_dir_entry_t *directoryEntries, uint32_t direc
     }
 }
 
+static bool fat_verify_lfn_checksum(const char *shortName, uint8_t checksum) {
+    uint8_t sum = 0;
+    for (uint32_t i = 11; i; i--)
+        sum = ((sum & 1) << 7) + (sum >> 1) + *shortName++;
+
+    return sum == checksum;
+}
+
 bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_t *outCount) {
     // Get FAT volume and directory entry.
     fat_t *fatVolume = (fat_t*)fsNode->FsObject;
@@ -344,6 +352,7 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
             // Get LFN entry.
             fat_dir_lfn_entry_t *lfnEntry = (fat_dir_lfn_entry_t*)(fatDirEntries + i);
             lfnCurrentSegment->SequenceNumber = lfnEntry->SequenceNumber;
+            lfnCurrentSegment->Checksum = lfnEntry->Checksum;
 
             // Get name characters.
             for (uint32_t i = 0; i < 5; i++)
@@ -358,7 +367,7 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
         }
 
         // Do we have LFN segments present? If so use that name instead of the 8.3 name.
-        if (lfnFirstSegment != NULL) {
+        if (lfnFirstSegment != NULL && fat_verify_lfn_checksum(fatDirEntries[i].FileName, lfnFirstSegment->Checksum)) {
             // Count segments.
             uint32_t lfnSegmentCount = 0;
             lfnCurrentSegment = lfnFirstSegment;
