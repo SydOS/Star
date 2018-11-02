@@ -208,9 +208,9 @@ bool fat_clusters_read(fat_t *fat, uint32_t startCluster, uint32_t chainLengthBy
     return result;
 }
 
-bool fat_get_root_dir(fat_t *fat, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount) {
-    // FAT12 and FAT16 have a static root directory.
-    if (fat->Type == FAT_TYPE_FAT12 || fat->Type == FAT_TYPE_FAT16) {
+bool fat_get_dir(fat_t *fat, uint32_t cluster, fat_dir_entry_t **outDirEntries, uint32_t *outEntryCount) {
+    // FAT12 and FAT16 have a static root directory, with others in data area.
+    if (cluster == 0 && (fat->Type == FAT_TYPE_FAT12 || fat->Type == FAT_TYPE_FAT16)) {
         // Allocate space for directory bytes.
         const uint32_t rootDirLength = sizeof(fat_dir_entry_t) * fat->BPB->MaxRootDirectoryEntries;
         fat_dir_entry_t *rootDirEntries = (fat_dir_entry_t*)kheap_alloc(rootDirLength);
@@ -236,28 +236,28 @@ bool fat_get_root_dir(fat_t *fat, fat_dir_entry_t **outDirEntries, uint32_t *out
         *outEntryCount = entryCount;
         return true;
     }
-    else if (fat->Type == FAT_TYPE_FAT32) { // FAT32 has root directory in data area.
+    else { // FAT32 has all directories in data area.
         // Determine size of root directory.
-        uint32_t rootDirLength = fat_get_num_clusters(fat, fat->RootDirectoryStart) * fat->BPB->BytesPerSector * fat->BPB->SectorsPerCluster;
-        fat_dir_entry_t *rootDirEntries = (fat_dir_entry_t*)kheap_alloc(rootDirLength);
-        memset(rootDirEntries, 0, rootDirLength);
+        uint32_t dirLength = fat_get_num_clusters(fat, cluster) * fat->BPB->BytesPerSector * fat->BPB->SectorsPerCluster;
+        fat_dir_entry_t *dirEntries = (fat_dir_entry_t*)kheap_alloc(dirLength);
+        memset(dirEntries, 0, dirLength);
 
         // Read root directory.
-        if (!fat_clusters_read(fat, fat->RootDirectoryStart, rootDirLength, rootDirEntries, rootDirLength)) {
-            kheap_free(rootDirEntries);
+        if (!fat_clusters_read(fat, cluster, dirLength, dirEntries, dirLength)) {
+            kheap_free(dirEntries);
             return false;
         }
 
         // Count up entries.
         uint32_t entryCount = 0;
-        for (uint32_t i = 0; i < rootDirLength / sizeof(fat_dir_entry_t) && rootDirEntries[i].FileName[0] != 0; i++)
+        for (uint32_t i = 0; i < dirLength / sizeof(fat_dir_entry_t) && dirEntries[i].FileName[0] != 0; i++)
             entryCount++;
 
         // Reduce size of directory array.
-        rootDirEntries = (fat_dir_entry_t*)kheap_realloc(rootDirEntries, entryCount * sizeof(fat_dir_entry_t));
+        dirEntries = (fat_dir_entry_t*)kheap_realloc(dirEntries, entryCount * sizeof(fat_dir_entry_t));
 
         // Get outputs.
-        *outDirEntries = rootDirEntries;
+        *outDirEntries = dirEntries;
         *outEntryCount = entryCount;
         return true;
     }
@@ -321,8 +321,9 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
     uint32_t fatDirEntriesCount = 0;
 
     // If the starting cluster is zero, its the root directory.
-    if (fatDirEntry->StartClusterLow == 0)
-        fat_get_root_dir(fatVolume, &fatDirEntries, &fatDirEntriesCount);
+    uint32_t cluster = fatDirEntry->StartClusterLow + (fatDirEntry->StartClusterHigh >> 16);
+    fat_get_dir(fatVolume, cluster, &fatDirEntries, &fatDirEntriesCount);
+        
 
     vfs_node_t *dirNodes = (vfs_node_t*)kheap_alloc(sizeof(vfs_node_t) * fatDirEntriesCount);
     memset(dirNodes, 0, sizeof(vfs_node_t) * fatDirEntriesCount);
@@ -338,13 +339,21 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
         uint32_t nameLength = strlen(fatDirEntries[i].FileName);
         if (nameLength > 11)
             nameLength = 11;
+
+        // Trim spaces from end.
+        char *nameStrPtr = fatDirEntries[i].FileName + nameLength;
+        while (isspace((char)*(--nameStrPtr))) {
+            nameLength--;
+        }
+
         dirNodes[destIndex].Name = (char*)kheap_alloc(nameLength + 1);
-        strncpy(dirNodes[destIndex].Name, fatDirEntries[i].FileName, nameLength + 1);
+        strncpy(dirNodes[destIndex].Name, fatDirEntries[i].FileName, nameLength);
         dirNodes[destIndex].Name[nameLength] = '\0';
 
         // Set other objects.
         dirNodes[destIndex].FsObject = fatVolume;
         dirNodes[destIndex].FsFileObject = fatDirEntries+i;
+        dirNodes[destIndex].GetDirNodes = fat_vfs_get_dir_nodes;
         destIndex++;
     }
 

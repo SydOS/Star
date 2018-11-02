@@ -176,6 +176,13 @@ size_t strlen(const char *str) {
 	return len;
 }
 
+char *strchr(const char *s, int c)
+{
+    while (*s != (char)c)
+        if (!*s++)
+            return 0;
+    return (char *)s;
+}
 
 char *strrchr(const char *str, int32_t c) {
 	char* ret=0;

@@ -395,7 +395,7 @@ bool floppy_seek(floppy_drive_t *floppyDrive, uint8_t track) {
 	// Attempt seek.
 	for (uint8_t i = 0; i < FLOPPY_CMD_RETRY_COUNT; i++) {
 		// Send seek command.
-		kprintf("Seeking to track %u...\n", track);
+		kprintf("FLOPPY: Seeking to track %u...\n", track);
 		floppy_write_data(FLOPPY_CMD_SEEK);
 		floppy_write_data((0 << 2) | floppyDrive->Number); // Head 0, drive.
 		floppy_write_data(track);
@@ -406,7 +406,7 @@ bool floppy_seek(floppy_drive_t *floppyDrive, uint8_t track) {
 
 		// Ensure command completed successfully.
 		if (st0 & FLOPPY_ST0_INTERRUPT_CODE) {
-			kprintf("Error executing floppy seek command!\n");
+			kprintf("FLOPPY: Error executing floppy seek command!\n");
 			continue;
 		}
 		
@@ -418,7 +418,7 @@ bool floppy_seek(floppy_drive_t *floppyDrive, uint8_t track) {
 	}
 
 	// Seek failed if we get here.
-	kprintf("Seek failed for %u on drive %u!\n", track, floppyDrive->Number);
+	kprintf("FLOPPY: Seek failed for %u on drive %u!\n", track, floppyDrive->Number);
 	return false;
 }
 
@@ -433,7 +433,7 @@ int8_t floppy_read_track(floppy_drive_t *floppyDrive, uint16_t track) {
 		floppy_dma_set(floppyDrive->DmaBuffer, dmaLength, false);
 
 		// Send read command to disk to read both sides of track.
-		kprintf("Attempting to read track %u...\n", track);
+		kprintf("FLOPPY: Attempting to read track %u...\n", track);
 		floppy_write_data(FLOPPY_CMD_READ_DATA | FLOPPY_CMD_EXT_SKIP | FLOPPY_CMD_EXT_MFM | FLOPPY_CMD_EXT_MT);
 		floppy_write_data(0 << 2 | floppyDrive->Number);
 		floppy_write_data(track); 	// Track.
@@ -464,7 +464,7 @@ int8_t floppy_read_track(floppy_drive_t *floppyDrive, uint16_t track) {
 			return 0;
 		}
 		else if (error > 1) {
-			kprintf("Not retrying...\n");
+			kprintf("FLOPPY: Not retrying...\n");
 			return 2;
 		}
 
@@ -472,7 +472,7 @@ int8_t floppy_read_track(floppy_drive_t *floppyDrive, uint16_t track) {
 	}
 
 	// Failed.
-	kprintf("Get sector failed!\n");
+	kprintf("FLOPPY: Get sector failed!\n");
 	return - 1;
 }
 

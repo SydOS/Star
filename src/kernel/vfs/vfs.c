@@ -49,17 +49,90 @@ int32_t vfs_open(const char *path, int32_t flags) {
 
     kprintf("VFS: Opening %s with flags 0x%X...\n", path, flags);
 
+    // Ensure path is not empty.
+    uint32_t pathLength = strlen(path);
+    if (pathLength == 0)
+        return -1;
+
+    
+
+    // Determine starting node.
+    vfs_node_t *currentNode;
+
+    uint32_t offset = 0;
+    uint32_t length = 0;
+    if (path[0] == '/') {
+        currentNode = RootVfsNode;
+        kprintf("VFS: Starting from /.\n");
+    }
+
+    
+    while (offset < pathLength) {
+        // Get first section of path.
+        char *dirCur = path + offset;
+        if (dirCur[0] == '/') {
+            dirCur++;
+            offset++;
+        }
+
+        char *dirNext = strchr(dirCur + 1, '/');
+        if (dirNext != NULL)
+            length = (uintptr_t)dirNext - (uintptr_t)dirCur;
+        else
+            length = pathLength - offset;
+
+        // If length is zero, we probably hit the end.
+        if (length == 0)
+            break;
+
+        char *dirName = (char*)kheap_alloc(length + 1);
+        strncpy(dirName, dirCur, length);
+        dirName[length] = '\0';
+
+        // Get child nodes.
+        vfs_node_t *nodes;
+        uint32_t nodeCount = 0;
+        currentNode->GetDirNodes(currentNode, &nodes, &nodeCount);
+
+        // Find the node.
+        vfs_node_t *childNode = NULL;
+        for (uint32_t i = 0; i < nodeCount; i++) {
+            if (strcmp(nodes[i].Name, dirName) == 0) {
+                childNode = nodes + i;
+                break;
+            }
+        }
+
+        // If node is null, not found.
+        if (childNode == NULL)
+            return -1;
+
+        currentNode = (vfs_node_t*)kheap_alloc(sizeof(vfs_node_t));
+        *currentNode = *childNode;
+
+        // Free nodes.
+        kheap_free(nodes);
+
+        kprintf("VFS: Got %s.\n", currentNode->Name);
+        kheap_free(dirName);
+        offset += length;
+    }
+
+
+    // Find node, rebuilding cache if needed.
+
+
     // Get handle.
     int32_t handle = tasking_process_get_file_handle();
     process_t *currentProcess = tasking_process_get_current();
     currentProcess->OpenFiles[handle] = (vfs_open_node_t*)kheap_alloc(sizeof(vfs_open_node_t));
-    currentProcess->OpenFiles[handle]->Node = RootVfsNode;
+    currentProcess->OpenFiles[handle]->Node = currentNode;
     currentProcess->OpenFiles[handle]->CurrentPosition = 0;
     kprintf("VFS: Opened %s with handle %u!\n", path, handle);
 
     // Get filename.
-    char *fileName = strrchr(path, '/') + 1;
-    kprintf("VFS: Filename is %s\n", fileName);
+    //char *fileName = strrchr(path, '/') + 1;
+   // kprintf("VFS: Filename is %s\n", fileName);
 
     return handle;
 }
@@ -119,7 +192,7 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     RootVfsNode->GetDirNodes = fat_vfs_get_dir_nodes;
     kprintf("VFS: Initialized root node at 0x%p!\n", RootVfsNode);
 
-    int32_t rootDirHandle = vfs_open("/", 0);
+    int32_t rootDirHandle = vfs_open("/DRAFTS/", 0);
    // int32_t df = vfs_open("/tmp/nou.txt", 0);
 
     // List our / test.
