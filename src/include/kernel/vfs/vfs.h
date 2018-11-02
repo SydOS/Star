@@ -36,7 +36,7 @@ typedef struct {
 } __attribute__((packed)) vfs_dir_ent_t;
 
 // File in VFS (node).
-typedef struct {
+typedef struct vfs_node_t {
     char *Name;
     uint16_t Flags;
 
@@ -54,6 +54,10 @@ typedef struct {
 
     // Pointers to FS-specific methods.
     void (*GetDirNodes)(struct vfs_node_t *fsNode, struct vfs_node_t **outDirNodes, uint32_t *outCount);
+
+    // Child nodes if this is a directory/mountpoint.
+    struct vfs_node_t *ChildNodes;
+    uint32_t ChildNodeCount;
 } vfs_node_t;
 
 // Open file node.

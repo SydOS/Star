@@ -166,7 +166,7 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 
 static void kernel_init_thread(void) {
     // Open file.
-    int32_t handle = (int32_t)syscalls_syscall("", 0, 0, 0, 0, 0, SYSCALL_OPEN);
+    int32_t handle = (int32_t)syscalls_syscall("/DRAFTS", 0, 0, 0, 0, 0, SYSCALL_OPEN);
 
     while(true) {
         syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());

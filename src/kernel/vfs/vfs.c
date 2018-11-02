@@ -89,16 +89,20 @@ int32_t vfs_open(const char *path, int32_t flags) {
         strncpy(dirName, dirCur, length);
         dirName[length] = '\0';
 
-        // Get child nodes.
-        vfs_node_t *nodes;
-        uint32_t nodeCount = 0;
-        currentNode->GetDirNodes(currentNode, &nodes, &nodeCount);
+        // Get child nodes if needed.
+        if (currentNode->ChildNodes == NULL) {
+            vfs_node_t *nodes;
+            uint32_t nodeCount = 0;
+            currentNode->GetDirNodes(currentNode, &nodes, &nodeCount);
+            currentNode->ChildNodes = nodes;
+            currentNode->ChildNodeCount = nodeCount;
+        }
 
         // Find the node.
         vfs_node_t *childNode = NULL;
-        for (uint32_t i = 0; i < nodeCount; i++) {
-            if (strcmp(nodes[i].Name, dirName) == 0) {
-                childNode = nodes + i;
+        for (uint32_t i = 0; i < currentNode->ChildNodeCount; i++) {
+            if (strcmp(currentNode->ChildNodes[i].Name, dirName) == 0) {
+                childNode = currentNode->ChildNodes + i;
                 break;
             }
         }
@@ -110,17 +114,10 @@ int32_t vfs_open(const char *path, int32_t flags) {
         currentNode = (vfs_node_t*)kheap_alloc(sizeof(vfs_node_t));
         *currentNode = *childNode;
 
-        // Free nodes.
-        kheap_free(nodes);
-
         kprintf("VFS: Got %s.\n", currentNode->Name);
         kheap_free(dirName);
         offset += length;
     }
-
-
-    // Find node, rebuilding cache if needed.
-
 
     // Get handle.
     int32_t handle = tasking_process_get_file_handle();
@@ -148,16 +145,20 @@ int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_
     // Get node.
     vfs_node_t *node = currentProcess->OpenFiles[handle]->Node;
 
-    // Get child nodes of /.
-    vfs_node_t *dirNodes;
-    uint32_t dirNodesCount = 0;
-    node->GetDirNodes(node, &dirNodes, &dirNodesCount);
+    // Get child nodes if needed.
+    if (node->ChildNodes == NULL) {
+        vfs_node_t *nodes;
+        uint32_t nodeCount = 0;
+        node->GetDirNodes(node, &nodes, &nodeCount);
+        node->ChildNodes = nodes;
+        node->ChildNodeCount = nodeCount;
+    }
 
     // Copy nodes to buffer.
     uint32_t currentPosition = 0;
-    for (uint32_t i = 0; i < dirNodesCount; i++) {
+    for (uint32_t i = 0; i < node->ChildNodeCount; i++) {
         // Get length of name.
-        uint32_t nameLength = strlen(dirNodes[i].Name) + 1;
+        uint32_t nameLength = strlen(node->ChildNodes[i].Name) + 1;
         uint32_t totalSize = nameLength + sizeof(vfs_dir_ent_t);
 
         // Make sure there is enough room. If not return the bytes written.
@@ -169,7 +170,7 @@ int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_
         dirEntry->NextOffset = i;
         dirEntry->Type = 0;
         dirEntry->Length = totalSize;
-        strcpy(dirEntry->Name, dirNodes[i].Name);
+        strcpy(dirEntry->Name, node->ChildNodes[i].Name);
         dirEntry->Name[nameLength] = '\0';
         currentPosition += totalSize;
     }
@@ -192,7 +193,7 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     RootVfsNode->GetDirNodes = fat_vfs_get_dir_nodes;
     kprintf("VFS: Initialized root node at 0x%p!\n", RootVfsNode);
 
-    int32_t rootDirHandle = vfs_open("/DRAFTS/", 0);
+    int32_t rootDirHandle = vfs_open("/DRAFTS", 0);
    // int32_t df = vfs_open("/tmp/nou.txt", 0);
 
     // List our / test.
