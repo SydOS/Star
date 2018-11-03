@@ -134,7 +134,22 @@ int32_t vfs_open(const char *path, int32_t flags) {
     return handle;
 }
 
-int32_t vfs_get_dir_entries(uint32_t handle, vfs_dir_ent_t *directories, uint32_t count) {
+int32_t vfs_read(int32_t handle, uint8_t *buffer, uint32_t bufferSize) {
+    // Get current process.
+    process_t *currentProcess = tasking_process_get_current();
+
+    // Ensure handle is valid.
+    if (handle < 0 || handle >= currentProcess->OpenFilesCount || currentProcess->OpenFiles[handle] == NULL)
+        return -1; // Invalid handle.
+
+    // Get node.
+    vfs_node_t *node = currentProcess->OpenFiles[handle]->Node;
+    node->Read(node, buffer, bufferSize);
+
+    return 0;
+}
+
+int32_t vfs_get_dir_entries(int32_t handle, vfs_dir_ent_t *directories, uint32_t count) {
     // Get current process.
     process_t *currentProcess = tasking_process_get_current();
 
@@ -193,15 +208,20 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     RootVfsNode->GetDirNodes = fat_vfs_get_dir_nodes;
     kprintf("VFS: Initialized root node at 0x%p!\n", RootVfsNode);
 
-    int32_t rootDirHandle = vfs_open("/DRAFTS", 0);
+    int32_t rootDirHandle = vfs_open("/STILLALV.TXT", 0);
    // int32_t df = vfs_open("/tmp/nou.txt", 0);
 
     // List our / test.
 
     uint8_t *buffer = (uint8_t*)kheap_alloc(512);
+    int32_t result = vfs_read(rootDirHandle, buffer, 512);
+    buffer[511] = '\0';
 
+    kprintf("VFS: Read file:\n%s", buffer);
+    kheap_free(buffer);
+    
 
-    int32_t result = vfs_get_dir_entries(rootDirHandle, buffer, 512);
+   /* int32_t result = vfs_get_dir_entries(rootDirHandle, buffer, 512);
     
     uint32_t current = 0;
     while (current < 512) {
@@ -213,7 +233,7 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
 
         kprintf("%s\n", dirEntry->Name);
         current += dirEntry->Length;
-    }
+    }*/
 
     
 

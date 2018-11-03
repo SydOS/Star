@@ -166,26 +166,31 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 
 static void kernel_init_thread(void) {
     // Open file.
-    int32_t handle = (int32_t)syscalls_syscall("/DRAFTS", 0, 0, 0, 0, 0, SYSCALL_OPEN);
+    int32_t handle = (int32_t)syscalls_syscall("/STILLALV.TXT", 0, 0, 0, 0, 0, SYSCALL_OPEN);
 
     while(true) {
         syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());
         sleep(1000);
-        syscalls_kprintf("TASKING: doing dir listing\n");
+        syscalls_kprintf("TASKING: opening file\n");
 
-        uint8_t entries[128];
+		uint8_t data[512];
+		syscalls_syscall(handle, data, 512, 0, 0, 0, SYSCALL_READ);
+		data[511] = '\0';
+		syscalls_kprintf("TASKING: read file:\n%s", data);
+
+       /* uint8_t entries[128];
         syscalls_syscall(0, entries, 128, 0, 0, 0, SYSCALL_GET_DIR_ENTRIES);
 		 uint32_t current = 0;
-    while (current < 128) {
-        vfs_dir_ent_t *dirEntry = (vfs_dir_ent_t*)(entries + current);
+		while (current < 128) {
+			vfs_dir_ent_t *dirEntry = (vfs_dir_ent_t*)(entries + current);
 
-        // If entry is zero, we reached the end.
-        if (dirEntry->Length == 0)
-            break;
+			// If entry is zero, we reached the end.
+			if (dirEntry->Length == 0)
+				break;
 
-        syscalls_kprintf("%s\n", dirEntry->Name);
-        current += dirEntry->Length;
-    }
+			syscalls_kprintf("%s\n", dirEntry->Name);
+			current += dirEntry->Length;
+		}*/
     }
 }
 

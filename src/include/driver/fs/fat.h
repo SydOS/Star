@@ -263,6 +263,7 @@ typedef struct {
 
 // FAT12.
 
+extern bool fat_vfs_read(vfs_node_t *fsNode, uint8_t *buffer, uint32_t bufferSize);
 extern bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_t *outCount);
 extern fat_t *fat_init(storage_device_t *storageDevice, uint16_t partitionIndex);
 

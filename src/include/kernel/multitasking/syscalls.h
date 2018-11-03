@@ -40,6 +40,7 @@
 #define SYSCALL_MSR_SYSENTER_EIP    0x176
 
 // Syscall definitions.
+#define SYSCALL_READ    0x00
 #define SYSCALL_OPEN 0x02
 #define SYSCALL_GET_DIR_ENTRIES 0x4E
 #define SYSCALL_UPTIME 0x15

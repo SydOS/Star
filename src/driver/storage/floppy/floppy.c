@@ -487,8 +487,8 @@ bool floppy_read_blocks(floppy_drive_t *floppyDrive, const uint64_t *blocks, uin
 	uint32_t remainingLength = length;
 	uint32_t bufferOffset = 0;
 	uint16_t lastTrack = -1;
-	for (uint32_t block = 0; block < blockCount; block++) {
-		for (uint32_t sectorOffset = 0; sectorOffset < blockSize; sectorOffset++) {
+	for (uint32_t block = 0; block < blockCount && remainingLength > 0; block++) {
+		for (uint32_t sectorOffset = 0; sectorOffset < blockSize && remainingLength > 0; sectorOffset++) {
 			uint32_t sectorLba = blocks[block] + sectorOffset;
 
 			// Convert LBA to CHS.
@@ -516,6 +516,7 @@ bool floppy_read_blocks(floppy_drive_t *floppyDrive, const uint64_t *blocks, uin
 
 			//int8_t error = floppy_read_chs(drive, track, head, sector, outBuffer+bufferOffset, size);
 			bufferOffset += 512;
+			remainingLength -= size;
 		}
 	}
 

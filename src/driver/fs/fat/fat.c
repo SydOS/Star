@@ -34,8 +34,6 @@
 #include <kernel/storage/storage.h>
 #include <kernel/vfs/vfs.h>
 
-
-
 /**
  * Gets the next FAT12 cluster in the specified chain.
  * @clusters    The array of clusters to pull from.
@@ -311,6 +309,14 @@ void fat_print_dir(fat_t *fat, fat_dir_entry_t *directoryEntries, uint32_t direc
     }
 }
 
+bool fat_vfs_read(vfs_node_t *fsNode, uint8_t *buffer, uint32_t bufferSize) {
+    // Get FAT volume and directory entry.
+    fat_t *fatVolume = (fat_t*)fsNode->FsObject;
+    fat_dir_entry_t *fatDirEntry = (fat_dir_entry_t*)fsNode->FsFileObject;
+
+    return fat_clusters_read(fatVolume, fatDirEntry->StartClusterLow + (fatDirEntry->StartClusterHigh << 16), fatDirEntry->Length, buffer, bufferSize);
+}
+
 static bool fat_verify_lfn_checksum(const char *shortName, uint8_t checksum) {
     uint8_t sum = 0;
     for (uint32_t i = 11; i; i--)
@@ -329,7 +335,7 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
     uint32_t fatDirEntriesCount = 0;
 
     // If the starting cluster is zero, its the root directory.
-    uint32_t cluster = fatDirEntry->StartClusterLow + (fatDirEntry->StartClusterHigh >> 16);
+    uint32_t cluster = fatDirEntry->StartClusterLow + (fatDirEntry->StartClusterHigh << 16);
     fat_get_dir(fatVolume, cluster, &fatDirEntries, &fatDirEntriesCount);
         
 
@@ -421,6 +427,7 @@ bool fat_vfs_get_dir_nodes(vfs_node_t *fsNode, vfs_node_t **outDirNodes, uint32_
         // Set other objects.
         dirNodes[destIndex].FsObject = fatVolume;
         dirNodes[destIndex].FsFileObject = fatDirEntries+i;
+        dirNodes[destIndex].Read = fat_vfs_read;
         dirNodes[destIndex].GetDirNodes = fat_vfs_get_dir_nodes;
         destIndex++;
     }
