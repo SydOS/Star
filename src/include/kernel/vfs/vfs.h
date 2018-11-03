@@ -53,7 +53,7 @@ typedef struct vfs_node_t {
     void *FsFileObject;
 
     // Pointers to FS-specific methods.
-    bool (*Read)(struct vfs_node_t *fsNode, uint8_t *buffer, uint32_t bufferSize);
+    bool (*Read)(struct vfs_node_t *fsNode, uint8_t *buffer, uint32_t bufferSize, uint64_t offset);
     bool (*GetDirNodes)(struct vfs_node_t *fsNode, struct vfs_node_t **outDirNodes, uint32_t *outCount);
 
     // Child nodes if this is a directory/mountpoint.
@@ -71,6 +71,7 @@ extern vfs_node_t *RootVfsNode;
 
 extern int32_t vfs_open(const char *path, int32_t flags);
 extern int32_t vfs_read(int32_t handle, uint8_t *buffer, uint32_t bufferSize);
+extern int32_t vfs_seek(int32_t handle, uint64_t offset);
 extern int32_t vfs_get_dir_entries(int32_t handle, vfs_dir_ent_t *directories, uint32_t count);
 extern void vfs_init(void);
 

@@ -174,6 +174,12 @@ static void kernel_init_thread(void) {
         syscalls_kprintf("TASKING: opening file\n");
 
 		uint8_t data[512];
+		syscalls_syscall(handle, 0, 0, 0, 0, 0, SYSCALL_SEEK);
+		syscalls_syscall(handle, data, 512, 0, 0, 0, SYSCALL_READ);
+		data[511] = '\0';
+		syscalls_kprintf("TASKING: read file:\n%s", data);
+
+		syscalls_syscall(handle, 512, 0, 0, 0, 0, SYSCALL_SEEK);
 		syscalls_syscall(handle, data, 512, 0, 0, 0, SYSCALL_READ);
 		data[511] = '\0';
 		syscalls_kprintf("TASKING: read file:\n%s", data);

@@ -144,9 +144,22 @@ int32_t vfs_read(int32_t handle, uint8_t *buffer, uint32_t bufferSize) {
 
     // Get node.
     vfs_node_t *node = currentProcess->OpenFiles[handle]->Node;
-    node->Read(node, buffer, bufferSize);
+    node->Read(node, buffer, bufferSize, currentProcess->OpenFiles[handle]->CurrentPosition);
 
     return 0;
+}
+
+int32_t vfs_seek(int32_t handle, uint64_t offset) {
+    // Get current process.
+    process_t *currentProcess = tasking_process_get_current();
+
+    // Ensure handle is valid.
+    if (handle < 0 || handle >= currentProcess->OpenFilesCount || currentProcess->OpenFiles[handle] == NULL)
+        return -1; // Invalid handle.
+
+    // TODO: actually validate this.
+    currentProcess->OpenFiles[handle]->CurrentPosition = offset;
+    return currentProcess->OpenFiles[handle]->CurrentPosition;
 }
 
 int32_t vfs_get_dir_entries(int32_t handle, vfs_dir_ent_t *directories, uint32_t count) {

@@ -131,20 +131,27 @@ void fat_print_info(fat_t *fatVolume) {
     kprintf("FAT:   Total sectors: %u | Total clusters: %u\n", fat_get_total_sectors(fatVolume), fatVolume->DataClusters);
 }
 
-bool fat_clusters_read(fat_t *fat, uint32_t startCluster, uint32_t chainLengthBytes, uint8_t *outBuffer, uint32_t length) {
+bool fat_clusters_read(fat_t *fat, uint32_t startCluster, uint32_t dataLength, uint8_t *outBuffer, uint32_t outBufferLength, uint64_t offset) {
+    // If offset is outside of length, return 0.
+    if (offset >= dataLength)
+        return 0;
+
     // Ensure length isn't bigger than the entry size, if the entry size isn't zero.
-    if (chainLengthBytes > 0 && length > chainLengthBytes)
-        length = chainLengthBytes;
+    if (dataLength > 0 && outBufferLength > dataLength)
+        outBufferLength = dataLength;
 
     // Get the total clusters of the entry.
     uint16_t bytesPerCluster = fat->BPB->SectorsPerCluster * fat->BPB->BytesPerSector;
-    uint32_t totalClusters = divide_round_up_uint32(chainLengthBytes > 0 ? chainLengthBytes : length, bytesPerCluster);
+
+    uint32_t startClusterActual = offset / bytesPerCluster;
+
+    uint32_t totalClusters = divide_round_up_uint32(offset + outBufferLength, bytesPerCluster) - startClusterActual;
 
     // Create list of clusters.
     uint64_t *blocks = (uint64_t*)kheap_alloc(totalClusters * sizeof(uint64_t));
     memset(blocks, 0, totalClusters);
     uint32_t remainingClusters = totalClusters;
-    uint32_t offset = 0;
+    uint32_t clusterOffset = 0;
 
     // Get clusters.
     if (fat->Type == FAT_TYPE_FAT12) {
@@ -154,12 +161,21 @@ bool fat_clusters_read(fat_t *fat, uint32_t startCluster, uint32_t chainLengthBy
             // Get value of next cluster from FAT.
             uint16_t nextCluster = fat12_get_cluster((fat12_cluster_pair_t*)fat->Table, cluster);
 
-            // Add cluster to block list.
-            blocks[offset] = fat->DataStart + ((cluster - FAT_CLUSTERS_RESERVED)) * fat->BPB->SectorsPerCluster;
+            // Have we skipped unneeded clusters to account for offset?
+            if (startClusterActual == 0) {
+                // Add cluster to block list.
+                blocks[clusterOffset] = fat->DataStart + ((cluster - FAT_CLUSTERS_RESERVED)) * fat->BPB->SectorsPerCluster;
 
-            offset++;
-            cluster = nextCluster;
-            remainingClusters--;
+                clusterOffset++;
+                remainingClusters--;
+            }
+            else {
+                // Skip this cluster.
+                startClusterActual--;
+            }
+
+            // Move to next cluster.
+            cluster = nextCluster; 
         }
     }
     else if (fat->Type == FAT_TYPE_FAT16) {
@@ -169,12 +185,21 @@ bool fat_clusters_read(fat_t *fat, uint32_t startCluster, uint32_t chainLengthBy
             // Get value of next cluster from FAT.
             uint16_t nextCluster = ((uint16_t*)fat->Table)[cluster];
 
-            // Add cluster to block list.
-            blocks[offset] = fat->DataStart + ((cluster - FAT_CLUSTERS_RESERVED)) * fat->BPB->SectorsPerCluster;
+            // Have we skipped unneeded clusters to account for offset?
+            if (startClusterActual == 0) {
+                // Add cluster to block list.
+                blocks[clusterOffset] = fat->DataStart + ((cluster - FAT_CLUSTERS_RESERVED)) * fat->BPB->SectorsPerCluster;
 
-            offset++;
-            cluster = nextCluster;
-            remainingClusters--;
+                clusterOffset++;
+                remainingClusters--;
+            }
+            else {
+                // Skip this cluster.
+                startClusterActual--;
+            }
+            
+            // Move to next cluster.
+            cluster = nextCluster; 
         }
     }
     else if (fat->Type == FAT_TYPE_FAT32) {
@@ -185,9 +210,9 @@ bool fat_clusters_read(fat_t *fat, uint32_t startCluster, uint32_t chainLengthBy
             uint32_t nextCluster = ((uint32_t*)fat->Table)[cluster] & FAT32_CLUSTER_MASK;
 
             // Add cluster to block list.
-            blocks[offset] = fat->DataStart + ((cluster - FAT_CLUSTERS_RESERVED)) * fat->BPB->SectorsPerCluster;
+            blocks[clusterOffset] = fat->DataStart + ((cluster - FAT_CLUSTERS_RESERVED)) * fat->BPB->SectorsPerCluster;
 
-            offset++;
+            clusterOffset++;
             cluster = nextCluster;
             remainingClusters--;
         }
@@ -199,7 +224,10 @@ bool fat_clusters_read(fat_t *fat, uint32_t startCluster, uint32_t chainLengthBy
     }
 
     // Read blocks from storage device.
-    bool result = fat->Device->ReadBlocks(fat->Device, fat->PartitionIndex, blocks, fat->BPB->SectorsPerCluster, totalClusters, outBuffer, length);
+    uint8_t *tmpBuffer = (uint8_t*)kheap_alloc(totalClusters * bytesPerCluster);
+    bool result = fat->Device->ReadBlocks(fat->Device, fat->PartitionIndex, blocks, fat->BPB->SectorsPerCluster, totalClusters, tmpBuffer, totalClusters * bytesPerCluster);
+    memcpy(outBuffer, tmpBuffer + offset - ((offset / bytesPerCluster) * bytesPerCluster), outBufferLength);
+    kheap_free(tmpBuffer);
 
     // Free cluster list.
     kheap_free(blocks);
@@ -241,7 +269,7 @@ bool fat_get_dir(fat_t *fat, uint32_t cluster, fat_dir_entry_t **outDirEntries, 
         memset(dirEntries, 0, dirLength);
 
         // Read root directory.
-        if (!fat_clusters_read(fat, cluster, dirLength, dirEntries, dirLength)) {
+        if (!fat_clusters_read(fat, cluster, dirLength, dirEntries, dirLength, 0)) {
             kheap_free(dirEntries);
             return false;
         }
@@ -301,7 +329,7 @@ void fat_print_dir(fat_t *fat, fat_dir_entry_t *directoryEntries, uint32_t direc
             if (fat->Type == FAT_TYPE_FAT32)
                 cluster += directoryEntries[i].StartClusterHigh << 16;
 
-            fat_clusters_read(fat, cluster, directoryEntries[i].Length, bees, directoryEntries[i].Length);
+            fat_clusters_read(fat, cluster, directoryEntries[i].Length, bees, directoryEntries[i].Length, 0);
             bees[directoryEntries[i].Length] ='\0';
             kprintf(bees);
             kheap_free(bees);
@@ -309,12 +337,12 @@ void fat_print_dir(fat_t *fat, fat_dir_entry_t *directoryEntries, uint32_t direc
     }
 }
 
-bool fat_vfs_read(vfs_node_t *fsNode, uint8_t *buffer, uint32_t bufferSize) {
+bool fat_vfs_read(vfs_node_t *fsNode, uint8_t *buffer, uint32_t bufferSize, uint64_t offset) {
     // Get FAT volume and directory entry.
     fat_t *fatVolume = (fat_t*)fsNode->FsObject;
     fat_dir_entry_t *fatDirEntry = (fat_dir_entry_t*)fsNode->FsFileObject;
 
-    return fat_clusters_read(fatVolume, fatDirEntry->StartClusterLow + (fatDirEntry->StartClusterHigh << 16), fatDirEntry->Length, buffer, bufferSize);
+    return fat_clusters_read(fatVolume, fatDirEntry->StartClusterLow + (fatDirEntry->StartClusterHigh << 16), fatDirEntry->Length, buffer, bufferSize, offset);
 }
 
 static bool fat_verify_lfn_checksum(const char *shortName, uint8_t checksum) {

@@ -105,6 +105,9 @@ uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
         case SYSCALL_READ:
             return vfs_read((int32_t)arg0, (void*)arg1, (uint32_t)arg2);
 
+        case SYSCALL_SEEK:
+            return vfs_seek((int32_t)arg0, (uint64_t)arg1);
+
         case SYSCALL_OPEN:
             return vfs_open((const char*)arg0, (int32_t)arg1);
 
