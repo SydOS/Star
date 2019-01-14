@@ -382,6 +382,14 @@ void *kheap_realloc(void *oldPtr, size_t newSize) {
     return newPtr;
 }
 
+void *kheap_alloc_zero(size_t size) {
+    // Allocate from heap.
+    void *ptr = kheap_alloc(size);
+    if (ptr != NULL)
+        memset(ptr, 0, size);
+    return ptr;
+}
+
 void kheap_init(void) {
     kprintf("\e[91mKHEAP: Initializing at 0x%p...\n", KHEAP_START);
 
