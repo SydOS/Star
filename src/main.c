@@ -164,24 +164,28 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 	}
 }
 
+// USERSPACE THREAD.
 static void kernel_init_thread(void) {
     // Open file.
     int32_t handle = (int32_t)syscalls_syscall("/STILLALV.TXT", 0, 0, 0, 0, 0, SYSCALL_OPEN);
 
     while(true) {
+		// Print ticks.
         syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());
         sleep(1000);
         syscalls_kprintf("TASKING: opening file\n");
 
-		uint8_t data[512];
+		// Seek to byte 0 and read 512 bytes of file, plus space for newline and a null terminator.
+		uint8_t data[514];
+		data[512] = '\n';
+		data[513] = '\0';
 		syscalls_syscall(handle, 0, 0, 0, 0, 0, SYSCALL_SEEK);
 		syscalls_syscall(handle, data, 512, 0, 0, 0, SYSCALL_READ);
-		data[511] = '\0';
 		syscalls_kprintf("TASKING: read file:\n%s", data);
 
+		// Seek to byte 512 and read 512 bytes of file.
 		syscalls_syscall(handle, 512, 0, 0, 0, 0, SYSCALL_SEEK);
 		syscalls_syscall(handle, data, 512, 0, 0, 0, SYSCALL_READ);
-		data[511] = '\0';
 		syscalls_kprintf("TASKING: read file:\n%s", data);
 
        /* uint8_t entries[128];
