@@ -42,6 +42,7 @@
 // Syscall definitions.
 #define SYSCALL_READ            0x00
 #define SYSCALL_OPEN            0x02
+#define SYSCALL_CLOSE           0x03
 #define SYSCALL_SEEK            0x08
 #define SYSCALL_GET_DIR_ENTRIES 0x4E
 #define SYSCALL_UPTIME 0x15

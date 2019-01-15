@@ -110,6 +110,10 @@ uintptr_t syscalls_handler(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintp
 
         case SYSCALL_OPEN:
             return vfs_open((const char*)arg0, (int32_t)arg1);
+        
+        case SYSCALL_CLOSE:
+            vfs_close((int32_t)arg0);
+            return 0;
 
         case SYSCALL_GET_DIR_ENTRIES:
             return vfs_get_dir_entries((int32_t)arg0, (vfs_dir_ent_t*)arg1, (uint32_t)arg2);

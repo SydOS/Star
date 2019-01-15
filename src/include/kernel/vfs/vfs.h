@@ -70,6 +70,7 @@ typedef struct {
 extern vfs_node_t *RootVfsNode;
 
 extern int32_t vfs_open(const char *path, int32_t flags);
+extern void vfs_close(int32_t handle);
 extern int32_t vfs_read(int32_t handle, uint8_t *buffer, uint32_t bufferSize);
 extern int32_t vfs_seek(int32_t handle, uint64_t offset);
 extern int32_t vfs_get_dir_entries(int32_t handle, vfs_dir_ent_t *directories, uint32_t count);

@@ -134,6 +134,14 @@ int32_t vfs_open(const char *path, int32_t flags) {
     return handle;
 }
 
+void vfs_close(int32_t handle) {
+    process_t *currentProcess = tasking_process_get_current();
+    if (currentProcess->OpenFiles[handle] != NULL) {
+        kheap_free(currentProcess->OpenFiles[handle]);
+        currentProcess->OpenFiles[handle] = NULL;
+    }
+}
+
 int32_t vfs_read(int32_t handle, uint8_t *buffer, uint32_t bufferSize) {
     // Get current process.
     process_t *currentProcess = tasking_process_get_current();
