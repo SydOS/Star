@@ -167,41 +167,41 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 // USERSPACE THREAD.
 static void kernel_init_thread(void) {
     // Open file.
-    int32_t handle = (int32_t)syscalls_syscall("/STILLALV.TXT", 0, 0, 0, 0, 0, SYSCALL_OPEN);
+    int32_t handle = (int32_t)syscalls_syscall("/HELLO", 0, 0, 0, 0, 0, SYSCALL_OPEN);
 
-    while(true) {
-		// Print ticks.
-        syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());
-        sleep(1000);
-        syscalls_kprintf("TASKING: opening file\n");
+	// Print ticks.
+    syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());
+    sleep(1000);
+    syscalls_kprintf("TASKING: opening file\n");
 
-		// Seek to byte 0 and read 512 bytes of file, plus space for newline and a null terminator.
-		uint8_t data[514];
-		data[512] = '\n';
-		data[513] = '\0';
-		syscalls_syscall(handle, 0, 0, 0, 0, 0, SYSCALL_SEEK);
-		syscalls_syscall(handle, data, 512, 0, 0, 0, SYSCALL_READ);
-		syscalls_kprintf("TASKING: read file:\n%s", data);
+	// Seek to byte 0 and read 336 bytes of test program
+	uint8_t data[336];
+	syscalls_syscall(handle, 0, 0, 0, 0, 0, SYSCALL_SEEK);
+	syscalls_syscall(handle, data, 336, 0, 0, 0, SYSCALL_READ);
+	syscalls_kprintf("TASKING: read file\n");
 
-		// Seek to byte 512 and read 512 bytes of file.
-		syscalls_syscall(handle, 512, 0, 0, 0, 0, SYSCALL_SEEK);
-		syscalls_syscall(handle, data, 512, 0, 0, 0, SYSCALL_READ);
-		syscalls_kprintf("TASKING: read file:\n%s", data);
+	for (int i = 0; i < 336; i++) {
+		syscalls_kprintf("%x ", data[i]);
+	}
+	syscalls_kprintf("\n");
 
-       /* uint8_t entries[128];
-        syscalls_syscall(0, entries, 128, 0, 0, 0, SYSCALL_GET_DIR_ENTRIES);
-		 uint32_t current = 0;
-		while (current < 128) {
-			vfs_dir_ent_t *dirEntry = (vfs_dir_ent_t*)(entries + current);
+	syscalls_kprintf("%p\n", &data);
+	syscalls_kprintf("%s\n", *&data);
 
-			// If entry is zero, we reached the end.
-			if (dirEntry->Length == 0)
-				break;
+	uint8_t *p = data;
+	for (int i = 0; i < 336; i++) {
+		syscalls_kprintf("%x ", *(p + i));
+	}
+	syscalls_kprintf("\n");
+	syscalls_kprintf("%p\n", &p);
+	syscalls_kprintf("%s\n", *&p);
+	p = p + 224;
+	syscalls_kprintf("entry: %x\n", *p);
+	syscalls_kprintf("TASKING: new p %p\n", p);
 
-			syscalls_kprintf("%s\n", dirEntry->Name);
-			current += dirEntry->Length;
-		}*/
-    }
+	void (*foo)(void) = p;
+	syscalls_kprintf("%p\n", p);
+	foo();
 }
 
 void kernel_late() {
