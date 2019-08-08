@@ -174,13 +174,13 @@ static void kernel_init_thread(void) {
     sleep(1000);
     syscalls_kprintf("TASKING: opening file\n");
 
-	// Seek to byte 0 and read 336 bytes of test program
-	uint8_t data[336];
+	// Seek to byte 0 and read 368 bytes of test program
+	uint8_t data[368];
 	syscalls_syscall(handle, 0, 0, 0, 0, 0, SYSCALL_SEEK);
-	syscalls_syscall(handle, data, 336, 0, 0, 0, SYSCALL_READ);
+	syscalls_syscall(handle, data, 368, 0, 0, 0, SYSCALL_READ);
 	syscalls_kprintf("TASKING: read file\n");
 
-	for (int i = 0; i < 336; i++) {
+	for (int i = 0; i < 368; i++) {
 		syscalls_kprintf("%x ", data[i]);
 	}
 	syscalls_kprintf("\n");
@@ -189,13 +189,13 @@ static void kernel_init_thread(void) {
 	syscalls_kprintf("%s\n", *&data);
 
 	uint8_t *p = data;
-	for (int i = 0; i < 336; i++) {
+	for (int i = 0; i < 368; i++) {
 		syscalls_kprintf("%x ", *(p + i));
 	}
 	syscalls_kprintf("\n");
 	syscalls_kprintf("%p\n", &p);
 	syscalls_kprintf("%s\n", *&p);
-	p = p + 224;
+	p = p + 241;
 	syscalls_kprintf("entry: %x\n", *p);
 	syscalls_kprintf("TASKING: new p %p\n", p);
 
