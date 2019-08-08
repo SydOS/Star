@@ -185,22 +185,10 @@ static void kernel_init_thread(void) {
 	}
 	syscalls_kprintf("\n");
 
-	syscalls_kprintf("%p\n", &data);
-	syscalls_kprintf("%s\n", *&data);
+	syscalls_kprintf("%x\n", *(&data[0] + 241));
 
-	uint8_t *p = data;
-	for (int i = 0; i < 368; i++) {
-		syscalls_kprintf("%x ", *(p + i));
-	}
-	syscalls_kprintf("\n");
-	syscalls_kprintf("%p\n", &p);
-	syscalls_kprintf("%s\n", *&p);
-	p = p + 241;
-	syscalls_kprintf("entry: %x\n", *p);
-	syscalls_kprintf("TASKING: new p %p\n", p);
-
-	void (*foo)(void) = p;
-	syscalls_kprintf("%p\n", p);
+	void (*foo)(void) = &data[0] + 241;
+	syscalls_kprintf("%p\n", foo);
 	foo();
 }
 
