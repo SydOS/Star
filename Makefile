@@ -71,7 +71,7 @@ ifeq ($(ARCH), x86_64)
 else
 	cp Star-i686.kernel isofiles/
 endif
-	grub-mkrescue -o os.iso isofiles -d /usr/lib/grub/i386-pc
+	grub-mkrescue -o os.iso isofiles -d /Users/lotteerickson/SydOS.framework/lib/grub/i386-pc
 
 # Compile assembly source files.
 $(ASM_OBJECTS):
@@ -110,10 +110,10 @@ else
 endif
 
 test:
-	qemu-system-x86_64 -kernel Star-i686.kernel -m 32M -d guest_errors -drive format=raw,file=fat12.img,index=0,if=floppy -serial stdio -net nic,model=rtl8139
+	qemu-system-x86_64 -cdrom os.iso -m 32M -d guest_errors -drive format=raw,file=helloworld.img,index=0,if=floppy -serial stdio -net nic,model=rtl8139 -boot d
 
 debug:
-	qemu-system-i386 -kernel Star-i686.kernel -S -s & gdb Star-i686.kerel -ex 'target remote localhost:1234'
+	qemu-system-i386 -kernel Star-x86_64.kernel -S -s & gdb Star-i686.kerel -ex 'target remote localhost:1234'
 
 clean:
 	# Clean up binaries.

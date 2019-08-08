@@ -164,6 +164,7 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 	}
 }
 
+uint8_t data[22];
 // USERSPACE THREAD.
 static void kernel_init_thread(void) {
     // Open file.
@@ -174,20 +175,19 @@ static void kernel_init_thread(void) {
     sleep(1000);
     syscalls_kprintf("TASKING: opening file\n");
 
-	// Seek to byte 0 and read 368 bytes of test program
-	uint8_t data[368];
+	// Seek to byte 0 and read 328 bytes of test program
 	syscalls_syscall(handle, 0, 0, 0, 0, 0, SYSCALL_SEEK);
-	syscalls_syscall(handle, data, 368, 0, 0, 0, SYSCALL_READ);
+	syscalls_syscall(handle, data, 22, 0, 0, 0, SYSCALL_READ);
 	syscalls_kprintf("TASKING: read file\n");
 
-	for (int i = 0; i < 368; i++) {
+	for (int i = 0; i < 22; i++) {
 		syscalls_kprintf("%x ", data[i]);
 	}
 	syscalls_kprintf("\n");
 
-	syscalls_kprintf("%x\n", *(&data[0] + 241));
+	syscalls_kprintf("%x\n", *(&data[0]));
 
-	void (*foo)(void) = &data[0] + 241;
+	void (*foo)(void) = &data[0];
 	syscalls_kprintf("%p\n", foo);
 	foo();
 }
