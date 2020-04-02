@@ -8,5 +8,5 @@ void syscalls_kprintf(const char *format, ...) {
     va_list args;
 	va_start(args, format);
 
-    _syscalls_interrupt(format, args, 0, 0, 0, 0, 0xAB);
+    _syscalls_interrupt((uintptr_t)format, (uintptr_t)args, 0xAB, 0xAB, 0xAB, 0xAB, 0xAB);
 }

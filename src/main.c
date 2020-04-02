@@ -153,11 +153,7 @@ void DumpHex(const void* data, size_t size) {
 }
 
 void kernel_late() {
-	//kprintf("MAIN: Adding second kernel thread...\n");
-	//tasking_thread_add_kernel(tasking_thread_create("hmm", (uintptr_t)hmmm_thread, 12, 3, 4));
-
 	kprintf("MAIN: Adding second process...\n"); 
-	//tasking_process_add(tasking_process_create("another one", tasking_thread_create("ring3", (uintptr_t)secondprocess_thread, 0, 0, 0), false));
 
 	acpi_late_init();
 	
@@ -209,6 +205,8 @@ void kernel_late() {
     uint8_t *progbuffer = (uint8_t*)kheap_alloc(512);
 	if (progbuffer == NULL)
 		panic("Could not alloc memory space for /init.");
+	for (size_t i = 0; i < 512; i++)
+		progbuffer[i] = 0;
     int32_t result = vfs_read(rootDirHandle, progbuffer, 512);
 	vfs_close(rootDirHandle);
 
