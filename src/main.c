@@ -113,84 +113,43 @@ void kernel_main() {
 	smp_init();
 
 	// Print CPUID info.
-	cpuid_print_capabilities();
+	//cpuid_print_capabilities();
 
 	// Start up tasking and create kernel task.
-	kprintf("Starting tasking...\n");
+	//kprintf("Starting tasking...\n");
 	tasking_init();
 
 	// We should never get here.
 	panic("MAIN: Tasking failed to start!\n");
 }
 
-#define OCTETS 4
-#define DELIMINATOR '.'
-#define DIGIT_OFFSET 48
-
-void hmmm_thread(uintptr_t arg1, uintptr_t arg2) {
-	while (1) { 
-		kprintf("hmm(): %u seconds\n", timer_ticks() / 1000);
-		sleep(2000);
-	 }
-}
-
-void secondprocess_thread(void) {
-	while (1) { 
-		uint64_t uptime = 0;
-		syscalls_syscall(&uptime, 0, 0, 0, 0, 0, SYSCALL_UPTIME);
-		syscalls_kprintf("Hi from ring 3, via syscall! Uptime: %u\n", uptime);
-		sleep(4000);
-	 }
-}
-
-static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
-	// If there are no children, just return.
-	if (usbDevice->Children == NULL)
-		return;
-
-	usb_device_t *childDevice = usbDevice->Children;
-	while (childDevice != NULL) {
-		kprintf(" ");
-		for (uint8_t i = 0; i < level; i++)
-			kprintf("-");
-		kprintf(" ");
-		kprintf("%4X:%4X %s %s\n", childDevice->VendorId, childDevice->ProductId, childDevice->VendorString, childDevice->ProductString);
-		
-		// Iterate through children.
-		print_usb_children(childDevice, level + 1);
-
-		// Move to next device.
-		childDevice = childDevice->Next;
+void DumpHex(const void* data, size_t size) {
+	char ascii[17];
+	size_t i, j;
+	ascii[16] = '\0';
+	for (i = 0; i < size; ++i) {
+		kprintf("%02X ", ((unsigned char*)data)[i]);
+		if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+			ascii[i % 16] = ((unsigned char*)data)[i];
+		} else {
+			ascii[i % 16] = '.';
+		}
+		if ((i+1) % 8 == 0 || i+1 == size) {
+			kprintf(" ");
+			if ((i+1) % 16 == 0) {
+				kprintf("|  %s \n", ascii);
+			} else if (i+1 == size) {
+				ascii[(i+1) % 16] = '\0';
+				if ((i+1) % 16 <= 8) {
+					kprintf(" ");
+				}
+				for (j = (i+1) % 16; j < 16; ++j) {
+					kprintf("   ");
+				}
+				kprintf("|  %s \n", ascii);
+			}
+		}
 	}
-}
-
-// USERSPACE THREAD.
-static void kernel_init_thread(void) {
-    // Open file.
-	size_t programSize = 2;
-	uint8_t *buffer = (uint8_t*)kheap_alloc(programSize);
-    int32_t handle = (int32_t)syscalls_syscall("/HELLO", 0, 0, 0, 0, 0, SYSCALL_OPEN);
-
-	// Print ticks.
-    syscalls_kprintf("TASKING: Test from ring 3: %u ticks\n", timer_ticks());
-    sleep(1000);
-    syscalls_kprintf("TASKING: opening file\n");
-
-	// Seek to byte 0 and read X bytes of test program
-	syscalls_syscall(handle, 0, 0, 0, 0, 0, SYSCALL_SEEK);
-	syscalls_syscall(handle, buffer, programSize, 0, 0, 0, SYSCALL_READ);
-	syscalls_kprintf("TASKING: read file\n");
-
-	for (int i = 0; i < programSize; i++) {
-		syscalls_kprintf("%x ", buffer[i]);
-	}
-	syscalls_kprintf("\n");
-
-	syscalls_kprintf("%x\n", *(&buffer[0]));
-
-	void (*foo)(void) = &buffer[0];
-	syscalls_kprintf("%p\n", foo);
-	foo();
 }
 
 void kernel_late() {
@@ -205,7 +164,7 @@ void kernel_late() {
 	// Initialize floppy.
 	floppy_init();
 
-	pci_init();
+	//pci_init();
 
 	// Initialize VFS.
 	vfs_init();
@@ -219,12 +178,12 @@ void kernel_late() {
 		kprintf("NX enabled!\n");
 	kprintf("\e[0m");
 	
-	rtc_init();
-	kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
-	kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
+	//rtc_init();
+	//kprintf("24 hour time: %d, binary input: %d\n", rtc_settings->twentyfour_hour_time, rtc_settings->binary_input);
+	//kprintf("%d:%d:%d %d/%d/%d\n", rtc_time->hours, rtc_time->minutes, rtc_time->seconds, rtc_time->month, rtc_time->day, rtc_time->year);
 
 	// Initialize networking.
-	networking_init();
+	//networking_init();
 
 	// Print logo.
 	kprintf("\n\e[94m");
@@ -244,10 +203,16 @@ void kernel_late() {
 	// Create userspace process.
     kprintf("Creating userspace process...\n");
 	int32_t rootDirHandle = vfs_open("/INIT", 0);
+	if (rootDirHandle == -1)
+		panic("Could not get handler for /init.");
 
     uint8_t *progbuffer = (uint8_t*)kheap_alloc(512);
+	if (progbuffer == NULL)
+		panic("Could not alloc memory space for /init.");
     int32_t result = vfs_read(rootDirHandle, progbuffer, 512);
 	vfs_close(rootDirHandle);
+
+	DumpHex(progbuffer, 512);
 
 	kprintf("Main thread jumping into init program...\n");
 	void (*foo)(void) = &progbuffer[0];
@@ -258,141 +223,5 @@ void kernel_late() {
     //tasking_thread_schedule_proc(initProcess->MainThread, 0);
 
     kheap_free(progbuffer);
-	panic("Init program returned");
-
-
-	// Launch fake terminal
-	char buffer[100];
-	while (true) {
-		kprintf("\e[96mroot@sydos ~:\e[0m ");
-
-		uint16_t i = 0;
-		while (i < 98) {
-			uint16_t k = keyboard_get_last_key();
-			while (k == KEYBOARD_KEY_UNKNOWN && serial_received() == 0)
-				k = keyboard_get_last_key();
-
-			if (serial_received() != 0) {
-				char c = serial_read();
-				if (c == '\r' || c == '\n')
-					break;
-				else if (c == '\b' || c == 127) {
-					if (i > 0) {
-						i--;
-						kprintf("\b \b");
-					}
-				}
-				else {
-					kprintf("%c", c);
-					buffer[i++] = c;
-				}
-			}
-			else {
-				if (k == KEYBOARD_KEY_ENTER)
-					break;
-				else if (k == KEYBOARD_KEY_BACKSPACE) {
-					if (i > 0) {
-						i--;
-						kprintf("\b \b");
-					}
-				}
-				else {
-					char c = keyboard_get_ascii(k);
-					if (c) {
-						kprintf("%c", c);
-						buffer[i++] = c;
-					}
-				}
-			}		
-		}
-
-		// Terminate.
-		buffer[i] = '\0';
-		kprintf("\n");
-
-
-		if (strcmp(buffer, "exit") == 0)
-			ps2_reset_system();
-
-		else if (strcmp(buffer, "uptime") == 0)
-			kprintf("Current uptime: %i milliseconds.\n", timer_ticks());
-		else if (strcmp(buffer, "floppy") == 0) {
-				// Mount? floppy drive. No partitions here.
-			//fat_init(storageDevices, PARTITION_NONE);
-		}
-
-		else if (strcmp(buffer, "corp") == 0)
-			kprintf("Hacking CorpNewt's computer and installing SydOS.....\n");
-		else if (strncmp(buffer, "beep ", 4) == 0) {
-			// Get hertz.
-			char* hzStr = buffer + 5;
-			char* msStr = hzStr;
-			uint32_t hzLen = strlen(hzStr);
-			for (uint16_t i = 0; i < hzLen; i++) {
-				if (hzStr[i] == ' ') {
-					hzLen = i;
-					msStr = hzStr + hzLen + 1;
-					break;
-				}
-			}
-
-			// Get freq.
-			char *hzStrTmp = (char*)kheap_alloc(hzLen + 1);
-			strncpy(hzStrTmp, hzStr, hzLen);
-			hzStrTmp[hzLen] = '\0';
-			uint32_t hz = atoi(hzStrTmp);
-			kheap_free(hzStrTmp);
-
-			// Get duration.
-			uint32_t ms = atoi(msStr);
-
-			kprintf("Beeping at %u hertz for %u ms...\n", hz, ms);
-			speaker_play_tone(hz, ms);
-		}
-		else if (strncmp(buffer, "arpping ", 7) == 0) {
-			char* ipstr = buffer + 8;
-			
-			// Parse IPv4 string
-			uint8_t octets[4];
-			int array_len = strlen(ipstr);
-			int multiplier = 1;
-			int current_num = 0;
-			int octet_index = OCTETS - 1;
-			for (int index = array_len - 1; index >= 0 && octet_index >= 0; index--) {
-				if (ipstr[index] == DELIMINATOR) {
-					octets[octet_index] = current_num;
-					octet_index--;
-
-					multiplier = 1;
-					current_num = 0;
-				} else if (ipstr[index] >= DIGIT_OFFSET && ipstr[index] <= DIGIT_OFFSET+10) {
-					current_num += (ipstr[index] - DIGIT_OFFSET) * multiplier;
-					multiplier *= 10;
-				}
-			}
-			octets[octet_index] = current_num;
-
-			// ARP request it
-			arp_frame_t* frame = arp_get_mac_address(&NetDevices[0], octets);
-			kheap_free(frame);
-		}
-		else if (strcmp(buffer, "lsusb") == 0) {
-			usb_device_t *usbDevice = StartUsbDevice;
-			while (usbDevice != NULL) {
-				kprintf("%4X:%4X %s %s\n", usbDevice->VendorId, usbDevice->ProductId, usbDevice->VendorString, usbDevice->ProductString);
-				
-				// Iterate through children.
-				print_usb_children(usbDevice, 1);
-
-				// Move to next device.
-				usbDevice = usbDevice->Next;
-			}
-		}
-		else if (strcmp(buffer, "lsnet") == 0) {
-			networking_print_devices();
-		}
-		else if (strcmp(buffer, "free") == 0) {
-			kprintf("Free page count: %u\n", pmm_frames_available_long());
-		}
-	}
+	panic("Init program returned.");
 }
