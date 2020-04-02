@@ -229,7 +229,7 @@ void vfs_init(void) { // TODO: probably accept some sort of FS that is to be mou
     RootVfsNode->GetDirNodes = fat_vfs_get_dir_nodes;
     kprintf("VFS: Initialized root node at 0x%p!\n", RootVfsNode);
 
-    int32_t rootDirHandle = vfs_open("/STILLALV.TXT", 0);
+    /*int32_t rootDirHandle = vfs_open("/STILLALV.TXT", 0);
    // int32_t df = vfs_open("/tmp/nou.txt", 0);
 
     // List our / test.

@@ -71,7 +71,7 @@ ifeq ($(ARCH), x86_64)
 else
 	cp Star-i686.kernel isofiles/
 endif
-	grub-mkrescue -o os.iso isofiles -d /Users/lotteerickson/SydOS.framework/lib/grub/i386-pc
+	grub-mkrescue -o os.iso isofiles -d /Users/anne/SydOS-dev.framework/lib/grub/i386-pc
 
 # Compile assembly source files.
 $(ASM_OBJECTS):

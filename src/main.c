@@ -164,10 +164,11 @@ static void print_usb_children(usb_device_t *usbDevice, uint8_t level) {
 	}
 }
 
-uint8_t data[22];
 // USERSPACE THREAD.
 static void kernel_init_thread(void) {
     // Open file.
+	size_t programSize = 2;
+	uint8_t *buffer = (uint8_t*)kheap_alloc(programSize);
     int32_t handle = (int32_t)syscalls_syscall("/HELLO", 0, 0, 0, 0, 0, SYSCALL_OPEN);
 
 	// Print ticks.
@@ -175,19 +176,19 @@ static void kernel_init_thread(void) {
     sleep(1000);
     syscalls_kprintf("TASKING: opening file\n");
 
-	// Seek to byte 0 and read 328 bytes of test program
+	// Seek to byte 0 and read X bytes of test program
 	syscalls_syscall(handle, 0, 0, 0, 0, 0, SYSCALL_SEEK);
-	syscalls_syscall(handle, data, 22, 0, 0, 0, SYSCALL_READ);
+	syscalls_syscall(handle, buffer, programSize, 0, 0, 0, SYSCALL_READ);
 	syscalls_kprintf("TASKING: read file\n");
 
-	for (int i = 0; i < 22; i++) {
-		syscalls_kprintf("%x ", data[i]);
+	for (int i = 0; i < programSize; i++) {
+		syscalls_kprintf("%x ", buffer[i]);
 	}
 	syscalls_kprintf("\n");
 
-	syscalls_kprintf("%x\n", *(&data[0]));
+	syscalls_kprintf("%x\n", *(&buffer[0]));
 
-	void (*foo)(void) = &data[0];
+	void (*foo)(void) = &buffer[0];
 	syscalls_kprintf("%p\n", foo);
 	foo();
 }
@@ -235,16 +236,29 @@ void kernel_late() {
 	kprintf(" |_____/ \\__, |\\__,_|\\____/|_____/ \n");
 	kprintf("          __/ |                    \n");
 	kprintf("         |___/                     \n");
-	kprintf("\e[36mCopyright (c) Sydney Erickson, John Davis 2017 - 2018\e[0m\n\n");
+	kprintf("\e[36mCopyright (c) Sydney Erickson, John Davis 2017 - 2020\e[0m\n\n");
 
     // Ring serial terminals.
 	kprintf("\a");
 
 	// Create userspace process.
     kprintf("Creating userspace process...\n");
-    process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", kernel_init_thread, 0, 0, 0);
-    tasking_thread_schedule_proc(initProcess->MainThread, 0);
+	int32_t rootDirHandle = vfs_open("/HELLO", 0);
 
+    uint8_t *progbuffer = (uint8_t*)kheap_alloc(2);
+    int32_t result = vfs_read(rootDirHandle, progbuffer, 2);
+	vfs_close(rootDirHandle);
+
+	void (*foo)(void) = &progbuffer[0];
+	foo();
+
+	//process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", foo, 0, 0, 0);
+    //tasking_thread_schedule_proc(initProcess->MainThread, 0);
+
+    kheap_free(progbuffer);
+
+
+	// Launch fake terminal
 	char buffer[100];
 	while (true) {
 		kprintf("\e[96mroot@sydos ~:\e[0m ");
