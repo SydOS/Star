@@ -69,7 +69,7 @@ void panic(const char *format, ...) {
 	va_start(args, format);
 
 	// Show panic.
-	kprintf_nolock("\nPANIC:\n");
+	kprintf_nolock("\e[41m\nPANIC:\n");
 	kprintf_va(false, format, args);
 	kprintf_nolock("\n\nHalted.");
 
@@ -253,11 +253,12 @@ void kernel_late() {
 	void (*foo)(void) = &progbuffer[0];
 	foo();
 
+	// TODO: Get this loaded into user space memory and jump to it in user space
 	//process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", foo, 0, 0, 0);
     //tasking_thread_schedule_proc(initProcess->MainThread, 0);
 
-	kprintf("Init program returned! Uh oh.\n");
     kheap_free(progbuffer);
+	panic("Init program returned");
 
 
 	// Launch fake terminal
