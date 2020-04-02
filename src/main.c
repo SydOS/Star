@@ -243,18 +243,20 @@ void kernel_late() {
 
 	// Create userspace process.
     kprintf("Creating userspace process...\n");
-	int32_t rootDirHandle = vfs_open("/HELLO", 0);
+	int32_t rootDirHandle = vfs_open("/INIT", 0);
 
-    uint8_t *progbuffer = (uint8_t*)kheap_alloc(2);
-    int32_t result = vfs_read(rootDirHandle, progbuffer, 2);
+    uint8_t *progbuffer = (uint8_t*)kheap_alloc(512);
+    int32_t result = vfs_read(rootDirHandle, progbuffer, 512);
 	vfs_close(rootDirHandle);
 
+	kprintf("Main thread jumping into init program...\n");
 	void (*foo)(void) = &progbuffer[0];
 	foo();
 
 	//process_t *initProcess = tasking_process_create(kernelProcess, "init", true, "init_main", foo, 0, 0, 0);
     //tasking_thread_schedule_proc(initProcess->MainThread, 0);
 
+	kprintf("Init program returned! Uh oh.\n");
     kheap_free(progbuffer);
 
 

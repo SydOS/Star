@@ -110,7 +110,7 @@ else
 endif
 
 test:
-	qemu-system-x86_64 -cdrom os.iso -m 32M -d guest_errors -drive format=raw,file=helloworld.img,index=0,if=floppy -serial stdio -net nic,model=rtl8139 -boot d
+	qemu-system-x86_64 -cdrom os.iso -m 128M -d guest_errors -drive format=raw,file=helloworld.img,index=0,if=floppy -serial stdio -net nic,model=rtl8139 -boot d
 
 debug:
 	qemu-system-i386 -kernel Star-x86_64.kernel -S -s & gdb Star-i686.kerel -ex 'target remote localhost:1234'
